@@ -1,0 +1,45 @@
+{
+  "rules": {
+    "rooms": {
+      "$code": {
+        ".read": "auth != null && (!data.exists() || data.child('hostId').val() === auth.uid)",
+        ".write": "auth != null && ((!data.exists() && newData.child('hostId').val() === auth.uid) || data.child('hostId').val() === auth.uid)",
+        "hostId": {
+          ".read": "auth != null"
+        },
+        "pub": {
+          ".read": "auth != null"
+        },
+        "teams": {
+          ".read": "auth != null",
+          "$team": {
+            "repUid": {
+              ".write": "auth != null && root.child('rooms/' + $code + '/hostId').exists() && ((!data.exists() && newData.val() === auth.uid) || (data.val() === auth.uid && !newData.exists()))"
+            },
+            "online": {
+              ".write": "auth != null && root.child('rooms/' + $code + '/teams/' + $team + '/repUid').val() === auth.uid"
+            }
+          }
+        },
+        "private": {
+          "$team": {
+            ".read": "auth != null && root.child('rooms/' + $code + '/teams/' + $team + '/repUid').val() === auth.uid"
+          }
+        },
+        "submissions": {
+          "$team": {
+            ".read": "auth != null && root.child('rooms/' + $code + '/teams/' + $team + '/repUid').val() === auth.uid",
+            ".write": "auth != null && root.child('rooms/' + $code + '/teams/' + $team + '/repUid').val() === auth.uid && root.child('rooms/' + $code + '/pub/stage').val() === 'submit' && now <= root.child('rooms/' + $code + '/pub/deadline').val() + 3000"
+          }
+        },
+        "requests": {
+          "$team": {
+            "$id": {
+              ".write": "auth != null && !data.exists() && root.child('rooms/' + $code + '/teams/' + $team + '/repUid').val() === auth.uid && root.child('rooms/' + $code + '/pub/stage').val() === 'submit'"
+            }
+          }
+        }
+      }
+    }
+  }
+}
