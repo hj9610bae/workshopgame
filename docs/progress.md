@@ -8,7 +8,7 @@
 |---|---|
 | 규칙서 v2 (`docs/rules.md`) | ✅ 확정 |
 | 규칙 엔진 + 테스트 (`npm test`, 23개: 엔진 18 + 튜토리얼 5) | ✅ 통과 |
-| **현장 진행 화면 (`board.html`)** + 게임 설명·예시 라운드 | ✅ 구현, 헤드리스 브라우저로 1~5라운드·진행자 창 동기화 확인. ⚠️ 실제 프로젝터로는 아직 안 해 봄, **커밋·배포 전** |
+| **현장 진행 화면 (`board.html`)** + 게임 설명·예시 라운드 | ✅ 구현·배포 (`f92d126`). 헤드리스 브라우저로 1~5라운드·진행자 창 동기화 확인. ⚠️ 실제 프로젝터로는 아직 안 해 봄 |
 | 사회자 화면 / 팀 대표 폰 구현 | ✅ 완료, ⚠️ **브라우저로 실제 진행해 본 적 없음** |
 | Firebase 보안 규칙 게시 + 검사 (`npm run check:rules`, 29개) | ✅ 통과 |
 | GitHub 저장소 push | ✅ `1f19935` → https://github.com/hj9610bae/workshopgame |
@@ -16,14 +16,14 @@
 | Firebase 승인된 도메인에 `hj9610bae.github.io` 추가 | ❓ 사용자 확인 필요 |
 
 ## 주소
-- 현장 진행(한 화면): https://hj9610bae.github.io/workshopgame/board.html (커밋·push 후 배포됨)
+- 현장 진행(한 화면): https://hj9610bae.github.io/workshopgame/board.html
 - 사회자 화면: https://hj9610bae.github.io/workshopgame/host.html
 - 팀 대표: https://hj9610bae.github.io/workshopgame/play.html (사회자 화면의 QR로 접속)
 - Firebase 콘솔: https://console.firebase.google.com/project/workshopgame-cd3fb
   - Realtime Database (asia-southeast1), 익명 로그인 사용
 
 ## 다음에 할 일 (우선순위 순)
-0. **현장 진행 화면 점검**: 커밋·push 후 실제 프로젝터(가능하면 확장 모드 + 🖥 진행자 창)에서 튜토리얼과 1~2라운드 진행
+0. **현장 진행 화면 점검**: 실제 프로젝터(가능하면 확장 모드 + 🖥 진행자 창)에서 튜토리얼과 1~2라운드 진행
    - 확인할 것: 글자 크기·가독성, 애니메이션 타이밍, 입력 패널 사용성, 되돌리기
    - (선택) 인쇄용 제출 용지 양식, 1라운드 순서를 현장 추첨으로 정하는 기능
 1. **승인된 도메인 확인**: Authentication > 설정 > 승인된 도메인에 `hj9610bae.github.io`가 있는지 확인
