@@ -4,7 +4,14 @@ import { AGENDAS, CARDS, FINAL_AGENDA, FINAL_OPEN_ROUND, QUEUE, ROUNDS, type Tea
 import { agendaTitle } from './engine';
 import type { GameEvent, PublicState, Stage, TableState } from './types';
 
-export const teamName = (t: TeamId): string => `${t}팀`;
+let customNames: Partial<Record<TeamId, string>> = {};
+
+/** 현장 진행 화면에서 정한 팀 이름 (비우면 기본값 'A팀') */
+export const setTeamNames = (names: Partial<Record<TeamId, string>>): void => {
+  customNames = names;
+};
+
+export const teamName = (t: TeamId): string => customNames[t]?.trim() || `${t}팀`;
 
 export const STAGE_LABEL: Record<Stage, string> = {
   lobby: '대기실',
