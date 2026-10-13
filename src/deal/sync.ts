@@ -45,7 +45,12 @@ const normTable = (t: Partial<TableState> | undefined): TableState => ({
   promos: t?.promos ?? [],
 });
 
-const normEvent = (e: GameEvent): GameEvent => ({ ...e, tables: (e.tables ?? []).map(normTable), scores: e.scores ?? {} });
+const normEvent = (e: GameEvent): GameEvent => ({
+  ...e,
+  tables: (e.tables ?? []).map(normTable),
+  scores: e.scores ?? {},
+  ...(e.demand ? { trail: e.trail ?? [] } : {}),
+});
 
 export function normPub(raw: Partial<PublicState> | null): PublicState {
   const r = raw ?? {};
@@ -82,6 +87,7 @@ export function normHostRoom(raw: any): HostRoom | null {
     pub: normPub(raw.pub),
     secret: {
       remaining: Array.from({ length: 4 }, (_, i) => remaining[i] ?? 0),
+      trail: Array.from({ length: 4 }, (_, i) => raw.secret?.trail?.[i] ?? []),
       practice: raw.secret?.practice ?? [],
     },
     teams: raw.teams ?? {},

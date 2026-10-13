@@ -4,7 +4,7 @@
  */
 import { AGENDAS, CARDS, TEAM_IDS, type TeamId } from './data';
 import { agendaTitle, beginSubmit, createGame, resolveRound, startRound, type EngineState } from './engine';
-import type { Submission, TableState } from './types';
+import type { Hit, Submission, TableState } from './types';
 
 /** 예시 장면: 남은 수치를 공개해서 보여줌 (실제 게임에서는 비공개) */
 export interface Scene {
@@ -21,7 +21,8 @@ export interface Scene {
   slips?: { team: TeamId; sub: Submission }[];
   /** 깎인 테이블 (0부터) */
   hit?: { index: number; amount: number };
-  deal?: { index: number; team: TeamId; agenda: number; reward: number };
+  /** 합의: 블라인드였던 처음 요구 수치와 깎인 이력도 함께 공개 */
+  deal?: { index: number; team: TeamId; agenda: number; reward: number; demand: number; trail: Hit[] };
   /** 이번 장면에 새로 들어온 안건이 있는 테이블 (0부터) */
   fresh?: number;
 }
@@ -63,10 +64,10 @@ function base(s: EngineState, title: string, text: string, extra: Partial<Scene>
 }
 
 const COMMENTS: Partial<Record<TeamId, string>> = {
-  A: '수치를 <b>0 이하</b>로 만든 팀이 보상을 독식! 합의된 안건은 사라지고 <b>대기열의 다음 안건</b>이 바로 올라와요.',
+  A: '수치를 <b>0 이하</b>로 만든 팀이 보상을 독식! 합의되는 순간 <b>숨겨져 있던 요구 수치와 깎인 이력</b>이 공개되고, <b>대기열의 다음 안건</b>이 바로 올라와요.',
   B: 'B팀은 검진비를 노렸지만 이미 합의됐죠. 카드는 <b>테이블</b>에 거는 것이라 <b>새로 온 안건</b>을 깎게 돼요.',
   C: 'C팀이 난임시술을 1까지 깎아 놓았어요. 다음 차례는…',
-  D: '<b>막타!</b> C팀이 깎아 둔 안건을 D팀이 가져갔어요. 이것이 이 게임의 핵심 긴장감이에요.',
+  D: '<b>막타!</b> 공개된 이력을 보면 C팀이 깎아 둔 안건을 D팀이 가져간 게 드러나요. 이것이 이 게임의 핵심 긴장감이에요.',
   E: 'E팀은 체육대회를 1까지 깎았어요. 다음 라운드에 누가 가져갈까요?',
 };
 
@@ -74,7 +75,7 @@ const COMMENTS: Partial<Record<TeamId, string>> = {
 export function exampleScenes(): Scene[] {
   const start = beginSubmit(startRound(createGame(TEAM_IDS), keepOrder).state, 0);
   const scenes: Scene[] = [
-    base(start, '예시 1라운드: 시작', '모든 팀이 주도권 <b>10점</b>, 기본 제시안만 가지고 시작해요. 순서는 추첨으로 <b>A → B → C → D → E</b>.'),
+    base(start, '예시 1라운드: 시작', '모든 팀이 주도권 <b>10점</b>, 기본 제시안만 가지고 시작해요. 순서는 추첨으로 <b>A → B → C → D → E</b>.<br>설명을 위해 이 예시에서만 요구 수치를 보여 드려요. <b>실제 게임에서는 모두 가려져 있어요.</b>'),
     base(
       start,
       '각 팀이 제출 용지를 냅니다',
@@ -98,7 +99,8 @@ export function exampleScenes(): Scene[] {
     const extra: Partial<Scene> = { active: team, slips: [{ team, sub }], hit: { index: i, amount: power } };
     if (dealt) {
       const a = AGENDAS[beforeAgenda];
-      extra.deal = { index: i, team, agenda: a.id, reward: a.reward };
+      const e = next.pub.events.find((ev) => ev.team === team && ev.agenda === a.id && ev.demand);
+      extra.deal = { index: i, team, agenda: a.id, reward: a.reward, demand: a.demand, trail: e?.trail ?? [] };
       extra.fresh = i;
     }
     const title = dealt ? `${line} 합의!` : line;
@@ -110,7 +112,7 @@ export function exampleScenes(): Scene[] {
     base(
       prev,
       '라운드 종료',
-      `점수: ${ORDER.map((t) => `${t} ${prev.pub.teams[t]!.score}`).join(' · ')}<br>사회자 화면에는 <b>누가 합의했는지만</b> 나오고, 누가 어디에 어떤 카드를 냈는지와 남은 수치는 비밀이에요.`,
+      `점수: ${ORDER.map((t) => `${t} ${prev.pub.teams[t]!.score}`).join(' · ')}<br>화면에는 <b>합의된 안건의 이력만</b> 공개돼요. 아직 합의되지 않은 안건(전기차·체육대회)에 누가 무엇을 냈는지와 수치는 비밀이에요.`,
     ),
   );
   const nextRound = startRound(prev).state;
@@ -138,14 +140,23 @@ export const INTRO_SLIDES: Slide[] = [
     kind: 'slide',
     title: '🎯 막타 시스템',
     html: `<div class="slide-row">
-        <div class="mini-table"><div class="mini-title">안건 3 · 검진비</div><div class="mini-num">2</div><div class="mini-reward">합의 보상 +2</div></div>
+        <div class="mini-table"><div class="mini-title">안건 3 · 검진비</div><div class="mini-gap">10만 원 인상<br>➔ (수면비) 5만 원 인상</div><div class="mini-num">?</div><div class="mini-reward">합의 보상 +2</div></div>
         <div class="slide-text">
-          <p>안건마다 <b>노조 요구 수치</b>가 있어요.</p>
+          <p>안건마다 숨겨진 <b>노조 요구 수치</b>가 있어요.</p>
           <p>각 팀이 카드로 수치를 깎고,<br><b>0 이하로 만든 팀이 보상을 독식</b>합니다.</p>
           <p class="muted">남이 깎아 둔 안건을 마지막에 가져갈 수도, 뺏길 수도 있어요.</p>
-          <p class="muted">남은 수치는 <b>비공개</b>! 처음 수치만 공개돼요.</p>
         </div>
       </div>`,
+  },
+  {
+    kind: 'slide',
+    title: '🙈 요구 수치는 블라인드',
+    html: `<ul class="slide-list">
+        <li>요구 수치는 <b>처음 값도, 남은 값도</b> 공개되지 않아요.</li>
+        <li><b>노조 요구안 ➔ 회사 제시안의 격차</b>를 보고 얼마나 깎아야 할지 추측하세요. 격차가 클수록, 보상이 클수록 수치도 커요.</li>
+        <li>확인하고 싶으면 <b>🔍 속마음 스카우터</b>(주도권 −1)로 우리 팀만 몰래 볼 수 있어요.</li>
+        <li>안건이 <b>합의되는 순간</b> 처음 요구 수치와 <b>누가 얼마나 깎았는지</b> 이력이 공개돼요.</li>
+      </ul>`,
   },
   {
     kind: 'slide',
@@ -192,8 +203,8 @@ export const OUTRO_SLIDE: Slide = {
   kind: 'slide',
   title: '이제 실제로 해 볼까요?',
   html: `<ul class="slide-list">
-      <li>실제 게임에서는 테이블의 남은 수치가 <b>?</b>로 가려져 있어요.</li>
-      <li>누가 무엇을 냈는지는 공개되지 않고, <b>합의된 결과만</b> 화면에 나와요.</li>
+      <li>실제 게임에서는 요구 수치가 모두 <b>?</b>로 가려져 있어요. 요구안과 제시안의 격차로 추측하세요.</li>
+      <li>누가 무엇을 냈는지는 비밀이고, 안건이 <b>합의될 때만</b> 그 안건의 이력이 공개돼요.</li>
       <li>얻은 특수 카드와 스카우터 결과는 보조자가 팀에게만 알려 줘요.</li>
     </ul>
     <p class="lead center">막타의 타이밍을 노리세요! 🎲</p>`,

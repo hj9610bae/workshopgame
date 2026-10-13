@@ -529,6 +529,75 @@ body.live button.small {
   color: var(--danger);
 }
 
+/* 합의 시 블라인드 해제: 깎인 이력 */
+.trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.trail-start,
+.trail-hit {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 4.2em;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--ink);
+  line-height: 1.15;
+}
+
+.trail-start {
+  background: #2a2118;
+  color: #fff;
+}
+
+.trail small {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.trail b {
+  font-size: 1.4rem;
+}
+
+.trail-hit b {
+  color: #d63a3a;
+}
+
+.trail-hit em {
+  font-style: normal;
+  font-size: 0.8rem;
+  color: #6c5f49;
+}
+
+.trail-hit em::before {
+  content: '남음 ';
+}
+
+.trail-hit.last {
+  outline: 3px solid var(--gold);
+}
+
+.trail-arrow {
+  font-weight: 900;
+}
+
+.trail-hit,
+.trail-arrow {
+  animation: pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  animation-delay: calc(0.4s + var(--d) * 0.45s);
+}
+
+.trail-start {
+  animation: pop 0.4s both 0.3s;
+}
+
 /* 오른쪽: 대기열 덱 + 사건 기록 */
 .rail {
   display: flex;
@@ -619,6 +688,12 @@ body.live button.small {
 
 .rail-events li {
   color: var(--muted);
+}
+
+.rail-events li small {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.85;
 }
 
 .rail-events li.deal {
@@ -1052,6 +1127,17 @@ body.console #app {
 
 .mini-title {
   font-weight: 800;
+}
+
+.mini-gap {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #6c5f49;
+}
+
+.mini-table .mini-num {
+  background: radial-gradient(circle at 35% 30%, #8d93b8, #4b5180 70%);
 }
 
 .mini-num {

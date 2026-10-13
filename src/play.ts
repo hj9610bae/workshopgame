@@ -1,5 +1,5 @@
 import './style.css';
-import { AGENDAS, CARDS, CUT_IN_COST, ROUNDS, SCOUT_COST, SPECIAL_CARDS, TEAM_IDS, type CardId, type TeamId } from './deal/data';
+import { CARDS, CUT_IN_COST, ROUNDS, SCOUT_COST, SPECIAL_CARDS, TEAM_IDS, type CardId, type TeamId } from './deal/data';
 import { agendaTitle, ranking } from './deal/engine';
 import { claimTeam, normPrivate, normPub, releaseTeam, requestScout, submitProposal, type PrivateData, type TeamSlot } from './deal/sync';
 import type { PublicState, Submission } from './deal/types';
@@ -90,7 +90,7 @@ function submitView(pub: PublicState, team: TeamId): string {
 
   const tables = open
     .map(({ no, agenda }) =>
-      choice('pick-table', no, sel.table === no, `<b>${no}번</b> ${esc(agendaTitle(agenda))}<span class="small">처음 ${AGENDAS[agenda].demand} · ${rewardText(agenda)}</span>`),
+      choice('pick-table', no, sel.table === no, `<b>${no}번</b> ${esc(agendaTitle(agenda))}<span class="small">${rewardText(agenda)}</span>`),
     )
     .join('');
   const cards = (['basic', ...SPECIAL_CARDS] as CardId[])

@@ -46,6 +46,27 @@ describe('규칙서 5장 예시 1라운드', () => {
     expect(notes.D?.[0].text).toContain('난임시술 합의');
   });
 
+  it('합의 사건에만 처음 요구 수치와 깎인 이력이 공개됨', () => {
+    const deals = state.pub.events.filter((e) => e.result === 'deal');
+    expect(deals[0]).toMatchObject({ team: 'A', demand: 2, trail: [{ team: 'A', card: 'basic', amount: 2 }] });
+    expect(deals[1]).toMatchObject({
+      team: 'D',
+      demand: 3,
+      trail: [
+        { team: 'C', card: 'basic', amount: 2 },
+        { team: 'D', card: 'basic', amount: 2 },
+      ],
+    });
+    const done = state.pub.events.filter((e) => e.result === 'done');
+    expect(done.every((e) => e.trail === undefined && e.demand === undefined)).toBe(true);
+  });
+
+  it('합의되지 않은 안건의 이력은 비공개 상태로만 쌓이고, 새 안건은 이력이 비어서 시작', () => {
+    expect(state.secret.trail[0]).toEqual([{ team: 'B', card: 'basic', amount: 2 }]);
+    expect(state.secret.trail[1]).toEqual([]);
+    expect(state.secret.trail[2]).toEqual([{ team: 'E', card: 'basic', amount: 2 }]);
+  });
+
   it('2라운드 순서: D → A → E → C → B', () => {
     expect(startRound(state).state.pub.order).toEqual(['D', 'A', 'E', 'C', 'B']);
   });
@@ -80,7 +101,13 @@ describe('특수 카드', () => {
     const r2 = startRound(r1);
     expect(r2.state.pub.tables[2].agenda).toBe(12);
     expect(r2.state.pub.teams.C!.score).toBe(13);
-    expect(r2.state.pub.events[0]).toMatchObject({ kind: 'practiceDeal', team: 'C', agenda: 8 });
+    expect(r2.state.pub.events[0]).toMatchObject({
+      kind: 'practiceDeal',
+      team: 'C',
+      agenda: 8,
+      demand: 3,
+      trail: [{ team: 'C', card: 'practice', amount: 10 }],
+    });
   });
 
   it('실무 교섭 병행은 5라운드에 낼 수 없음', () => {
@@ -97,7 +124,21 @@ describe('특수 카드', () => {
     // 체육대회 3 − 2(A) − 1(홍보물) = 0 → B 합의
     expect(state.pub.teams.B!.score).toBe(13);
     expect(state.pub.tables[2]).toMatchObject({ agenda: 12, promos: ['B'] });
-    expect(state.pub.events.some((e) => e.kind === 'promoDeal' && e.team === 'B')).toBe(true);
+    expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({
+      team: 'B',
+      demand: 3,
+      trail: [
+        { team: 'A', card: 'basic', amount: 2 },
+        { team: 'B', card: 'promo', amount: 1 },
+      ],
+    });
+  });
+
+  it('예전에 저장된 게임(이력 없음)도 이어서 진행', () => {
+    const s = round1();
+    delete (s.secret as Partial<typeof s.secret>).trail;
+    const { state } = resolveRound(s, { A: basic(1) });
+    expect(state.pub.events.find((e) => e.result === 'deal')?.trail).toEqual([{ team: 'A', card: 'basic', amount: 2 }]);
   });
 
   it('전격 타결: 6 감소, 넘친 수치는 사라짐', () => {

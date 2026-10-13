@@ -1,5 +1,12 @@
 import type { CardId, SpecialCardId, TeamId } from './data';
 
+/** 안건의 요구 수치를 깎은 기록 (합의되기 전까지 비공개) */
+export interface Hit {
+  team: TeamId;
+  card: CardId;
+  amount: number;
+}
+
 /** lobby: 대기실 · order: 순서 발표 · submit: 비공개 제출 · reveal: 제안 공개 · final: 최종 결과 */
 export type Stage = 'lobby' | 'order' | 'submit' | 'reveal' | 'final';
 
@@ -20,7 +27,7 @@ export type EventKind = 'finalOpen' | 'practiceDeal' | 'start' | 'hold' | 'propo
 export type ProposalResult = 'done' | 'deal' | 'promo' | 'void' | 'pass';
 export type VoidReason = 'hold' | 'empty' | 'invalid';
 
-/** 사회자 화면에 공개되는 사건. 남은 수치나 낸 카드 같은 비공개 정보는 담지 않음 */
+/** 사회자 화면에 공개되는 사건. 남은 수치나 낸 카드 같은 비공개 정보는 담지 않음 (합의된 안건의 이력만 예외) */
 export interface GameEvent {
   kind: EventKind;
   team?: TeamId;
@@ -32,6 +39,9 @@ export interface GameEvent {
   reason?: VoidReason;
   /** start: 새치기로 순서가 바뀌었는지 */
   cutIn?: boolean;
+  /** 합의 사건: 블라인드였던 처음 요구 수치와 깎인 이력 (합의 순간에 공개) */
+  demand?: number;
+  trail?: Hit[];
   /** 이 사건 직후의 테이블·점수 (공개 연출용) */
   tables: TableState[];
   scores: Partial<Record<TeamId, number>>;
@@ -61,6 +71,8 @@ export interface PublicState {
 export interface SecretState {
   /** index 0~3 → 테이블별 남은 요구 수치 */
   remaining: number[];
+  /** index 0~3 → 테이블에 올라온 안건이 지금까지 깎인 이력 */
+  trail: Hit[][];
   /** 다음 라운드 시작 시 발동할 실무 교섭 병행 */
   practice: { team: TeamId; table: number }[];
 }

@@ -4,9 +4,9 @@
  */
 import './style.css';
 import './board.css';
-import { CARDS, CUT_IN_COST, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, TEAM_IDS, type CardId, type TeamId } from './deal/data';
+import { AGENDAS, CARDS, CUT_IN_COST, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, TEAM_IDS, type CardId, type TeamId } from './deal/data';
 import { agendaTitle, beginSubmit, createGame, finish, ranking, resolveRound, revealNext, scout, startRound, type EngineState } from './deal/engine';
-import { deck, feltTable, seats, slip, type TableLook } from './deal/felt';
+import { deck, feltTable, seats, slip, trailStrip, type TableLook } from './deal/felt';
 import {
   beatConsole,
   closeConsole,
@@ -103,6 +103,7 @@ function sceneView(s: Scene, prev: Scene | undefined): string {
     <div class="felt">
       <div class="felt-tables">${tables}</div>
       ${slips}
+      ${s.deal ? trailStrip(s.deal) : ''}
     </div>
     ${seats(s.order, s.scores, { active: s.active, deltas })}
   </section>`;
@@ -210,7 +211,7 @@ function banner(): string {
       const e = latestEvent();
       if (!e) return '';
       const d = describeEvent(e);
-      return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}</div>`;
+      return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}${trailStrip(e)}</div>`;
     }
     default:
       return '';
@@ -224,7 +225,7 @@ function eventRail(): string {
     .slice(0, pub.revealed)
     .map((e) => describeEvent(e))
     .reverse()
-    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}</li>`)
+    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}${d.trail ? `<small>${esc(d.trail)}</small>` : ''}</li>`)
     .join('');
   return `<div class="rail-events"><h3>이번 라운드</h3><ol>${items}</ol></div>`;
 }
@@ -363,7 +364,11 @@ function scoutModal(): string {
 function secretPanel(): string {
   const s = eng();
   const tables = s.pub.tables
-    .map((t, i) => `<li><b>${i + 1}번</b> ${esc(agendaTitle(t.agenda))} <strong class="secret-num">${t.agenda ? s.secret.remaining[i] : '-'}</strong></li>`)
+    .map((t, i) => {
+      if (!t.agenda) return `<li><b>${i + 1}번</b> ${esc(agendaTitle(t.agenda))} <strong class="secret-num">-</strong></li>`;
+      const hits = (s.secret.trail?.[i] ?? []).map((h) => `${esc(teamName(h.team))} −${h.amount}`).join(', ');
+      return `<li><b>${i + 1}번</b> ${esc(agendaTitle(t.agenda))} <strong class="secret-num">${s.secret.remaining[i]} / ${AGENDAS[t.agenda].demand}</strong>${hits ? `<br><span class="muted small">${hits}</span>` : ''}</li>`;
+    })
     .join('');
   const hands = s.pub.teamIds
     .map((t) => {
@@ -379,7 +384,7 @@ function secretPanel(): string {
     .map((l) => `<li><span class="muted">R${l.round}</span> <b>${esc(teamName(l.team))}</b> ${esc(l.text)}</li>`)
     .join('');
   return `<section class="secret card">
-    <div><h3>남은 요구 수치</h3><ul class="plain">${tables}</ul>${practice ? `<p class="muted small">예약된 실무 교섭: ${practice}</p>` : ''}</div>
+    <div><h3>남은 / 처음 요구 수치</h3><ul class="plain">${tables}</ul>${practice ? `<p class="muted small">예약된 실무 교섭: ${practice}</p>` : ''}</div>
     <div><h3>보유 특수 카드</h3><ul class="plain">${hands}</ul></div>
     <div class="log"><h3>팀별 결과 (팀에게 알려 주세요)</h3><ul class="plain">${log || '<li class="muted">아직 없어요</li>'}</ul></div>
   </section>`;

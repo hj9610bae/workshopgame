@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Hit } from './types';
 import { exampleScenes, tutorialSteps } from './tutorial';
 
 describe('튜토리얼 예시 1라운드 (규칙서 5장)', () => {
@@ -19,7 +20,8 @@ describe('튜토리얼 예시 1라운드 (규칙서 5장)', () => {
 
   it('C가 깎은 난임시술을 D가 막타', () => {
     expect(byTeam.C.remaining[1]).toBe(1);
-    expect(byTeam.D.deal).toMatchObject({ team: 'D', agenda: 5 });
+    expect(byTeam.D.deal).toMatchObject({ team: 'D', agenda: 5, demand: 3 });
+    expect(byTeam.D.deal!.trail.map((h: Hit) => h.team)).toEqual(['C', 'D']);
     expect(byTeam.D.tables[1].agenda).toBe(2);
   });
 

@@ -19,7 +19,7 @@ import {
   type SpecialCardId,
   type TeamId,
 } from './data';
-import type { GameEvent, Hand, Note, PublicState, ScoutResult, SecretState, Submission } from './types';
+import type { GameEvent, Hand, Hit, Note, PublicState, ScoutResult, SecretState, Submission } from './types';
 
 export interface EngineState {
   pub: PublicState;
@@ -41,6 +41,8 @@ interface Deal {
   agenda: number;
   reward: number;
   card?: SpecialCardId;
+  demand: number;
+  trail: Hit[];
 }
 
 export const emptyHand = (): Hand => ({ blitz: 0, practice: 0, promo: 0, hold: 0 });
@@ -64,7 +66,7 @@ export function createGame(teamIds: readonly TeamId[]): EngineState {
       events: [],
       revealed: 0,
     },
-    secret: { remaining: [...INITIAL_TABLES.map((a) => AGENDAS[a].demand), 0], practice: [] },
+    secret: { remaining: [...INITIAL_TABLES.map((a) => AGENDAS[a].demand), 0], trail: [[], [], [], []], practice: [] },
     hands: Object.fromEntries(teamIds.map((t) => [t, emptyHand()])),
   };
 }
@@ -79,6 +81,9 @@ class Turn {
     private readonly phase: NoteDraft['phase'],
   ) {
     this.s = structuredClone(state);
+    // Firebase 는 빈 배열을 저장하지 않고, 예전에 저장된 게임에는 이력이 없음
+    const trail = this.s.secret.trail ?? [];
+    this.s.secret.trail = this.s.pub.tables.map((_, i) => trail[i] ?? []);
   }
 
   team(t: TeamId) {
@@ -109,25 +114,29 @@ class Turn {
     (this.notes[team] ??= []).push({ phase: this.phase, event, text });
   }
 
-  /** 테이블의 요구 수치를 깎고, 0 이하가 되면 보상 지급 후 테이블 보충 */
-  damage(tableNo: number, amount: number, team: TeamId): Deal | null {
+  /** 테이블의 요구 수치를 깎고(이력 기록), 0 이하가 되면 보상 지급 후 테이블 보충 */
+  damage(tableNo: number, card: CardId, team: TeamId): Deal | null {
     const { pub, secret } = this.s;
     const i = tableNo - 1;
     const agenda = AGENDAS[pub.tables[i]?.agenda];
     if (!agenda) return null;
+    const amount = CARDS[card].power;
     secret.remaining[i] -= amount;
+    (secret.trail[i] ??= []).push({ team, card, amount });
     if (secret.remaining[i] > 0) return null;
+    const trail = secret.trail[i];
     this.team(team).score += agenda.reward;
     this.team(team).deals += 1;
     if (agenda.card) this.hand(team)[agenda.card] += 1;
     this.refill(i);
-    return { agenda: agenda.id, reward: agenda.reward, card: agenda.card };
+    return { agenda: agenda.id, reward: agenda.reward, card: agenda.card, demand: agenda.demand, trail };
   }
 
   private refill(i: number) {
     const { pub, secret } = this.s;
     // 4번(최종 교섭) 테이블은 보충 없이 닫힘
     const next = i < INITIAL_TABLES.length ? QUEUE[pub.queue] : undefined;
+    secret.trail[i] = [];
     if (next === undefined) {
       pub.tables[i].agenda = 0;
       secret.remaining[i] = 0;
@@ -173,12 +182,13 @@ export function startRound(state: EngineState, rng: Rng = Math.random): Step {
     const i = INITIAL_TABLES.length;
     pub.tables[i] = { ...emptyTable(), agenda: FINAL_AGENDA };
     secret.remaining[i] = AGENDAS[FINAL_AGENDA].demand;
+    secret.trail[i] = [];
     turn.event({ kind: 'finalOpen', table: i + 1, agenda: FINAL_AGENDA });
   }
 
   for (const { team, table } of secret.practice) {
     const before = pub.tables[table - 1]?.agenda;
-    const deal = turn.damage(table, CARDS.practice.power, team);
+    const deal = turn.damage(table, 'practice', team);
     if (deal) {
       turn.event({ kind: 'practiceDeal', team, table, ...deal });
       turn.note(team, `🤝 실무 교섭 병행 발동! ${dealText(deal)}`);
@@ -319,7 +329,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
       continue;
     }
     if (card === 'blitz') turn.hand(t).blitz -= 1;
-    const deal = turn.damage(tableNo, CARDS[card].power, t);
+    const deal = turn.damage(tableNo, card, t);
     if (deal) {
       turn.event({ kind: 'proposal', team: t, result: 'deal', table: tableNo, ...deal });
       turn.note(t, `🎉 ${dealText(deal)}`);
@@ -334,7 +344,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     if (table.frozen) return;
     for (const owner of table.promos) {
       if (!table.agenda) break;
-      const deal = turn.damage(i + 1, CARDS.promo.power, owner);
+      const deal = turn.damage(i + 1, 'promo', owner);
       if (deal) {
         turn.event({ kind: 'promoDeal', team: owner, table: i + 1, ...deal });
         turn.note(owner, `📣 홍보물 효과로 ${dealText(deal)}`);
