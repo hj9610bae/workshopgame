@@ -25,7 +25,7 @@ describe('규칙서 5장 예시 1라운드', () => {
   it('A가 검진비, D가 난임시술을 합의하고 B는 새로 온 전기차를 공격', () => {
     const tables = state.pub.tables.map((t) => t.agenda);
     expect(tables).toEqual([12, 2, 8, 0]);
-    expect(state.secret.remaining).toEqual([2, 5, 1, 0]);
+    expect(state.secret.remaining).toEqual([6, 5, 1, 0]);
     expect(scores(state)).toEqual({ A: 12, B: 10, C: 10, D: 12, E: 10 });
   });
 
@@ -73,6 +73,12 @@ describe('규칙서 5장 예시 1라운드', () => {
     const deals = state.pub.events.filter((e) => e.result === 'deal');
     expect(deals.every((e) => e.loot === true && !('card' in e))).toBe(true);
     expect(notes.A?.[0].text).toContain('홍보물 발행');
+  });
+
+  it('합의된 안건은 테이블의 지나간 안건 목록에 쌓임 (공개 정보)', () => {
+    expect(state.pub.tables[0].done).toEqual([{ agenda: 3, team: 'A' }]);
+    expect(state.pub.tables[1].done).toEqual([{ agenda: 5, team: 'D' }]);
+    expect(state.pub.tables[2].done ?? []).toEqual([]);
   });
 
   it('2라운드 순서: D → A → E → C → B', () => {
@@ -153,7 +159,7 @@ describe('특수 카드', () => {
     const s = withHand('A', 'blitz');
     const { state } = resolveRound(s, { A: { table: 1, card: 'blitz', cutIn: 0 }, B: basic(1) });
     expect(state.pub.teams.A!.score).toBe(12);
-    expect(state.secret.remaining[0]).toBe(2); // 새로 온 전기차 4 − B의 2
+    expect(state.secret.remaining[0]).toBe(6); // 새로 온 전기차(난항 안건) 8 − B의 2
   });
 
   it('보유하지 않은 카드는 무효', () => {

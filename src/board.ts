@@ -4,9 +4,9 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, CARDS, CUT_IN_COST, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, TEAM_IDS, type CardId, type TeamId } from './deal/data';
+import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, SUBMIT_SECONDS, TEAM_IDS, type CardId, type TeamId } from './deal/data';
 import { agendaTitle, beginSubmit, createGame, finish, ranking, resolveRound, revealNext, scout, startRound, type EngineState } from './deal/engine';
-import { deck, feltTable, seats, slip, trailStrip, type TableLook } from './deal/felt';
+import { deck, feltTable, seats, trailStrip, type TableLook } from './deal/felt';
 import {
   beatConsole,
   closeConsole,
@@ -20,9 +20,9 @@ import {
   undo,
   type LocalGame,
 } from './deal/local';
-import { tutorialSteps, type Scene } from './deal/tutorial';
+import { practiceSetup, tutorialSteps } from './deal/tutorial';
 import type { GameEvent, ScoutResult, Stage, Submission } from './deal/types';
-import { STAGE_LABEL, describeEvent, formatTimer, setTeamNames, snapshot, teamName } from './deal/view';
+import { STAGE_LABEL, describeEvent, formatTimer, setTeamNames, snapshot, teamName, useSetup } from './deal/view';
 import { esc, onAction, render, toast } from './ui';
 
 const app = document.querySelector<HTMLElement>('#app')!;
@@ -38,8 +38,7 @@ let inputOpen = false;
 let scoutShown: (ScoutResult & { team: TeamId }) | null = null;
 let tutorialIndex = 0;
 let autoplay: number | undefined;
-/** 예시 라운드의 안건 배치는 설명을 열 때마다 새로 섞음 */
-let steps = tutorialSteps();
+const steps = tutorialSteps();
 
 setTeamNames(game.names);
 
@@ -51,6 +50,8 @@ function save(next: LocalGame) {
 }
 
 const eng = (): EngineState => game.engine!;
+/** 연습 게임: 무작위 배치(setup)로 1라운드만 */
+const isPractice = (): boolean => !!game.engine?.setup;
 const stage = (): Stage => game.engine?.pub.stage ?? 'lobby';
 /** 진행자 창이 따로 열려 있으면 프로젝터 화면에는 조작 버튼을 숨김 */
 const showDock = () => isConsole || !consoleAlive();
@@ -73,7 +74,8 @@ function homeView(): string {
       <div class="hero-chips">${['🃏', '💰', '🤝', '🎲'].map((c) => `<span>${c}</span>`).join('')}</div>
       <h1>💼 교섭의 도박사들</h1>
       <p class="muted">Deal or No Deal · 한 화면 현장 진행</p>
-      <button class="tutorial-btn" data-action="tutorial">📖 게임 설명 & 예시 라운드 보기</button>
+      <button class="tutorial-btn" data-action="tutorial">📖 게임 설명 보기</button>
+      <button class="secondary practice-home" data-action="practice">🎲 바로 연습 게임 (1라운드, 무작위 안건)</button>
     </div>
     <div class="card setup">
       <h2>참가 팀</h2>
@@ -87,43 +89,11 @@ function homeView(): string {
 
 /* ───────── 튜토리얼 ───────── */
 
-function sceneView(s: Scene, prev: Scene | undefined): string {
-  const looks: TableLook[] = s.tables.map(() => ({}));
-  if (s.deal) looks[s.deal.index] = { deal: s.deal, fresh: true };
-  else if (s.hit) looks[s.hit.index] = { hit: s.hit.amount, target: true };
-  const round = 1;
-  const tables = s.tables.map((t, i) => feltTable(t, i, round, looks[i])).join('');
-  const deltas = prev ? Object.fromEntries(s.order.map((t) => [t, (s.scores[t] ?? 0) - (prev.scores[t] ?? 0)])) : {};
-  const slips = s.slips?.length ? `<div class="slips${s.slips.length > 1 ? ' many' : ''}">${s.slips.map((x) => slip(x.team, x.sub)).join('')}</div>` : '';
-  // 실제 게임의 공개 배너와 같은 모양
-  const banner = s.deal
-    ? `<div class="banner pop deal"><div class="banner-icon">🎉</div><h2>${esc(teamName(s.deal.team))}, ${esc(agendaTitle(s.deal.agenda))} 합의!</h2><p>주도권 +${s.deal.reward}</p>${trailStrip(s.deal)}</div>`
-    : s.active && s.slips?.length === 1
-      ? `<div class="banner pop"><div class="banner-icon">📝</div><h2>${esc(teamName(s.active))} 제안 완료</h2><p>아직 합의되지 않았습니다</p></div>`
-      : '';
-  return `<section class="scene">
-    <div class="caption">
-      <span class="badge">예시 라운드</span>
-      <h2>${esc(s.title)}</h2>
-      <p>${s.text}</p>
-    </div>
-    <div class="felt">
-      <div class="felt-tables">${tables}</div>
-      <div class="scene-play">${slips}${banner}</div>
-    </div>
-    ${seats(s.order, s.scores, { active: s.active, deltas })}
-  </section>`;
-}
-
 function tutorialView(): string {
   const step = steps[tutorialIndex];
-  const prev = steps[tutorialIndex - 1];
-  const body =
-    step.kind === 'slide'
-      ? `<section class="slide"><h1>${esc(step.title)}</h1>${step.html}</section>`
-      : sceneView(step, prev?.kind === 'scene' ? prev : undefined);
+  const body = `<section class="slide"><h1>${esc(step.title)}</h1>${step.html}</section>`;
   const dots = steps
-    .map((s, i) => `<button class="dot-btn${i === tutorialIndex ? ' on' : ''}${s.kind === 'scene' ? ' is-scene' : ''}" data-action="tut-go" data-index="${i}" aria-label="${i + 1}번째 장면"></button>`)
+    .map((_, i) => `<button class="dot-btn${i === tutorialIndex ? ' on' : ''}" data-action="tut-go" data-index="${i}" aria-label="${i + 1}번째 장면"></button>`)
     .join('');
   const last = tutorialIndex === steps.length - 1;
   return `<div class="tutorial">
@@ -139,7 +109,7 @@ function tutorialView(): string {
     <footer class="tut-nav">
       <button class="secondary" data-action="tut-prev" ${tutorialIndex ? '' : 'disabled'}>◀ 이전</button>
       <div class="dots">${dots}</div>
-      ${last ? '<button data-action="tut-exit">게임 시작하러 가기 ▶</button>' : '<button data-action="tut-next">다음 ▶</button>'}
+      ${last ? '<button data-action="practice">연습 게임 시작 ▶</button>' : '<button data-action="tut-next">다음 ▶</button>'}
     </footer>
   </div>`;
 }
@@ -159,6 +129,7 @@ function goTutorial(i: number) {
 
 function roundText(): string {
   const { pub } = eng();
+  if (isPractice()) return `🎲 연습 게임 · ${STAGE_LABEL[pub.stage]}`;
   return pub.stage === 'final' ? '최종 결과' : `라운드 ${pub.round}/${ROUNDS} · ${STAGE_LABEL[pub.stage]}`;
 }
 
@@ -209,10 +180,23 @@ function banner(): string {
         ${news.length ? `<ul class="news">${news.join('')}</ul>` : ''}<p class="muted small">${tie}</p></div>`;
     }
     case 'submit':
-      return `<div class="banner calm"><h2>📝 제출 용지를 작성하세요</h2>
-        <p>[테이블 + 카드] · 스카우터·새치기는 용지와 함께 신청</p>
-        <div class="big-timer" data-timer></div>
-        <p class="muted">${done}/${pub.teamIds.length}팀 입력 완료</p></div>`;
+      return `<div class="banner calm submit-guide">
+        <div class="guide-main">
+          <h2>📝 포스트잇에 적어 내세요</h2>
+          <div class="big-timer" data-timer></div>
+          <p class="scout-now">🔍 <b>스카우터</b>를 쓰려면 <b>지금</b> 진행자에게 오세요! <span>(주도권 −${SCOUT_COST}, 테이블 1곳의 남은 수치)</span></p>
+          <p class="muted">${done}/${pub.teamIds.length}팀 입력 완료</p>
+        </div>
+        <div class="guide-example">
+          <div class="postit">
+            <div class="postit-team">A팀</div>
+            <div class="postit-line"><span>테이블</span><b>2번</b></div>
+            <div class="postit-line"><span>카드</span><b>기본 제시안</b></div>
+            <div class="postit-line opt"><span>새치기</span><b>1번째</b><em>(쓸 때만)</em></div>
+          </div>
+          <p class="muted small">이렇게 적어 주세요</p>
+        </div>
+      </div>`;
     case 'reveal': {
       const e = latestEvent();
       if (!e) return '';
@@ -281,7 +265,7 @@ function dock(): string {
   let main = '';
   switch (pub.stage) {
     case 'order':
-      main = `<button class="wide" data-action="submit">📝 제출 받기 시작 (2분) ▶</button>`;
+      main = `<button class="wide" data-action="submit">📝 제출 받기 시작 (${SUBMIT_SECONDS / 60}분) ▶</button>`;
       break;
     case 'submit': {
       const done = pub.teamIds.filter((t) => game.subs[t]?.table).length;
@@ -296,7 +280,9 @@ function dock(): string {
         left > 0
           ? `<div class="row"><button class="wide" data-action="reveal">다음 공개 ▶ <span class="small">(${left})</span></button>
              <button class="secondary narrow" data-action="reveal-all">모두 공개</button></div>`
-          : pub.round < ROUNDS
+          : isPractice()
+            ? '<button class="wide" data-action="practice-end">🏁 연습 끝 · 실제 게임 준비하기</button>'
+            : pub.round < ROUNDS
             ? `<button class="wide" data-action="next-round">${next}라운드 시작 ▶${next === FINAL_OPEN_ROUND ? ' 🏁 최종 교섭 개시!' : ''}</button>`
             : '<button class="wide" data-action="finish">🏆 최종 결과 발표</button>';
       break;
@@ -356,12 +342,12 @@ function inputRow(t: TeamId, pos: number): string {
 function scoutModal(): string {
   if (!scoutShown) return '';
   const s = scoutShown;
-  const hidden = !isConsole;
-  return `<div class="modal-back"><div class="modal${hidden ? '' : ' peek'}" data-peek-box>
+  return `<div class="modal-back"><div class="modal" data-peek-box>
     <h2>🔍 ${esc(teamName(s.team))} 스카우터 결과</h2>
     <p>${s.table}번 테이블 · ${esc(agendaTitle(s.agenda))}</p>
     <div class="scout-num"><span class="masked">?</span><strong>${s.remaining}</strong></div>
-    ${hidden ? '<p class="muted">📢 이 팀 대표에게만 보여 주세요. <b>누르고 있는 동안</b>만 숫자가 보여요.</p><button class="secondary" data-peek>👁 누르고 있기</button>' : '<p class="muted">이 팀 대표에게만 알려 주세요.</p>'}
+    <p class="muted">📢 팀 대표가 직접 <b>누르고 있는 동안</b>만 숫자가 보여요. 손을 떼면 다시 가려져요.</p>
+    <button class="secondary peek-btn" data-peek>👁 누르고 있기</button>
     <button data-action="scout-close">닫기</button>
   </div></div>`;
 }
@@ -397,6 +383,10 @@ function secretPanel(): string {
 }
 
 function finalView(): string {
+  return game.agendasShown ? agendaReveal() : rankView();
+}
+
+function rankView(): string {
   const rows = ranking(eng().pub);
   const winners = rows.filter((r) => r.rank === 1);
   const medal = ['🥇', '🥈', '🥉'];
@@ -413,7 +403,33 @@ function finalView(): string {
       이번 게임에서는 노조의 요구 수치를 가늠하고 합의(막타)를 이끌어내는 타이밍이 핵심이었습니다.
       실제 교섭장에서도 회사의 제시안을 내는 시점과 비공개 채널을 가동하는 '타이밍 전략'이 성공적인 타결을 만든다는 점을 기억해 주시기 바랍니다!"
     </blockquote>
-    ${isConsole ? '' : '<div class="row center-row"><button class="secondary narrow" data-action="home">처음 화면</button></div>'}
+    ${showDock() ? '<div class="row center-row"><button class="narrow" data-action="final-tab">🔓 안건별 요구 수치 공개 ▶</button></div>' : ''}
+  </section>`;
+}
+
+/** 모든 안건의 실제 요구 수치·보상·결과. 겉보기와 다른 안건을 강조해 메시지 전달 */
+function agendaReveal(): string {
+  const { pub } = eng();
+  const dealtBy = new Map(pub.tables.flatMap((t) => t.done ?? []).map((d) => [d.agenda, d.team]));
+  const cards = ALL_AGENDAS.map((id, i) => {
+    const a = AGENDAS[id];
+    const team = dealtBy.get(id);
+    const tag = a.fake === 'hard' ? '<div class="fake-tag hard">😰 작아 보여도 난항</div>' : a.fake === 'easy' ? '<div class="fake-tag easy">🤝 커 보여도 원만</div>' : '';
+    return `<li class="reveal-card${a.fake ? ` fake ${a.fake}` : ''}" style="--i:${i}">
+      <div class="reveal-head"><span class="pictogram">${a.icon}</span><b>${esc(a.title)}</b></div>
+      <div class="reveal-nums"><span><small>요구 수치</small><strong>${a.demand}</strong></span><span><small>보상</small><strong>+${a.reward}</strong></span></div>
+      <div class="reveal-result">${team ? `✔ ${esc(teamName(team))} 합의` : '미합의'}</div>
+      ${tag}
+    </li>`;
+  }).join('');
+  return `<section class="agenda-reveal">
+    <h1>🔓 안건별 실제 요구 수치</h1>
+    <ol class="reveal-grid">${cards}</ol>
+    <blockquote class="closing lesson">
+      별것 아닌 안건이라도 실제 교섭에서는 <b>난항</b>을 겪을 수 있고,<br />
+      중요한 안건이라도 <b>원만한 노사관계</b>를 바탕으로 쉽게 합의할 수 있습니다.
+    </blockquote>
+    ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="final-tab">◀ 순위 보기</button>' + (isConsole ? '' : '<button class="secondary narrow" data-action="home">처음 화면</button>') + '</div>' : ''}
   </section>`;
 }
 
@@ -422,6 +438,7 @@ function finalView(): string {
 function draw() {
   // 튜토리얼 설명문은 A~E 팀 기준이라 이름 바꾸기를 적용하지 않음
   setTeamNames(mode === 'tutorial' ? {} : game.names);
+  useSetup(game.engine?.setup);
   if (mode === 'tutorial') return render(app, tutorialView());
   if (mode === 'home' || !game.engine) {
     if (isConsole) return render(app, '<section class="card center"><h2>🖥 진행자 창</h2><p>프로젝터 화면에서 게임을 시작하면 여기에 입력 패널이 나와요.</p></section>');
@@ -458,6 +475,7 @@ const ALLOWED: Record<string, Stage[]> = {
   reveal: ['reveal'],
   'reveal-all': ['reveal'],
   'next-round': ['reveal'],
+  'practice-end': ['reveal'],
   finish: ['reveal'],
 };
 
@@ -494,8 +512,19 @@ function act(action: string, el: HTMLElement) {
     case 'tutorial':
       mode = 'tutorial';
       tutorialIndex = 0;
-      steps = tutorialSteps();
       return draw();
+    case 'practice': {
+      if (game.engine && !isPractice() && game.engine.pub.stage !== 'final' && !confirm('진행 중인 실제 게임을 지우고 연습 게임을 시작할까요?')) return;
+      stopAutoplay();
+      const teams = TEAM_IDS.filter((t) => picked.has(t));
+      const step = startRound(createGame(teams.length ? teams : TEAM_IDS, practiceSetup()));
+      mode = 'game';
+      inputOpen = false;
+      return save({ ...emptyGame(game.names), engine: step.state, log: logNotes(step) });
+    }
+    case 'practice-end':
+      mode = 'home';
+      return save(emptyGame(game.names));
     case 'tut-next':
       return goTutorial(tutorialIndex + 1);
     case 'tut-prev':
@@ -571,7 +600,9 @@ function act(action: string, el: HTMLElement) {
       return save(commit(game, { engine: step.state, log: [...game.log, ...logNotes(step)] }));
     }
     case 'finish':
-      return save(commit(game, { engine: finish(eng()) }));
+      return save(commit(game, { engine: finish(eng()), agendasShown: false }));
+    case 'final-tab':
+      return save({ ...game, agendasShown: !game.agendasShown });
   }
 }
 
@@ -581,7 +612,11 @@ function primaryAction(): string | null {
   if (mode !== 'game' || !game.engine || !showDock()) return null;
   const { pub } = eng();
   if (pub.stage === 'order') return 'submit';
-  if (pub.stage === 'reveal') return pub.revealed < pub.events.length ? 'reveal' : pub.round < ROUNDS ? 'next-round' : 'finish';
+  if (pub.stage === 'final') return game.agendasShown ? null : 'final-tab';
+  if (pub.stage === 'reveal') {
+    if (pub.revealed < pub.events.length) return 'reveal';
+    return isPractice() ? null : pub.round < ROUNDS ? 'next-round' : 'finish';
+  }
   return null;
 }
 
@@ -616,7 +651,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 // 스카우터 숫자: 누르고 있는 동안만 보이기
-const peek = (on: boolean) => app.querySelector('[data-peek-box]')?.classList.toggle('peek', on || isConsole);
+const peek = (on: boolean) => app.querySelector('[data-peek-box]')?.classList.toggle('peek', on);
 app.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).closest('[data-peek]')) peek(true);
 });

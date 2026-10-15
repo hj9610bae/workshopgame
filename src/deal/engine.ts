@@ -10,7 +10,6 @@ import {
   FINAL_AGENDA,
   FINAL_OPEN_ROUND,
   INITIAL_TABLES,
-  LOOT,
   ROUNDS,
   SCOUT_COST,
   SETUP,
@@ -135,10 +134,11 @@ class Turn {
     (secret.trail[i] ??= []).push({ team, card, amount });
     if (secret.remaining[i] > 0) return null;
     const trail = secret.trail[i];
-    const loot = LOOT[agenda.id];
+    const loot = this.setup.loot[agenda.id];
     this.team(team).score += agenda.reward;
     this.team(team).deals += 1;
     if (loot) this.hand(team)[loot] += 1;
+    (pub.tables[i].done ??= []).push({ agenda: agenda.id, team });
     this.refill(i);
     return { agenda: agenda.id, reward: agenda.reward, card: loot, demand: this.setup.demand[agenda.id], trail };
   }

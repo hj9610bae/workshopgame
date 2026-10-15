@@ -16,6 +16,8 @@ export interface TableState {
   frozen: boolean;
   /** 홍보물을 부착한 팀 (부착 순서) */
   promos: TeamId[];
+  /** 이 테이블에서 합의되어 지나간 안건 (오래된 것부터). 테이블에 쌓이는 연출용, 예전 저장 게임엔 없음 */
+  done?: { agenda: number; team: TeamId }[];
 }
 
 export interface TeamState {

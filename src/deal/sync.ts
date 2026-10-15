@@ -43,6 +43,7 @@ const normTable = (t: Partial<TableState> | undefined): TableState => ({
   agenda: t?.agenda ?? 0,
   frozen: t?.frozen ?? false,
   promos: t?.promos ?? [],
+  done: t?.done ?? [],
 });
 
 const normEvent = (e: GameEvent): GameEvent => ({

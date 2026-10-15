@@ -1,6 +1,6 @@
 /* 사회자 화면·대표 폰이 함께 쓰는 화면 조각 */
 import { esc } from '../ui';
-import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, LOOT, QUEUE, ROUNDS, type CardId, type TeamId } from './data';
+import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, ROUNDS, SETUP, type CardId, type Setup, type TeamId } from './data';
 import { agendaTitle } from './engine';
 import type { GameEvent, PublicState, Stage, TableState } from './types';
 
@@ -12,6 +12,15 @@ export const setTeamNames = (names: Partial<Record<TeamId, string>>): void => {
 };
 
 export const teamName = (t: TeamId): string => customNames[t]?.trim() || `${t}팀`;
+
+let setup: Setup = SETUP;
+
+/** 지금 그리는 게임의 안건 배치 (연습 게임은 무작위 배치). 대기열·전리품 표시에 씀 */
+export const useSetup = (s: Setup | undefined): void => {
+  setup = s ?? SETUP;
+};
+
+export const activeSetup = (): Setup => setup;
 
 export const STAGE_LABEL: Record<Stage, string> = {
   lobby: '대기실',
@@ -33,7 +42,7 @@ export function snapshot(pub: PublicState): { tables: TableState[]; scores: Part
 
 /** 합의 보상. 전리품은 어떤 카드인지 밝히지 않고 '특수 카드'로만 */
 export function rewardText(agendaId: number): string {
-  return `+${AGENDAS[agendaId].reward}${LOOT[agendaId] ? ' · 특수 카드' : ''}`;
+  return `+${AGENDAS[agendaId].reward}${setup.loot[agendaId] ? ' · 특수 카드' : ''}`;
 }
 
 /** 합의되는 순간 공개되는 실제 타결 내용 */
@@ -68,7 +77,7 @@ export function tableCard(table: TableState, index: number, round: number): stri
 }
 
 export function queueStrip(pub: PublicState): string {
-  const rest = QUEUE.slice(pub.queue);
+  const rest = setup.queue.slice(pub.queue);
   if (!rest.length) return '<p class="muted">대기열이 비었어요</p>';
   return `<ol class="queue">${rest.map((id) => `<li>${AGENDAS[id].icon} ${esc(agendaTitle(id))}</li>`).join('')}</ol>`;
 }

@@ -26,6 +26,8 @@ export interface LocalGame {
   /** 이번 라운드에 보조자가 입력한 제출 */
   subs: Partial<Record<TeamId, Submission>>;
   log: LogEntry[];
+  /** 최종 결과에서 안건별 요구 수치 공개 화면을 보여 주는 중 (진행자 창과 같이 바뀜) */
+  agendasShown?: boolean;
   /** 되돌리기용 이전 상태 (가장 최근이 마지막) */
   history: Omit<LocalGame, 'history'>[];
 }

@@ -1,33 +1,43 @@
 /* 현장 진행 화면(board.html)과 튜토리얼이 함께 쓰는 '교섭 테이블' 그림 조각 */
 import { esc } from '../ui';
-import { AGENDAS, CARDS, FINAL_AGENDA, FINAL_OPEN_ROUND, QUEUE, type TeamId } from './data';
-import type { GameEvent, Submission, TableState } from './types';
-import { rewardText, teamName, trailSteps } from './view';
+import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, type TeamId } from './data';
+import type { GameEvent, TableState } from './types';
+import { activeSetup, rewardText, teamName, trailSteps } from './view';
 
 export interface TableLook {
-  /** 방금 깎인 양 (튜토리얼) */
-  hit?: number;
   /** 방금 합의된 안건 (테이블에는 이미 새 안건이 올라와 있음) */
   deal?: { team: TeamId; agenda: number; reward: number };
   /** 방금 새 안건이 들어옴 */
   fresh?: boolean;
   /** 방금 홍보물이 붙음 */
   promo?: boolean;
-  /** 이번 제안의 대상 (튜토리얼) */
-  target?: boolean;
+}
+
+/** 이 테이블에서 합의되어 지나간 안건이 뒤로 희미하게 쌓인 모양 (최근 3장) */
+function pile(table: TableState): { html: string; depth: number } {
+  const done = table.done ?? [];
+  const shown = done.slice(-3);
+  const more = done.length - shown.length;
+  const html = shown
+    .map((d, k) => {
+      const a = AGENDAS[d.agenda];
+      const label = `${k === 0 && more ? `+${more} · ` : ''}${a.icon} ${esc(a.title)} · ${esc(teamName(d.team))} ✔`;
+      return `<div class="past" style="--k:${shown.length - k}"><span>${label}</span></div>`;
+    })
+    .join('');
+  return { html, depth: shown.length };
 }
 
 export function feltTable(table: TableState, index: number, round: number, look: TableLook = {}): string {
   const no = index + 1;
   const isFinal = index === 3;
   const a = AGENDAS[table.agenda];
-  const cls = ['ftable', isFinal ? 'final' : '', table.frozen ? 'frozen' : '', look.target ? 'target' : '', look.fresh ? 'fresh' : '']
+  const cls = ['ftable', isFinal ? 'final' : '', table.frozen ? 'frozen' : '', look.fresh ? 'fresh' : '']
     .filter(Boolean)
     .join(' ');
   const stamp = look.deal
     ? `<div class="deal-stamp"><span>합의!</span><small>${esc(teamName(look.deal.team))} +${look.deal.reward}</small></div>`
     : '';
-  const hit = look.hit ? `<div class="hit-float">−${look.hit}</div>` : '';
   const head = `<div class="ftable-no">${no}번 테이블${isFinal ? ' · 최종 교섭' : ''}</div>`;
   if (!a) {
     const label = isFinal
@@ -35,20 +45,23 @@ export function feltTable(table: TableState, index: number, round: number, look:
         ? `<div class="ftable-wait">🏁 ${FINAL_OPEN_ROUND}라운드 개시</div><div class="ftable-teaser">성과급 ${rewardText(FINAL_AGENDA)}</div>`
         : '<div class="ftable-wait">최종 교섭 종료</div>'
       : '<div class="ftable-wait">대기열 소진</div>';
-    return `<article class="${cls} empty">${head}<div class="ftable-slot">${label}</div>${stamp}</article>`;
+    const past = pile(table);
+    return `<article class="${cls} empty">${head}<div class="stack" style="--n:${past.depth}">${past.html}<div class="ftable-slot">${label}</div></div>${stamp}</article>`;
   }
   // 요구 수치는 블라인드라 카드에 숫자 없이 픽토그램과 노조 요구안만
   const promos = table.promos
     .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">📣 ${esc(teamName(t))}</span>`)
     .join('');
+  const past = pile(table);
   return `<article class="${cls}">
     ${head}
+    <div class="stack" style="--n:${past.depth}">${past.html}
     <div class="agenda-card">
       <div class="pictogram" aria-hidden="true">${a.icon}</div>
       <h3>${esc(a.title)}</h3>
       <p class="gap"><span>노조 요구</span>${esc(a.union)}</p>
       <div class="reward">🏆 ${rewardText(a.id)}</div>
-      ${hit}
+    </div>
     </div>
     ${promos ? `<div class="stickers">${promos}</div>` : ''}
     ${table.frozen ? '<div class="frozen-cover">⛔ 보류</div>' : ''}
@@ -57,7 +70,7 @@ export function feltTable(table: TableState, index: number, round: number, look:
 }
 
 export function deck(queue: number): string {
-  const rest = QUEUE.slice(queue);
+  const rest = activeSetup().queue.slice(queue);
   const stack = rest.length ? Array.from({ length: Math.min(rest.length, 5) }, (_, i) => `<i style="--i:${i}"></i>`).join('') : '';
   const list = rest.map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)}</li>`).join('');
   return `<div class="deck">
@@ -90,16 +103,6 @@ export function seats(order: TeamId[], scores: Partial<Record<TeamId, number>>, 
     })
     .join('');
   return `<ol class="seats">${items}</ol>`;
-}
-
-/** 손으로 쓴 제출 용지 모양 */
-export function slip(team: TeamId, sub: Submission): string {
-  return `<div class="slip">
-    <div class="slip-team">${esc(teamName(team))}</div>
-    <div class="slip-line"><span>테이블</span><b>${sub.table}번</b></div>
-    <div class="slip-line"><span>카드</span><b>${CARDS[sub.card].name}</b></div>
-    ${sub.cutIn ? `<div class="slip-line"><span>새치기</span><b>${sub.cutIn}번째</b></div>` : ''}
-  </div>`;
 }
 
 /** 합의된 안건의 블라인드 해제: 실제 타결 내용과, 처음 요구 수치부터 한 단계씩 깎여 온 과정 */
