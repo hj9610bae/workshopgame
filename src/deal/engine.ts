@@ -41,6 +41,10 @@ export interface Step {
 export type Rng = () => number;
 
 interface Deal {
+  /** 보상을 받은 팀 (실무 교섭으로 가로챘으면 그 팀) */
+  winner: TeamId;
+  /** 실무 교섭 병행으로 가로챈 경우 */
+  stolen: boolean;
   agenda: number;
   reward: number;
   card?: SpecialCardId;
@@ -80,6 +84,8 @@ export function createGame(teamIds: readonly TeamId[], setup?: Setup): EngineSta
 class Turn {
   readonly s: EngineState;
   readonly notes: Step['notes'] = {};
+  /** 이번 라운드 실무 교섭 병행(가로채기)을 건 팀: 테이블 index → 건 순서대로 */
+  readonly steals = new Map<number, TeamId[]>();
 
   constructor(
     state: EngineState,
@@ -135,12 +141,23 @@ class Turn {
     if (secret.remaining[i] > 0) return null;
     const trail = secret.trail[i];
     const loot = this.setup.loot[agenda.id];
-    this.team(team).score += agenda.reward;
-    this.team(team).deals += 1;
-    if (loot) this.hand(team)[loot] += 1;
-    (pub.tables[i].done ??= []).push({ agenda: agenda.id, team });
+    // 실무 교섭 병행: 이번 라운드 이 테이블의 합의는 먼저 건 팀이 가로챔
+    const thief = this.steals.get(i)?.shift();
+    const winner = thief ?? team;
+    this.team(winner).score += agenda.reward;
+    this.team(winner).deals += 1;
+    if (loot) this.hand(winner)[loot] += 1;
+    (pub.tables[i].done ??= []).push({ agenda: agenda.id, team: winner });
     this.refill(i);
-    return { agenda: agenda.id, reward: agenda.reward, card: loot, demand: this.setup.demand[agenda.id], trail };
+    return {
+      winner,
+      stolen: !!thief && thief !== team,
+      agenda: agenda.id,
+      reward: agenda.reward,
+      card: loot,
+      demand: this.setup.demand[agenda.id],
+      trail,
+    };
   }
 
   private refill(i: number) {
@@ -164,7 +181,7 @@ class Turn {
 }
 
 /** 사회자 화면용 합의 사건: 어떤 특수 카드를 받았는지는 숨기고 받았다는 것만 */
-const shown = ({ card, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: true } : {}) });
+const shown = ({ card, winner, stolen, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: true } : {}), ...(stolen ? { stolenBy: winner } : {}) });
 
 const dealText = (deal: Deal) =>
   `${agendaTitle(deal.agenda)} 합의! 주도권 +${deal.reward}${deal.card ? ` · 특수 카드 [${CARDS[deal.card].name}] 획득 (${CARDS[deal.card].desc})` : ''}`;
@@ -207,7 +224,7 @@ export function startRound(state: EngineState, rng: Rng = Math.random): Step {
       turn.event({ kind: 'practiceDeal', team, table, ...shown(deal) });
       turn.note(team, `🤝 실무 교섭 병행 발동! ${dealText(deal)}`);
     } else if (before) {
-      turn.note(team, `🤝 실무 교섭 병행 발동: ${table}번 테이블 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
+      turn.note(team, `🤝 실무 교섭 병행(못 가로챈 카드) 발동: ${table}번 테이블 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
     } else {
       turn.note(team, `실무 교섭 병행: ${table}번 테이블이 비어 있어 효과가 없었어요`, -1);
     }
@@ -278,39 +295,99 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     turn.note(t, cutInPos.has(t) ? `⚡ 새치기: ${cutInPos.get(t)}번째로 제안 (주도권 −${CUT_IN_COST})` : '새치기 실패: 주도권이 부족해요');
   }
 
-  // 안건 보류는 순번과 관계없이 가장 먼저 적용
+  // 추가 카드(홍보물·안건 보류)는 extra 로, 예전 방식처럼 주 카드로 낸 것도 같은 효과
+  const extraOf = (t: TeamId) => {
+    const sub = subs[t];
+    if (sub?.extra) return sub.extra;
+    return sub && (sub.card === 'promo' || sub.card === 'hold') ? { card: sub.card, table: sub.table } : undefined;
+  };
+  const mainOf = (t: TeamId) => {
+    const sub = subs[t];
+    return sub && sub.card !== 'promo' && sub.card !== 'hold' ? sub : undefined;
+  };
+
+  // ① 안건 보류: 순번과 관계없이 가장 먼저 적용, 보류한 팀은 다음 라운드 그 테이블 우선권
+  const lastPriority = secret.priority ?? [];
+  secret.priority = [];
   const held = new Set<TeamId>();
   for (const t of order) {
-    const sub = subs[t];
-    if (sub?.card !== 'hold' || !turn.has(t, 'hold') || !turn.isOpen(sub.table)) continue;
+    const x = extraOf(t);
+    if (x?.card !== 'hold' || !turn.has(t, 'hold') || !turn.isOpen(x.table)) continue;
     turn.hand(t).hold -= 1;
     held.add(t);
-    const table = pub.tables[sub.table - 1];
+    if (pub.round < ROUNDS) secret.priority.push({ team: t, table: x.table });
+    const table = pub.tables[x.table - 1];
     if (!table.frozen) {
       table.frozen = true;
-      turn.event({ kind: 'hold', table: sub.table, agenda: table.agenda });
+      turn.event({ kind: 'hold', table: x.table, agenda: table.agenda });
     }
   }
 
+  // ② 실무 교섭 병행: 이번 라운드 그 테이블의 합의를 가로챔 (순번과 관계없이 미리 걸어 둠)
   for (const t of order) {
+    const sub = mainOf(t);
+    if (sub?.card !== 'practice' || !turn.has(t, 'practice') || !turn.isOpen(sub.table)) continue;
+    if (pub.tables[sub.table - 1].frozen) continue;
+    turn.hand(t).practice -= 1;
+    const i = sub.table - 1;
+    turn.steals.set(i, [...(turn.steals.get(i) ?? []), t]);
+  }
+  const stealing = new Set([...turn.steals.values()].flat());
+
+  // ③ 지난 라운드 보류 우선권: 그 테이블에 낸 제안을 가장 먼저
+  const first = order.filter((t) => lastPriority.some((p) => p.team === t && mainOf(t)?.table === p.table));
+  const sequence = [...first, ...order.filter((t) => !first.includes(t))];
+
+  const dealEvent = (t: TeamId, tableNo: number, deal: Deal, kind: 'proposal' | 'promoDeal') => {
+    turn.event({ kind, team: t, table: tableNo, ...(kind === 'proposal' ? { result: 'deal' as const } : {}), ...shown(deal) });
+    if (deal.stolen) {
+      turn.note(deal.winner, `🤝 실무 교섭 병행으로 가로채기 성공! ${dealText(deal)}`);
+      turn.note(t, `${agendaTitle(deal.agenda)} 합의 막타를 쳤지만 실무 교섭 병행에 보상을 빼앗겼어요`);
+    } else {
+      turn.note(t, `${kind === 'promoDeal' ? '📣 홍보물 효과로 ' : '🎉 '}${dealText(deal)}`);
+    }
+  };
+
+  for (const t of sequence) {
     const sub = subs[t];
+    const isFirst = first.includes(t) ? { first: true } : {};
     if (!sub) {
       turn.event({ kind: 'proposal', team: t, result: 'pass' });
       turn.note(t, '제출하지 않아 이번 라운드는 패스했어요');
       continue;
     }
-    const { table: tableNo, card } = sub;
-    if (card === 'hold') {
-      if (held.has(t)) {
-        turn.event({ kind: 'proposal', team: t, result: 'done' });
-        turn.note(t, `⛔ ${tableNo}번 테이블 보류 성공! 이번 라운드 이 테이블의 제안은 모두 무효예요`);
+    // 추가 카드: 홍보물은 이 팀 차례에 부착 공개, 보류는 위에서 처리
+    const x = extraOf(t);
+    if (x?.card === 'hold' && !held.has(t)) turn.note(t, '안건 보류를 쓸 수 없어 무효가 됐어요');
+    if (x?.card === 'hold' && held.has(t)) {
+      turn.note(t, `⛔ ${x.table}번 테이블 보류 성공! 이번 라운드 이 테이블의 제안은 모두 무효${pub.round < ROUNDS ? ', 다음 라운드 이 테이블에 낸 우리 제안이 가장 먼저 적용돼요' : ''}`, -1);
+    }
+    if (x?.card === 'promo') {
+      const table = pub.tables[x.table - 1];
+      if (!turn.has(t, 'promo') || !turn.isOpen(x.table)) {
+        turn.note(t, '홍보물을 붙일 수 없어 무효가 됐어요 (카드는 돌려받았어요)');
+      } else if (table.frozen) {
+        turn.note(t, `⛔ ${x.table}번 테이블이 보류되어 홍보물 무효 (카드는 돌려받았어요)`);
       } else {
-        turn.event({ kind: 'proposal', team: t, result: 'void', reason: 'invalid' });
-        turn.note(t, '안건 보류를 쓸 수 없어 무효가 됐어요');
+        turn.hand(t).promo -= 1;
+        table.promos.push(t);
+        turn.event({ kind: 'proposal', team: t, result: 'promo', table: x.table, agenda: table.agenda });
+        turn.note(t, `📣 ${x.table}번 테이블에 홍보물 부착 — 매 라운드 종료 시 −${CARDS.promo.power}`);
       }
+    }
+    const main = mainOf(t);
+    if (!main) {
+      // 추가 카드만 낸 경우 (예전 방식으로 주 카드 자리에 보류·홍보물을 쓴 경우)
+      if (x?.card === 'hold') turn.event({ kind: 'proposal', team: t, result: held.has(t) ? 'done' : 'void', ...(held.has(t) ? {} : { reason: 'invalid' as const }) });
       continue;
     }
-    if (!turn.has(t, card) || (card === 'practice' && pub.round >= ROUNDS)) {
+    const { table: tableNo, card } = main;
+    if (card === 'practice' && stealing.has(t)) {
+      turn.event({ kind: 'proposal', team: t, result: 'done', ...isFirst });
+      turn.note(t, `🤝 ${tableNo}번 테이블에 실무 교섭 병행 — 이번 라운드 이 테이블에서 합의가 나면 보상을 가로채요`);
+      continue;
+    }
+    if (!turn.has(t, card)) {
       turn.event({ kind: 'proposal', team: t, result: 'void', reason: 'invalid' });
       turn.note(t, '사용할 수 없는 카드라 무효가 됐어요');
       continue;
@@ -328,27 +405,13 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
       continue;
     }
     const before = table.agenda;
-    if (card === 'practice') {
-      turn.hand(t).practice -= 1;
-      secret.practice.push({ team: t, table: tableNo });
-      turn.event({ kind: 'proposal', team: t, result: 'done' });
-      turn.note(t, `🤝 ${tableNo}번 테이블에 실무 교섭 병행 예약 — 다음 라운드 시작 시 −${CARDS.practice.power}`);
-      continue;
-    }
-    if (card === 'promo') {
-      turn.hand(t).promo -= 1;
-      table.promos.push(t);
-      turn.event({ kind: 'proposal', team: t, result: 'promo', table: tableNo, agenda: before });
-      turn.note(t, `📣 ${tableNo}번 테이블에 홍보물 부착 — 매 라운드 종료 시 −${CARDS.promo.power}`);
-      continue;
-    }
     if (card === 'blitz') turn.hand(t).blitz -= 1;
     const deal = turn.damage(tableNo, card, t);
     if (deal) {
-      turn.event({ kind: 'proposal', team: t, result: 'deal', table: tableNo, ...shown(deal) });
-      turn.note(t, `🎉 ${dealText(deal)}`);
+      dealEvent(t, tableNo, deal, 'proposal');
+      if (isFirst.first) pub.events[pub.events.length - 1].first = true;
     } else {
-      turn.event({ kind: 'proposal', team: t, result: 'done' });
+      turn.event({ kind: 'proposal', team: t, result: 'done', ...isFirst });
       turn.note(t, `${tableNo}번 테이블 ${agendaTitle(before)}에 [${CARDS[card].name}] 적용 (−${CARDS[card].power})`);
     }
   }
@@ -359,12 +422,22 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     for (const owner of table.promos) {
       if (!table.agenda) break;
       const deal = turn.damage(i + 1, 'promo', owner);
-      if (deal) {
-        turn.event({ kind: 'promoDeal', team: owner, table: i + 1, ...shown(deal) });
-        turn.note(owner, `📣 홍보물 효과로 ${dealText(deal)}`);
-      }
+      if (deal) dealEvent(owner, i + 1, deal, 'promoDeal');
     }
   });
+
+  // 가로채지 못한 실무 교섭 병행은 다음 라운드 시작 시 −6
+  for (const [i, teams] of turn.steals) {
+    for (const t of teams) {
+      if (pub.round < ROUNDS) {
+        secret.practice.push({ team: t, table: i + 1 });
+        turn.note(t, `🤝 ${i + 1}번 테이블에서 가로챌 합의가 없었어요 — 다음 라운드 시작 시 −${CARDS.practice.power}`, -1);
+      } else {
+        turn.note(t, `🤝 ${i + 1}번 테이블에서 가로챌 합의가 없었어요`, -1);
+      }
+    }
+  }
+  turn.steals.clear();
 
   for (const table of pub.tables) table.frozen = false;
   turn.event({ kind: 'end' });

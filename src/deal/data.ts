@@ -18,10 +18,22 @@ export type SpecialCardId = Exclude<CardId, 'basic'>;
 export const CARDS: Record<CardId, { name: string; power: number; desc: string }> = {
   basic: { name: '기본 제시안', power: 2, desc: '요구 수치 2 감소 · 매 라운드 사용' },
   blitz: { name: '전격 타결', power: 6, desc: '요구 수치 6 감소 · 1회용' },
-  practice: { name: '실무 교섭 병행', power: 10, desc: '다음 라운드 시작 시 10 감소 · 비공개' },
-  promo: { name: '홍보물 발행', power: 1, desc: '테이블에 부착, 매 라운드 종료 시 1 감소' },
-  hold: { name: '안건 보류', power: 0, desc: '이번 라운드 그 테이블의 모든 제안 무효' },
+  practice: {
+    name: '실무 교섭 병행',
+    power: 6,
+    desc: '이번 라운드 그 테이블에서 합의가 나면 보상을 가로챔. 못 가로채면 다음 라운드 시작 시 6 감소 · 비공개',
+  },
+  promo: { name: '홍보물 발행', power: 1, desc: '제시안과 함께 추가로 냄. 테이블에 부착, 매 라운드 종료 시 1 감소' },
+  hold: {
+    name: '안건 보류',
+    power: 0,
+    desc: '제시안과 함께 추가로 냄. 이번 라운드 그 테이블의 모든 제안 무효 + 다음 라운드 그 테이블에 낸 우리 제안을 가장 먼저 적용',
+  },
 };
+
+/** 제시안과 함께 '추가 카드'로 내는 특수 카드 */
+export type ExtraCardId = 'promo' | 'hold';
+export const EXTRA_CARDS: ExtraCardId[] = ['promo', 'hold'];
 
 export const SPECIAL_CARDS: SpecialCardId[] = ['blitz', 'practice', 'promo', 'hold'];
 

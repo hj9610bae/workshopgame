@@ -1,4 +1,4 @@
-import type { CardId, SpecialCardId, TeamId } from './data';
+import type { CardId, ExtraCardId, SpecialCardId, TeamId } from './data';
 
 /** 안건의 요구 수치를 깎은 기록 (합의되기 전까지 비공개) */
 export interface Hit {
@@ -40,6 +40,10 @@ export interface GameEvent {
   loot?: boolean;
   result?: ProposalResult;
   reason?: VoidReason;
+  /** 합의 사건: 실무 교섭 병행으로 보상을 가로챈 팀 */
+  stolenBy?: TeamId;
+  /** proposal: 지난 라운드 안건 보류 우선권으로 순번보다 먼저 적용됨 */
+  first?: boolean;
   /** start: 새치기로 순서가 바뀌었는지, 바뀐 순서 */
   cutIn?: boolean;
   order?: TeamId[];
@@ -77,8 +81,10 @@ export interface SecretState {
   remaining: number[];
   /** index 0~3 → 테이블에 올라온 안건이 지금까지 깎인 이력 */
   trail: Hit[][];
-  /** 다음 라운드 시작 시 발동할 실무 교섭 병행 */
+  /** 다음 라운드 시작 시 발동할 실무 교섭 병행 (가로채기에 실패한 카드의 −6) */
   practice: { team: TeamId; table: number }[];
+  /** 다음 라운드에 그 테이블에 낸 제안을 가장 먼저 적용받는 팀 (지난 라운드 안건 보류). 예전 저장 게임엔 없음 */
+  priority?: { team: TeamId; table: number }[];
 }
 
 export type Hand = Record<SpecialCardId, number>;
@@ -89,6 +95,8 @@ export interface Submission {
   card: CardId;
   /** 새치기로 원하는 순번 (1부터). 0이면 사용 안 함 */
   cutIn: number;
+  /** 제시안과 함께 추가로 내는 특수 카드 (홍보물·안건 보류) */
+  extra?: { card: ExtraCardId; table: number };
 }
 
 /** 팀에게만 보이는 결과 메시지. reveal 단계 메시지는 해당 사건이 공개된 뒤에 보여줌 */

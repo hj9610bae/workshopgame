@@ -6,6 +6,7 @@
   hold=priority     보류 + 다음 라운드 그 테이블에 낸 보류 팀 제안을 가장 먼저 적용
   practice=steal_fb 실무 교섭: 이번 라운드 그 테이블 합의 보상 가로채기, 합의 없으면 다음 라운드 시작 시 −6 (fbp=N)
   force=카드        카드를 받은 팀이 바로 쓰도록 강제
+현재 규칙(v2.4) = extra=1 hold=priority practice=steal_fb
 AG·LOOT 표는 src/deal/data.ts 를 손으로 옮긴 것이라 데이터를 바꾸면 여기도 맞출 것.
 
 AI 팀: 남은 수치를 노이즈 섞어 추정(블라인드), 막타 가능해 보이는 테이블을 우선 노리고,

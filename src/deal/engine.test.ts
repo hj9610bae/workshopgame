@@ -108,28 +108,86 @@ describe('특수 카드', () => {
     expect(state.pub.events.find((e) => e.kind === 'hold')?.team).toBeUndefined();
   });
 
-  it('실무 교섭 병행: 다음 라운드 시작 시 10 감소, 합의되면 카드 주인이 보상', () => {
+  it('실무 교섭 병행: 이번 라운드 그 테이블의 합의를 순번과 관계없이 가로챔', () => {
+    const s = withHand('C', 'practice');
+    // 난임시술 3: A −2, B −2 로 B가 합의시키지만 C가 가로챔
+    const { state, notes } = resolveRound(s, { A: basic(2), B: basic(2), C: { table: 2, card: 'practice', cutIn: 0 } });
+    expect(state.pub.teams.C!.score).toBe(12);
+    expect(state.pub.teams.B!.score).toBe(10);
+    expect(state.hands.C).toMatchObject({ practice: 0, hold: 1 });
+    expect(state.pub.events.find((e) => e.result === 'deal')).toMatchObject({ team: 'B', stolenBy: 'C', agenda: 5 });
+    expect(state.pub.tables[1].done).toEqual([{ agenda: 5, team: 'C' }]);
+    expect(notes.B?.at(-1)?.text).toContain('빼앗겼어요');
+    expect(state.secret.practice).toEqual([]);
+  });
+
+  it('뒤 순번이 걸어도 앞 순번의 합의를 가로챔', () => {
+    const s = withHand('E', 'practice');
+    const { state } = resolveRound(s, { A: basic(1), E: { table: 1, card: 'practice', cutIn: 0 } });
+    expect(state.pub.teams.E!.score).toBe(12);
+    expect(state.pub.teams.A!.score).toBe(10);
+  });
+
+  it('가로챌 합의가 없으면 다음 라운드 시작 시 −6, 합의되면 카드 주인이 보상', () => {
     const s = withHand('C', 'practice');
     const r1 = resolveRound(s, { C: { table: 3, card: 'practice', cutIn: 0 } }).state;
     expect(r1.secret.remaining[2]).toBe(3);
+    expect(r1.secret.practice).toEqual([{ team: 'C', table: 3 }]);
     const r2 = startRound(r1);
-    expect(r2.state.pub.tables[2].agenda).toBe(12);
     expect(r2.state.pub.teams.C!.score).toBe(13);
     expect(r2.state.pub.events[0]).toMatchObject({
       kind: 'practiceDeal',
       team: 'C',
       agenda: 8,
       demand: 3,
-      trail: [{ team: 'C', card: 'practice', amount: 10 }],
+      trail: [{ team: 'C', card: 'practice', amount: 6 }],
     });
   });
 
-  it('실무 교섭 병행은 5라운드에 낼 수 없음', () => {
+  it('실무 교섭 병행은 5라운드에도 가로채기로 쓸 수 있고, 못 가로채면 그대로 끝', () => {
     const s = withHand('C', 'practice');
     s.pub.round = 5;
     const { state } = resolveRound(s, { C: { table: 3, card: 'practice', cutIn: 0 } });
-    expect(state.hands.C!.practice).toBe(1);
+    expect(state.hands.C!.practice).toBe(0);
     expect(state.secret.practice).toEqual([]);
+  });
+
+  it('보류된 테이블에 건 실무 교섭은 무효, 카드 반환', () => {
+    const s = withHand('C', 'practice');
+    s.hands.E!.hold = 1;
+    const { state } = resolveRound(s, { C: { table: 2, card: 'practice', cutIn: 0 }, E: { ...basic(1), extra: { card: 'hold', table: 2 } } });
+    expect(state.hands.C!.practice).toBe(1);
+    expect(state.pub.events.find((e) => e.team === 'C')).toMatchObject({ result: 'void', reason: 'hold' });
+  });
+
+  it('안건 보류는 제시안과 함께 추가로: 내 제안은 그대로, 다음 라운드 그 테이블 우선 적용', () => {
+    const s = withHand('E', 'hold');
+    s.hands.A!.blitz = 1;
+    const { state } = resolveRound(s, { A: { table: 2, card: 'blitz', cutIn: 0 }, E: { ...basic(3), extra: { card: 'hold', table: 2 } } });
+    expect(state.secret.remaining[1]).toBe(3); // A의 전격 무효
+    expect(state.hands.A!.blitz).toBe(1);
+    expect(state.secret.remaining[2]).toBe(1); // E의 기본 제시안은 그대로 적용
+    expect(state.secret.priority).toEqual([{ team: 'E', table: 2 }]);
+    // 다음 라운드: E가 마지막 순번이어도 2번 테이블 제안이 가장 먼저
+    for (const t of ['A', 'B', 'C', 'D'] as const) state.pub.teams[t]!.score = 15;
+    const r2 = beginSubmit(startRound(state).state, 0);
+    expect(r2.pub.order.at(-1)).toBe('E');
+    const lead = r2.pub.order[0];
+    const after = resolveRound(r2, { [lead]: basic(2), E: basic(2) }).state;
+    const proposals = after.pub.events.filter((e) => e.kind === 'proposal');
+    expect(proposals[0]).toMatchObject({ team: 'E', first: true });
+    expect(after.pub.tables[1].done).toEqual([{ agenda: 5, team: lead }]); // E가 3→1, 1위 팀이 막타
+    expect(after.secret.priority).toEqual([]);
+  });
+
+  it('홍보물은 제시안과 함께 추가로 붙이고, 제시안도 그대로 적용', () => {
+    const s = withHand('B', 'promo');
+    const { state } = resolveRound(s, { A: basic(3), B: { ...basic(1), extra: { card: 'promo', table: 3 } } });
+    // B: 검진비 합의(+2) + 체육대회 3 − 2(A) − 1(홍보물) = 0 → B 합의(+3)
+    expect(state.pub.teams.B!.score).toBe(15);
+    expect(state.hands.B!.promo).toBe(1); // 쓴 1장 − 검진비 전리품(홍보물) 1장
+    expect(state.pub.tables[2].promos).toEqual(['B']);
+    expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 8 });
   });
 
   it('홍보물: 매 라운드 종료 시 1 감소, 합의 시 부착 팀이 보상', () => {

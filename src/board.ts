@@ -4,7 +4,7 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, SUBMIT_SECONDS, TEAM_IDS, type CardId, type TeamId } from './deal/data';
+import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, SUBMIT_SECONDS, TEAM_IDS, type CardId, type ExtraCardId, type TeamId } from './deal/data';
 import { agendaTitle, beginSubmit, createGame, finish, ranking, resolveRound, revealNext, scout, startRound, type EngineState } from './deal/engine';
 import { deck, feltTable, seats, trailStrip, type TableLook } from './deal/felt';
 import {
@@ -163,7 +163,7 @@ function tableLooks(): TableLook[] {
     if (!e?.table) continue;
     const i = e.table - 1;
     if (e.kind === 'finalOpen') looks[i] = { fresh: true };
-    else if (e.agenda && e.reward && e.team) looks[i] = { deal: { team: e.team, agenda: e.agenda, reward: e.reward }, fresh: true };
+    else if (e.agenda && e.reward && e.team) looks[i] = { deal: { team: e.stolenBy ?? e.team, agenda: e.agenda, reward: e.reward }, fresh: true };
     else if (e.kind === 'proposal' && e.result === 'promo') looks[i] = { promo: true };
   }
   return looks;
@@ -193,6 +193,7 @@ function banner(): string {
             <div class="postit-line"><span>테이블</span><b>2번</b></div>
             <div class="postit-line"><span>카드</span><b>기본 제시안</b></div>
             <div class="postit-line opt"><span>새치기</span><b>1번째</b><em>(쓸 때만)</em></div>
+            <div class="postit-line opt"><span>추가</span><b>카드명 3번</b><em>(가진 팀만)</em></div>
           </div>
           <p class="muted small">이렇게 적어 주세요</p>
         </div>
@@ -315,25 +316,39 @@ function inputRow(t: TeamId, pos: number): string {
   const tableBtns = pub.tables
     .map((tb, i) => btn('sub-table', i + 1, `${i + 1}번 <small>${esc(agendaTitle(tb.agenda))}</small>`, sub?.table === i + 1, tb.agenda > 0))
     .join('');
-  const cards = (Object.keys(CARDS) as CardId[])
+  const mainCards: CardId[] = ['basic', 'blitz', 'practice'];
+  const cards = mainCards
     .map((c) => {
       const n = c === 'basic' ? Infinity : (hand?.[c] ?? 0);
-      const blocked = c === 'practice' && pub.round >= ROUNDS;
       const label = `${CARDS[c].name}${c === 'basic' ? '' : ` ×${n}`}`;
-      return btn('sub-card', c, label, (sub?.card ?? 'basic') === c && !!sub?.table, n > 0 && !blocked);
+      return btn('sub-card', c, label, (sub?.card ?? 'basic') === c && !!sub?.table, n > 0);
     })
     .join('');
+  // 추가 카드(홍보물·안건 보류)는 제시안과 함께 1장
+  const extra = sub?.extra;
+  const extras = [
+    btn('sub-extra', '', '안 함', !extra),
+    ...EXTRA_CARDS.map((c) => btn('sub-extra', c, `${CARDS[c].name} ×${hand?.[c] ?? 0}`, extra?.card === c, (hand?.[c] ?? 0) > 0)),
+  ].join('');
+  const extraTables = extra
+    ? `<div class="in-group"><span class="in-label">추가 카드 테이블</span>${pub.tables
+        .map((tb, i) => btn('sub-extra-table', i + 1, `${i + 1}번 <small>${esc(agendaTitle(tb.agenda))}</small>`, extra.table === i + 1, tb.agenda > 0))
+        .join('')}</div>`
+    : '';
   const cuts = [
     btn('sub-cut', 0, '안 함', !sub?.cutIn),
     ...pub.order.map((_, i) => btn('sub-cut', i + 1, `${i + 1}번째`, sub?.cutIn === i + 1, score >= CUT_IN_COST)),
   ].join('');
   const scouts = pub.tables.map((tb, i) => btn('scout', i + 1, `${i + 1}번`, false, tb.agenda > 0 && score >= SCOUT_COST)).join('');
-  const state = sub?.table ? `✅ ${sub.table}번 · ${CARDS[sub.card].name}${sub.cutIn ? ` · 새치기 ${sub.cutIn}번째` : ''}` : '⌛ 미입력 (패스)';
+  const extraText = extra ? ` · + ${CARDS[extra.card].name} ${extra.table ? `${extra.table}번` : '(테이블 선택!)'}` : '';
+  const state = sub?.table ? `✅ ${sub.table}번 · ${CARDS[sub.card].name}${extraText}${sub.cutIn ? ` · 새치기 ${sub.cutIn}번째` : ''}` : '⌛ 미입력 (패스)';
   return `<div class="in-row${sub?.table ? ' done' : ''}">
     <div class="in-team"><b>${pos + 1}. ${esc(teamName(t))}</b><span>💰 ${score}</span><span class="in-state">${state}</span>
       ${sub ? `<button class="pill ghost" data-action="sub-clear" data-team="${t}">지우기</button>` : ''}</div>
     <div class="in-group"><span class="in-label">테이블</span>${tableBtns}</div>
     <div class="in-group"><span class="in-label">카드</span>${cards}</div>
+    <div class="in-group"><span class="in-label">추가 카드</span>${extras}</div>
+    ${extraTables || '<div></div>'}
     <div class="in-group"><span class="in-label">새치기 −${CUT_IN_COST}</span>${cuts}</div>
     <div class="in-group"><span class="in-label">🔍 스카우터 −${SCOUT_COST}</span>${scouts}</div>
   </div>`;
@@ -470,6 +485,8 @@ const ALLOWED: Record<string, Stage[]> = {
   'sub-table': ['submit'],
   'sub-card': ['submit'],
   'sub-cut': ['submit'],
+  'sub-extra': ['submit'],
+  'sub-extra-table': ['submit'],
   'sub-clear': ['submit'],
   scout: ['submit'],
   reveal: ['reveal'],
@@ -565,6 +582,15 @@ function act(action: string, el: HTMLElement) {
       return setSub(team, { card: value as CardId });
     case 'sub-cut':
       return setSub(team, { cutIn: Number(value) });
+    case 'sub-extra': {
+      const cur = game.subs[team]?.extra;
+      return setSub(team, { extra: value ? { card: value as ExtraCardId, table: cur?.table ?? 0 } : undefined });
+    }
+    case 'sub-extra-table': {
+      const cur = game.subs[team]?.extra;
+      if (!cur) return;
+      return setSub(team, { extra: { ...cur, table: Number(value) } });
+    }
     case 'sub-clear': {
       const { [team]: _, ...rest } = game.subs;
       return save({ ...game, subs: rest });
@@ -586,6 +612,8 @@ function act(action: string, el: HTMLElement) {
       const subs = Object.fromEntries(Object.entries(game.subs).filter(([, s]) => s?.table));
       const missing = n - Object.keys(subs).length;
       if (missing && !confirm(`${missing}팀이 입력되지 않았어요. 이 팀들은 이번 라운드 패스로 처리할까요?`)) return;
+      const noTable = Object.entries(subs).filter(([, s]) => s?.extra && !s.extra.table).map(([t]) => teamName(t as TeamId));
+      if (noTable.length && !confirm(`${noTable.join(', ')}의 추가 카드 테이블이 비어 있어요. 추가 카드 없이 진행할까요?`)) return;
       inputOpen = false;
       scoutShown = null;
       const step = resolveRound(eng(), subs);

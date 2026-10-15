@@ -113,6 +113,19 @@ export function describeEvent(e: GameEvent): {
   const agenda = e.agenda ? `${agendaTitle(e.agenda)}` : '';
   const reward = e.reward ? `주도권 +${e.reward}${e.loot ? ' · 특수 카드 1장 획득' : ''}` : '';
   const settled = settledText(e.agenda);
+  // 실무 교섭 병행으로 가로챈 합의: 보상은 가로챈 팀에게
+  if (e.stolenBy && e.agenda) {
+    const thief = teamName(e.stolenBy);
+    return {
+      icon: '🤝',
+      title: `${agenda} 합의! 그런데… ${thief} 실무 교섭 가로채기!`,
+      detail: `막타는 ${team} · 보상은 ${thief}: ${reward}`,
+      settled,
+      trail: trailText(e),
+      tone: 'deal',
+    };
+  }
+  const firstMark = e.first ? ' (보류 우선권으로 먼저)' : '';
   switch (e.kind) {
     case 'finalOpen':
       return { icon: '🏁', title: `최종 교섭 개시! ${e.table}번 테이블에 성과급 등장`, detail: `합의 보상 ${rewardText(FINAL_AGENDA)}`, tone: 'deal' };
@@ -131,7 +144,7 @@ export function describeEvent(e: GameEvent): {
     case 'proposal':
       switch (e.result) {
         case 'deal':
-          return { icon: '🎉', title: `${team}, ${agenda} 합의!`, detail: reward, settled, trail: trailText(e), tone: 'deal' };
+          return { icon: '🎉', title: `${team}, ${agenda} 합의!${firstMark}`, detail: reward, settled, trail: trailText(e), tone: 'deal' };
         case 'promo':
           return { icon: '📣', title: `${team}, ${e.table}번 테이블에 홍보물 부착`, detail: '매 라운드 종료 시 요구 수치 1 감소' };
         case 'void':
@@ -144,7 +157,7 @@ export function describeEvent(e: GameEvent): {
         case 'pass':
           return { icon: '💤', title: `${team} 제출 없음 (패스)` };
         default:
-          return { icon: '📝', title: `${team} 제안 완료`, detail: '아직 합의되지 않았습니다' };
+          return { icon: '📝', title: `${team} 제안 완료${firstMark}`, detail: '아직 합의되지 않았습니다' };
       }
   }
 }
