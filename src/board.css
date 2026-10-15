@@ -1448,3 +1448,120 @@ button.dot-btn.on {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* 예시 장면: 노트북·프로젝터(높이 900px 이하)에서도 한 화면에 들어가게 */
+@media (max-height: 960px) {
+  .tutorial {
+    gap: 10px;
+  }
+
+  .scene {
+    gap: 10px;
+  }
+
+  .scene .felt {
+    min-height: 0;
+    padding: 14px 18px;
+    gap: 12px;
+  }
+
+  .scene .caption {
+    padding: 10px 18px;
+  }
+
+  .scene .caption h2 {
+    margin: 4px 0 2px;
+    font-size: 1.3rem;
+  }
+
+  .scene .caption p {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .scene .agenda-card {
+    padding: 10px 12px;
+    gap: 4px;
+  }
+
+  .scene .pictogram {
+    font-size: 2rem;
+  }
+
+  .scene .agenda-card h3 {
+    font-size: 1.3rem;
+  }
+
+  .scene-play .banner {
+    padding: 10px 22px;
+  }
+
+  .scene-play .banner-icon {
+    display: none;
+  }
+
+  .scene-play .banner h2 {
+    font-size: 1.5rem;
+  }
+
+  .scene-play .banner p {
+    margin-top: 2px;
+    font-size: 1rem;
+  }
+
+  .scene-play .settled {
+    margin-top: 6px;
+  }
+
+  .scene-play .trail {
+    margin-top: 8px;
+  }
+
+  .scene .seat {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+
+@media (max-height: 780px) {
+  .scene .caption p {
+    font-size: 0.92rem;
+  }
+
+  .scene .ftable-no {
+    font-size: 0.85rem;
+  }
+
+  .scene .pictogram {
+    font-size: 1.6rem;
+  }
+
+  .scene .agenda-card h3 {
+    font-size: 1.15rem;
+  }
+
+  .scene-play .slip {
+    padding: 6px 12px;
+  }
+
+  .scene-play .banner h2 {
+    font-size: 1.3rem;
+  }
+
+  .scene-play .trail b {
+    font-size: 1.15rem;
+  }
+
+  .scene .seat-score {
+    font-size: 1.2rem;
+  }
+
+  .scene-play .trail-start,
+  .scene-play .trail-hit {
+    padding: 3px 8px;
+  }
+
+  .scene .felt {
+    padding: 10px 14px;
+  }
+}
