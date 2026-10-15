@@ -10,12 +10,14 @@ import {
   FINAL_AGENDA,
   FINAL_OPEN_ROUND,
   INITIAL_TABLES,
-  QUEUE,
+  LOOT,
   ROUNDS,
   SCOUT_COST,
+  SETUP,
   START_SCORE,
   SUBMIT_SECONDS,
   type CardId,
+  type Setup,
   type SpecialCardId,
   type TeamId,
 } from './data';
@@ -25,6 +27,8 @@ export interface EngineState {
   pub: PublicState;
   secret: SecretState;
   hands: Partial<Record<TeamId, Hand>>;
+  /** 튜토리얼 예시처럼 다른 안건 배치를 쓸 때만. 없으면 실제 게임 배치(SETUP) */
+  setup?: Setup;
 }
 
 export type NoteDraft = Omit<Note, 'round'>;
@@ -51,7 +55,8 @@ export const agendaTitle = (id: number | undefined): string => (id ? AGENDAS[id]
 
 const emptyTable = () => ({ agenda: 0, frozen: false, promos: [] as TeamId[] });
 
-export function createGame(teamIds: readonly TeamId[]): EngineState {
+export function createGame(teamIds: readonly TeamId[], setup?: Setup): EngineState {
+  const { tables, demand } = setup ?? SETUP;
   return {
     pub: {
       stage: 'lobby',
@@ -60,14 +65,15 @@ export function createGame(teamIds: readonly TeamId[]): EngineState {
       teamIds: [...teamIds],
       order: [],
       prevOrder: [],
-      tables: [...INITIAL_TABLES.map((agenda) => ({ ...emptyTable(), agenda })), emptyTable()],
+      tables: [...tables.map((agenda) => ({ ...emptyTable(), agenda })), emptyTable()],
       queue: 0,
       teams: Object.fromEntries(teamIds.map((t) => [t, { score: START_SCORE, deals: 0 }])),
       events: [],
       revealed: 0,
     },
-    secret: { remaining: [...INITIAL_TABLES.map((a) => AGENDAS[a].demand), 0], trail: [[], [], [], []], practice: [] },
+    secret: { remaining: [...tables.map((a) => demand[a]), 0], trail: [[], [], [], []], practice: [] },
     hands: Object.fromEntries(teamIds.map((t) => [t, emptyHand()])),
+    ...(setup ? { setup } : {}),
   };
 }
 
@@ -84,6 +90,10 @@ class Turn {
     // Firebase 는 빈 배열을 저장하지 않고, 예전에 저장된 게임에는 이력이 없음
     const trail = this.s.secret.trail ?? [];
     this.s.secret.trail = this.s.pub.tables.map((_, i) => trail[i] ?? []);
+  }
+
+  get setup(): Setup {
+    return this.s.setup ?? SETUP;
   }
 
   team(t: TeamId) {
@@ -125,17 +135,18 @@ class Turn {
     (secret.trail[i] ??= []).push({ team, card, amount });
     if (secret.remaining[i] > 0) return null;
     const trail = secret.trail[i];
+    const loot = LOOT[agenda.id];
     this.team(team).score += agenda.reward;
     this.team(team).deals += 1;
-    if (agenda.card) this.hand(team)[agenda.card] += 1;
+    if (loot) this.hand(team)[loot] += 1;
     this.refill(i);
-    return { agenda: agenda.id, reward: agenda.reward, card: agenda.card, demand: agenda.demand, trail };
+    return { agenda: agenda.id, reward: agenda.reward, card: loot, demand: this.setup.demand[agenda.id], trail };
   }
 
   private refill(i: number) {
     const { pub, secret } = this.s;
     // 4번(최종 교섭) 테이블은 보충 없이 닫힘
-    const next = i < INITIAL_TABLES.length ? QUEUE[pub.queue] : undefined;
+    const next = i < INITIAL_TABLES.length ? this.setup.queue[pub.queue] : undefined;
     secret.trail[i] = [];
     if (next === undefined) {
       pub.tables[i].agenda = 0;
@@ -143,7 +154,7 @@ class Turn {
     } else {
       pub.queue += 1;
       pub.tables[i].agenda = next;
-      secret.remaining[i] = AGENDAS[next].demand;
+      secret.remaining[i] = this.setup.demand[next];
     }
   }
 
@@ -152,8 +163,11 @@ class Turn {
   }
 }
 
+/** 사회자 화면용 합의 사건: 어떤 특수 카드를 받았는지는 숨기고 받았다는 것만 */
+const shown = ({ card, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: true } : {}) });
+
 const dealText = (deal: Deal) =>
-  `${agendaTitle(deal.agenda)} 합의! 주도권 +${deal.reward}${deal.card ? ` · [${CARDS[deal.card].name}] 획득` : ''}`;
+  `${agendaTitle(deal.agenda)} 합의! 주도권 +${deal.reward}${deal.card ? ` · 특수 카드 [${CARDS[deal.card].name}] 획득 (${CARDS[deal.card].desc})` : ''}`;
 
 function shuffle<T>(items: T[], rng: Rng): T[] {
   for (let i = items.length - 1; i > 0; i--) {
@@ -181,7 +195,7 @@ export function startRound(state: EngineState, rng: Rng = Math.random): Step {
   if (pub.round === FINAL_OPEN_ROUND) {
     const i = INITIAL_TABLES.length;
     pub.tables[i] = { ...emptyTable(), agenda: FINAL_AGENDA };
-    secret.remaining[i] = AGENDAS[FINAL_AGENDA].demand;
+    secret.remaining[i] = turn.setup.demand[FINAL_AGENDA];
     secret.trail[i] = [];
     turn.event({ kind: 'finalOpen', table: i + 1, agenda: FINAL_AGENDA });
   }
@@ -190,7 +204,7 @@ export function startRound(state: EngineState, rng: Rng = Math.random): Step {
     const before = pub.tables[table - 1]?.agenda;
     const deal = turn.damage(table, 'practice', team);
     if (deal) {
-      turn.event({ kind: 'practiceDeal', team, table, ...deal });
+      turn.event({ kind: 'practiceDeal', team, table, ...shown(deal) });
       turn.note(team, `🤝 실무 교섭 병행 발동! ${dealText(deal)}`);
     } else if (before) {
       turn.note(team, `🤝 실무 교섭 병행 발동: ${table}번 테이블 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
@@ -259,7 +273,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   const order = slots.map((t) => t ?? rest.shift()!);
   const changed = order.some((t, i) => t !== pub.order[i]);
   pub.order = order;
-  turn.event({ kind: 'start', cutIn: changed });
+  turn.event({ kind: 'start', ...(changed ? { cutIn: true, order } : {}) });
   for (const t of wantsCutIn) {
     turn.note(t, cutInPos.has(t) ? `⚡ 새치기: ${cutInPos.get(t)}번째로 제안 (주도권 −${CUT_IN_COST})` : '새치기 실패: 주도권이 부족해요');
   }
@@ -331,7 +345,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     if (card === 'blitz') turn.hand(t).blitz -= 1;
     const deal = turn.damage(tableNo, card, t);
     if (deal) {
-      turn.event({ kind: 'proposal', team: t, result: 'deal', table: tableNo, ...deal });
+      turn.event({ kind: 'proposal', team: t, result: 'deal', table: tableNo, ...shown(deal) });
       turn.note(t, `🎉 ${dealText(deal)}`);
     } else {
       turn.event({ kind: 'proposal', team: t, result: 'done' });
@@ -346,7 +360,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
       if (!table.agenda) break;
       const deal = turn.damage(i + 1, 'promo', owner);
       if (deal) {
-        turn.event({ kind: 'promoDeal', team: owner, table: i + 1, ...deal });
+        turn.event({ kind: 'promoDeal', team: owner, table: i + 1, ...shown(deal) });
         turn.note(owner, `📣 홍보물 효과로 ${dealText(deal)}`);
       }
     }

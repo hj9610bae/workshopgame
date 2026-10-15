@@ -27,27 +27,30 @@ export const SPECIAL_CARDS: SpecialCardId[] = ['blitz', 'practice', 'promo', 'ho
 
 export interface Agenda {
   id: number;
+  /** 제목에 맞는 픽토그램 */
+  icon: string;
   title: string;
+  /** 노조 요구안 (테이블에 공개) */
   union: string;
+  /** 회사 제시안 = 실제 타결 내용 (합의되는 순간 공개) */
   company: string;
   demand: number;
   reward: number;
-  card?: SpecialCardId;
 }
 
 const list: Agenda[] = [
-  { id: 3, title: '검진비', union: '10만 원 인상', company: '(수면비) 5만 원 인상', demand: 2, reward: 2 },
-  { id: 5, title: '난임시술', union: '본인부담금 100% & 100만 원 인상', company: '100% 지원', demand: 3, reward: 2 },
-  { id: 8, title: '체육대회', union: '체육대회 실시', company: '가족초청 행사 실시', demand: 3, reward: 3 },
-  { id: 12, title: '전기차', union: '충전소 확대', company: '사내 완속 충전기 추가 설치', demand: 4, reward: 3 },
-  { id: 2, title: '근속/건강', union: '41,182원 인상', company: '수당 5,045원 인상', demand: 5, reward: 4, card: 'blitz' },
-  { id: 7, title: '해외연수', union: '해외연수 재개', company: '2027년 조건부 시행', demand: 5, reward: 4, card: 'blitz' },
-  { id: 4, title: '복지포인트', union: '80만P 인상', company: '선택형 10만P 인상', demand: 6, reward: 4, card: 'hold' },
-  { id: 6, title: '근무제도', union: '상주 자율근무제', company: '상주 휴식플러스제', demand: 6, reward: 5, card: 'promo' },
-  { id: 9, title: '복지기금', union: '200억 출연', company: '후생제도 개선 TF 구성', demand: 8, reward: 7 },
-  { id: 10, title: '제도개선', union: '전사제도개선위', company: '임금제도개선위 구성', demand: 8, reward: 6 },
-  { id: 1, title: '기본급', union: '179,320원 인상', company: '80,000원 인상', demand: 10, reward: 8, card: 'practice' },
-  { id: 11, title: '성과급', union: "'25년 대비 150%", company: '300%+500만 원+30만 원', demand: 12, reward: 10 },
+  { id: 3, icon: '🩺', title: '검진비', union: '10만 원 인상', company: '(수면비) 5만 원 인상', demand: 2, reward: 2 },
+  { id: 5, icon: '👶', title: '난임시술', union: '본인부담금 100% & 100만 원 인상', company: '100% 지원', demand: 3, reward: 2 },
+  { id: 8, icon: '🏃', title: '체육대회', union: '체육대회 실시', company: '가족초청 행사 실시', demand: 3, reward: 3 },
+  { id: 12, icon: '🔌', title: '전기차', union: '충전소 확대', company: '사내 완속 충전기 추가 설치', demand: 4, reward: 3 },
+  { id: 2, icon: '💪', title: '근속/건강', union: '41,182원 인상', company: '수당 5,045원 인상', demand: 5, reward: 4 },
+  { id: 7, icon: '✈️', title: '해외연수', union: '해외연수 재개', company: '2027년 조건부 시행', demand: 5, reward: 4 },
+  { id: 4, icon: '🎁', title: '복지포인트', union: '80만P 인상', company: '선택형 10만P 인상', demand: 6, reward: 4 },
+  { id: 6, icon: '⏰', title: '근무제도', union: '상주 자율근무제', company: '상주 휴식플러스제', demand: 6, reward: 5 },
+  { id: 9, icon: '🏦', title: '복지기금', union: '200억 출연', company: '후생제도 개선 TF 구성', demand: 8, reward: 7 },
+  { id: 10, icon: '📋', title: '제도개선', union: '전사제도개선위', company: '임금제도개선위 구성', demand: 8, reward: 6 },
+  { id: 1, icon: '💵', title: '기본급', union: '179,320원 인상', company: '80,000원 인상', demand: 10, reward: 8 },
+  { id: 11, icon: '💰', title: '성과급', union: "'25년 대비 150%", company: '300%+500만 원+30만 원', demand: 12, reward: 10 },
 ];
 
 export const AGENDAS: Record<number, Agenda> = Object.fromEntries(list.map((a) => [a.id, a]));
@@ -58,3 +61,22 @@ export const INITIAL_TABLES = [3, 5, 8];
 export const QUEUE = [12, 2, 7, 4, 6, 9, 10, 1];
 /** 4라운드에 4번 테이블로 열리는 최종 교섭 안건 */
 export const FINAL_AGENDA = 11;
+
+/** 전리품(특수 카드)은 안건과 따로 정하고, 테이블에 오르는 순서대로 앞쪽 안건에 하나씩 붙임. 화면에는 '특수 카드'로만 표시 */
+export const LOOT_ORDER: SpecialCardId[] = ['promo', 'hold', 'blitz', 'blitz', 'practice'];
+export const LOOT: Partial<Record<number, SpecialCardId>> = Object.fromEntries(
+  [...INITIAL_TABLES, ...QUEUE].slice(0, LOOT_ORDER.length).map((id, i) => [id, LOOT_ORDER[i]]),
+);
+
+/** 안건 배치와 요구 수치. 실제 게임은 SETUP, 튜토리얼 예시는 따로 만든 배치를 씀 */
+export interface Setup {
+  tables: number[];
+  queue: number[];
+  demand: Record<number, number>;
+}
+
+export const SETUP: Setup = {
+  tables: INITIAL_TABLES,
+  queue: QUEUE,
+  demand: Object.fromEntries(list.map((a) => [a.id, a.demand])),
+};

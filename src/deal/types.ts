@@ -34,11 +34,13 @@ export interface GameEvent {
   table?: number;
   agenda?: number;
   reward?: number;
-  card?: SpecialCardId;
+  /** 합의로 특수 카드를 받았는지 (어떤 카드인지는 비공개) */
+  loot?: boolean;
   result?: ProposalResult;
   reason?: VoidReason;
-  /** start: 새치기로 순서가 바뀌었는지 */
+  /** start: 새치기로 순서가 바뀌었는지, 바뀐 순서 */
   cutIn?: boolean;
+  order?: TeamId[];
   /** 합의 사건: 블라인드였던 처음 요구 수치와 깎인 이력 (합의 순간에 공개) */
   demand?: number;
   trail?: Hit[];

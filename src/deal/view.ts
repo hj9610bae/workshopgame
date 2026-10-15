@@ -1,6 +1,6 @@
 /* 사회자 화면·대표 폰이 함께 쓰는 화면 조각 */
 import { esc } from '../ui';
-import { AGENDAS, CARDS, FINAL_AGENDA, FINAL_OPEN_ROUND, QUEUE, ROUNDS, type CardId, type TeamId } from './data';
+import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, LOOT, QUEUE, ROUNDS, type CardId, type TeamId } from './data';
 import { agendaTitle } from './engine';
 import type { GameEvent, PublicState, Stage, TableState } from './types';
 
@@ -31,10 +31,14 @@ export function snapshot(pub: PublicState): { tables: TableState[]; scores: Part
   };
 }
 
+/** 합의 보상. 전리품은 어떤 카드인지 밝히지 않고 '특수 카드'로만 */
 export function rewardText(agendaId: number): string {
-  const a = AGENDAS[agendaId];
-  return `+${a.reward}${a.card ? ` · ${CARDS[a.card].name}` : ''}`;
+  return `+${AGENDAS[agendaId].reward}${LOOT[agendaId] ? ' · 특수 카드' : ''}`;
 }
+
+/** 합의되는 순간 공개되는 실제 타결 내용 */
+export const settledText = (agendaId: number | undefined): string | undefined =>
+  agendaId && AGENDAS[agendaId] ? `타결: ${AGENDAS[agendaId].company}` : undefined;
 
 export function tableCard(table: TableState, index: number, round: number): string {
   const no = index + 1;
@@ -53,10 +57,9 @@ export function tableCard(table: TableState, index: number, round: number): stri
   }
   return `<article class="table${isFinal ? ' final' : ''}${table.frozen ? ' frozen' : ''}">
     <div class="table-no">${no}번 테이블${isFinal ? ' · 최종 교섭' : ''}</div>
-    <h3>안건 ${a.id} · ${esc(a.title)}</h3>
-    <p class="gap">${esc(a.union)} ➔ ${esc(a.company)}</p>
+    <h3>${a.icon} ${esc(a.title)}</h3>
+    <p class="gap">노조 요구: ${esc(a.union)}</p>
     <div class="table-stats">
-      <div><span class="label">요구 수치</span><strong>?</strong></div>
       <div><span class="label">합의 보상</span><strong>${rewardText(a.id)}</strong></div>
     </div>
     ${promos}
@@ -67,7 +70,7 @@ export function tableCard(table: TableState, index: number, round: number): stri
 export function queueStrip(pub: PublicState): string {
   const rest = QUEUE.slice(pub.queue);
   if (!rest.length) return '<p class="muted">대기열이 비었어요</p>';
-  return `<ol class="queue">${rest.map((id) => `<li>${esc(agendaTitle(id))}</li>`).join('')}</ol>`;
+  return `<ol class="queue">${rest.map((id) => `<li>${AGENDAS[id].icon} ${esc(agendaTitle(id))}</li>`).join('')}</ol>`;
 }
 
 const HIT_ICON: Record<CardId, string> = { basic: '', blitz: '⚡', practice: '🤝', promo: '📣', hold: '' };
@@ -88,29 +91,38 @@ export function trailText(e: GameEvent): string | undefined {
 }
 
 /** 사회자 화면에 띄울 사건 문장 */
-export function describeEvent(e: GameEvent): { icon: string; title: string; detail?: string; trail?: string; tone?: 'deal' | 'bad' } {
+export function describeEvent(e: GameEvent): {
+  icon: string;
+  title: string;
+  detail?: string;
+  /** 합의된 안건의 실제 타결 내용 */
+  settled?: string;
+  trail?: string;
+  tone?: 'deal' | 'bad';
+} {
   const team = e.team ? teamName(e.team) : '';
   const agenda = e.agenda ? `${agendaTitle(e.agenda)}` : '';
-  const reward = e.reward ? `주도권 +${e.reward}${e.card ? ` · [${CARDS[e.card].name}] 획득` : ''}` : '';
+  const reward = e.reward ? `주도권 +${e.reward}${e.loot ? ' · 특수 카드 1장 획득' : ''}` : '';
+  const settled = settledText(e.agenda);
   switch (e.kind) {
     case 'finalOpen':
       return { icon: '🏁', title: `최종 교섭 개시! ${e.table}번 테이블에 성과급 등장`, detail: `합의 보상 ${rewardText(FINAL_AGENDA)}`, tone: 'deal' };
     case 'practiceDeal':
-      return { icon: '🤝', title: `비공개 실무 교섭 타결! ${team}, ${agenda} 합의`, detail: reward, trail: trailText(e), tone: 'deal' };
+      return { icon: '🤝', title: `비공개 실무 교섭 타결! ${team}, ${agenda} 합의`, detail: reward, settled, trail: trailText(e), tone: 'deal' };
     case 'start':
       return e.cutIn
-        ? { icon: '⚡', title: '새치기 발생! 제안 순서가 바뀌었어요' }
+        ? { icon: '⚡', title: '새치기 발생! 제안 순서가 바뀌었어요', detail: e.order?.map(teamName).join(' → ') }
         : { icon: '📨', title: '제안을 공개합니다' };
     case 'hold':
       return { icon: '⛔', title: `${e.table}번 테이블 안건 보류!`, detail: '이번 라운드 이 테이블에 대한 제안은 모두 무효', tone: 'bad' };
     case 'promoDeal':
-      return { icon: '📣', title: `홍보물 효과! ${team}, ${agenda} 합의`, detail: reward, trail: trailText(e), tone: 'deal' };
+      return { icon: '📣', title: `홍보물 효과! ${team}, ${agenda} 합의`, detail: reward, settled, trail: trailText(e), tone: 'deal' };
     case 'end':
-      return { icon: '🔔', title: '라운드 종료', detail: '홍보물 효과 적용 완료' };
+      return { icon: '🔔', title: '라운드 종료' };
     case 'proposal':
       switch (e.result) {
         case 'deal':
-          return { icon: '🎉', title: `${team}, ${agenda} 합의!`, detail: reward, trail: trailText(e), tone: 'deal' };
+          return { icon: '🎉', title: `${team}, ${agenda} 합의!`, detail: reward, settled, trail: trailText(e), tone: 'deal' };
         case 'promo':
           return { icon: '📣', title: `${team}, ${e.table}번 테이블에 홍보물 부착`, detail: '매 라운드 종료 시 요구 수치 1 감소' };
         case 'void':
@@ -131,7 +143,7 @@ export function describeEvent(e: GameEvent): { icon: string; title: string; deta
 export function eventItem(e: GameEvent, big = false): string {
   const d = describeEvent(e);
   return `<li class="event${d.tone ? ` ${d.tone}` : ''}${big ? ' big' : ''}"><span class="icon">${d.icon}</span>
-    <div><strong>${esc(d.title)}</strong>${d.detail ? `<span class="muted">${esc(d.detail)}</span>` : ''}${d.trail ? `<span class="muted small">${esc(d.trail)}</span>` : ''}</div></li>`;
+    <div><strong>${esc(d.title)}</strong>${d.detail ? `<span class="muted">${esc(d.detail)}</span>` : ''}${d.settled ? `<span>${esc(d.settled)}</span>` : ''}${d.trail ? `<span class="muted small">${esc(d.trail)}</span>` : ''}</div></li>`;
 }
 
 export const roundLabel = (pub: PublicState): string =>

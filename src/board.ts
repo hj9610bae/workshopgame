@@ -38,7 +38,8 @@ let inputOpen = false;
 let scoutShown: (ScoutResult & { team: TeamId }) | null = null;
 let tutorialIndex = 0;
 let autoplay: number | undefined;
-const steps = tutorialSteps();
+/** 예시 라운드의 안건 배치는 설명을 열 때마다 새로 섞음 */
+let steps = tutorialSteps();
 
 setTeamNames(game.names);
 
@@ -87,23 +88,28 @@ function homeView(): string {
 /* ───────── 튜토리얼 ───────── */
 
 function sceneView(s: Scene, prev: Scene | undefined): string {
-  const looks: TableLook[] = s.tables.map((_, i) => ({ remaining: s.remaining[i] }));
-  if (s.deal) looks[s.deal.index] = { ...looks[s.deal.index], deal: s.deal, fresh: true };
-  else if (s.hit) looks[s.hit.index] = { ...looks[s.hit.index], hit: s.hit.amount, target: true };
+  const looks: TableLook[] = s.tables.map(() => ({}));
+  if (s.deal) looks[s.deal.index] = { deal: s.deal, fresh: true };
+  else if (s.hit) looks[s.hit.index] = { hit: s.hit.amount, target: true };
   const round = 1;
   const tables = s.tables.map((t, i) => feltTable(t, i, round, looks[i])).join('');
   const deltas = prev ? Object.fromEntries(s.order.map((t) => [t, (s.scores[t] ?? 0) - (prev.scores[t] ?? 0)])) : {};
   const slips = s.slips?.length ? `<div class="slips${s.slips.length > 1 ? ' many' : ''}">${s.slips.map((x) => slip(x.team, x.sub)).join('')}</div>` : '';
+  // 실제 게임의 공개 배너와 같은 모양
+  const banner = s.deal
+    ? `<div class="banner pop deal"><div class="banner-icon">🎉</div><h2>${esc(teamName(s.deal.team))}, ${esc(agendaTitle(s.deal.agenda))} 합의!</h2><p>주도권 +${s.deal.reward}</p>${trailStrip(s.deal)}</div>`
+    : s.active && s.slips?.length === 1
+      ? `<div class="banner pop"><div class="banner-icon">📝</div><h2>${esc(teamName(s.active))} 제안 완료</h2><p>아직 합의되지 않았습니다</p></div>`
+      : '';
   return `<section class="scene">
     <div class="caption">
-      <span class="badge">예시 · 남은 수치 공개</span>
+      <span class="badge">예시 라운드</span>
       <h2>${esc(s.title)}</h2>
       <p>${s.text}</p>
     </div>
     <div class="felt">
       <div class="felt-tables">${tables}</div>
-      ${slips}
-      ${s.deal ? trailStrip(s.deal) : ''}
+      <div class="scene-play">${slips}${banner}</div>
     </div>
     ${seats(s.order, s.scores, { active: s.active, deltas })}
   </section>`;
@@ -225,7 +231,7 @@ function eventRail(): string {
     .slice(0, pub.revealed)
     .map((e) => describeEvent(e))
     .reverse()
-    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}${d.trail ? `<small>${esc(d.trail)}</small>` : ''}</li>`)
+    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}${d.settled ? `<small>${esc(d.settled)}</small>` : ''}${d.trail ? `<small>${esc(d.trail)}</small>` : ''}</li>`)
     .join('');
   return `<div class="rail-events"><h3>이번 라운드</h3><ol>${items}</ol></div>`;
 }
@@ -488,6 +494,7 @@ function act(action: string, el: HTMLElement) {
     case 'tutorial':
       mode = 'tutorial';
       tutorialIndex = 0;
+      steps = tutorialSteps();
       return draw();
     case 'tut-next':
       return goTutorial(tutorialIndex + 1);

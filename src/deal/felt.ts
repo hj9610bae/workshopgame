@@ -5,9 +5,7 @@ import type { GameEvent, Submission, TableState } from './types';
 import { rewardText, teamName, trailSteps } from './view';
 
 export interface TableLook {
-  /** 남은 수치를 보여줄 때만 (튜토리얼, 진행자 창) */
-  remaining?: number;
-  /** 방금 깎인 양 */
+  /** 방금 깎인 양 (튜토리얼) */
   hit?: number;
   /** 방금 합의된 안건 (테이블에는 이미 새 안건이 올라와 있음) */
   deal?: { team: TeamId; agenda: number; reward: number };
@@ -39,18 +37,16 @@ export function feltTable(table: TableState, index: number, round: number, look:
       : '<div class="ftable-wait">대기열 소진</div>';
     return `<article class="${cls} empty">${head}<div class="ftable-slot">${label}</div>${stamp}</article>`;
   }
-  // 요구 수치는 블라인드: 남은 수치를 보여줄 때(튜토리얼·진행자 창)만 숫자 표시
-  const shown = look.remaining !== undefined;
+  // 요구 수치는 블라인드라 카드에 숫자 없이 픽토그램과 노조 요구안만
   const promos = table.promos
     .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">📣 ${esc(teamName(t))}</span>`)
     .join('');
   return `<article class="${cls}">
     ${head}
     <div class="agenda-card">
-      <div class="agenda-id">안건 ${a.id}</div>
+      <div class="pictogram" aria-hidden="true">${a.icon}</div>
       <h3>${esc(a.title)}</h3>
-      <p class="gap">${esc(a.union)}<br>➔ ${esc(a.company)}</p>
-      <div class="demand${shown ? '' : ' hidden'}"><strong>${shown ? Math.max(0, look.remaining!) : '?'}</strong>${shown ? `<span>/ ${a.demand}</span>` : ''}</div>
+      <p class="gap"><span>노조 요구</span>${esc(a.union)}</p>
       <div class="reward">🏆 ${rewardText(a.id)}</div>
       ${hit}
     </div>
@@ -63,7 +59,7 @@ export function feltTable(table: TableState, index: number, round: number, look:
 export function deck(queue: number): string {
   const rest = QUEUE.slice(queue);
   const stack = rest.length ? Array.from({ length: Math.min(rest.length, 5) }, (_, i) => `<i style="--i:${i}"></i>`).join('') : '';
-  const list = rest.map((id) => `<li>${esc(AGENDAS[id].title)}</li>`).join('');
+  const list = rest.map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)}</li>`).join('');
   return `<div class="deck">
     <div class="deck-stack">${stack}<span class="deck-count">${rest.length}</span></div>
     <div class="deck-label">대기열</div>
@@ -106,16 +102,20 @@ export function slip(team: TeamId, sub: Submission): string {
   </div>`;
 }
 
-/** 합의된 안건의 블라인드 해제: 처음 요구 수치부터 한 단계씩 깎여 온 과정 */
-export function trailStrip(e: Pick<GameEvent, 'demand' | 'trail'>): string {
+/** 합의된 안건의 블라인드 해제: 실제 타결 내용과, 처음 요구 수치부터 한 단계씩 깎여 온 과정 */
+export function trailStrip(e: Pick<GameEvent, 'agenda' | 'demand' | 'trail'>): string {
   if (!e.demand) return '';
+  const a = e.agenda ? AGENDAS[e.agenda] : undefined;
+  const settled = a
+    ? `<div class="settled"><span class="settled-from">노조 요구 ${esc(a.union)}</span><span class="settled-arrow">➔</span><span class="settled-to">타결 <b>${esc(a.company)}</b></span></div>`
+    : '';
   const steps = trailSteps(e as GameEvent)
     .map(
       (s, i) => `<span class="trail-arrow" style="--d:${i + 1}">➔</span>
         <span class="trail-hit${s.after <= 0 ? ' last' : ''}" style="--d:${i + 1}"><small>${esc(s.label)}</small><b>−${s.amount}</b><em>${s.after}</em></span>`,
     )
     .join('');
-  return `<div class="trail">
+  return `${settled}<div class="trail">
     <span class="trail-start"><small>블라인드 공개 · 요구 수치</small><b>${e.demand}</b></span>${steps}
   </div>`;
 }

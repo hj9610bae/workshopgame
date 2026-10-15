@@ -67,6 +67,14 @@ describe('규칙서 5장 예시 1라운드', () => {
     expect(state.secret.trail[2]).toEqual([{ team: 'E', card: 'basic', amount: 2 }]);
   });
 
+  it('전리품은 앞쪽 안건에 홍보물 → 안건 보류 순으로 붙고, 사회자 화면에는 받았다는 것만', () => {
+    expect(state.hands.A).toMatchObject({ promo: 1, hold: 0 });
+    expect(state.hands.D).toMatchObject({ hold: 1, promo: 0 });
+    const deals = state.pub.events.filter((e) => e.result === 'deal');
+    expect(deals.every((e) => e.loot === true && !('card' in e))).toBe(true);
+    expect(notes.A?.[0].text).toContain('홍보물 발행');
+  });
+
   it('2라운드 순서: D → A → E → C → B', () => {
     expect(startRound(state).state.pub.order).toEqual(['D', 'A', 'E', 'C', 'B']);
   });
@@ -160,7 +168,7 @@ describe('새치기', () => {
     expect(state.pub.order).toEqual(['E', 'A', 'B', 'C', 'D']);
     // E는 −2 후 검진비 합의 +2
     expect(state.pub.teams.E!.score).toBe(10);
-    expect(state.pub.events[0]).toMatchObject({ kind: 'start', cutIn: true });
+    expect(state.pub.events[0]).toMatchObject({ kind: 'start', cutIn: true, order: ['E', 'A', 'B', 'C', 'D'] });
   });
 
   it('겹치면 주도권 높은 팀 우선, 밀린 팀은 다음 빈자리', () => {
@@ -168,6 +176,20 @@ describe('새치기', () => {
     s.pub.teams.D!.score = 15;
     const { state } = resolveRound(s, { C: { ...basic(1), cutIn: 1 }, D: { ...basic(1), cutIn: 1 } });
     expect(state.pub.order).toEqual(['D', 'C', 'A', 'B', 'E']);
+  });
+
+  it('설명 슬라이드 예시: D·E가 모두 1번째 → D → E → A → B → C, 둘 다 −2', () => {
+    const s = round1();
+    Object.assign(s.pub.teams, { A: { score: 14, deals: 0 }, B: { score: 12, deals: 0 }, D: { score: 9, deals: 0 }, E: { score: 8, deals: 0 } });
+    const { state } = resolveRound(s, { D: { ...basic(4), cutIn: 1 }, E: { ...basic(4), cutIn: 1 } });
+    expect(state.pub.order).toEqual(['D', 'E', 'A', 'B', 'C']);
+    expect(state.pub.teams.E!.score).toBe(6);
+  });
+
+  it('순서가 그대로면 새 순서를 싣지 않음', () => {
+    const { state } = resolveRound(round1(), { A: { ...basic(3), cutIn: 1 } });
+    expect(state.pub.events[0]).toEqual(expect.objectContaining({ kind: 'start' }));
+    expect(state.pub.events[0].order).toBeUndefined();
   });
 
   it('주도권이 부족하면 실패', () => {
