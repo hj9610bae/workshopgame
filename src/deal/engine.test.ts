@@ -93,7 +93,7 @@ describe('특수 무기', () => {
     return s;
   }
 
-  it('포세이돈의 삼지창: 순번과 관계없이 앞 순번 선단의 공격도 무효, 특수 무기는 반환', () => {
+  it('포세이돈의 삼지창: 순번과 관계없이 앞 순번 함대의 공격도 무효, 특수 무기는 반환', () => {
     const s = withHand('E', 'hold');
     s.hands.A!.blitz = 1;
     const { state, notes } = resolveRound(s, {
@@ -176,7 +176,7 @@ describe('특수 무기', () => {
     const after = resolveRound(r2, { [lead]: basic(2), E: basic(2) }).state;
     const proposals = after.pub.events.filter((e) => e.kind === 'proposal');
     expect(proposals[0]).toMatchObject({ team: 'E', first: true });
-    expect(after.pub.tables[1].done).toEqual([{ agenda: 2, team: lead }]); // E가 3→1, 1위 선단이 마지막 일격
+    expect(after.pub.tables[1].done).toEqual([{ agenda: 2, team: lead }]); // E가 3→1, 1위 함대가 마지막 일격
     expect(after.secret.priority).toEqual([]);
   });
 
@@ -190,7 +190,7 @@ describe('특수 무기', () => {
     expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 2 });
   });
 
-  it('쇠사슬: 매일 끝날 때 1 감소, 처치 시 건 선단이 보상', () => {
+  it('쇠사슬: 매일 끝날 때 1 감소, 처치 시 건 함대가 보상', () => {
     const s = withHand('B', 'promo');
     const { state } = resolveRound(s, { A: basic(2), B: { table: 2, card: 'promo', cutIn: 0 } });
     // 바람 자루 3 − 2(A) − 1(쇠사슬) = 0 → B 처치
@@ -235,7 +235,7 @@ describe('제피로스의 순풍 (새치기)', () => {
     expect(state.pub.events[0]).toMatchObject({ kind: 'start', cutIn: true, order: ['E', 'A', 'B', 'C', 'D'] });
   });
 
-  it('겹치면 고국에 가까운 선단 우선, 밀린 선단은 다음 빈자리', () => {
+  it('겹치면 고국에 가까운 함대 우선, 밀린 함대는 다음 빈자리', () => {
     const s = round1();
     s.pub.teams.D!.score = 15;
     const { state } = resolveRound(s, { C: { ...basic(1), cutIn: 1 }, D: { ...basic(1), cutIn: 1 } });

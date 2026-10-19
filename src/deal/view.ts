@@ -6,12 +6,12 @@ import type { GameEvent, PublicState, Stage, TableState } from './types';
 
 let customNames: Partial<Record<TeamId, string>> = {};
 
-/** 현장 진행 화면에서 정한 선단 이름 (비우면 기본값 'A선단') */
+/** 현장 진행 화면에서 정한 함대 이름 (비우면 기본값 'A함대') */
 export const setTeamNames = (names: Partial<Record<TeamId, string>>): void => {
   customNames = names;
 };
 
-export const teamName = (t: TeamId): string => customNames[t]?.trim() || `${t}선단`;
+export const teamName = (t: TeamId): string => customNames[t]?.trim() || `${t}함대`;
 
 let setup: Setup = SETUP;
 
@@ -92,7 +92,7 @@ export function trailSteps(e: GameEvent): { label: string; amount: number; after
   });
 }
 
-/** 예: "생명력 3 ➔ C선단 −2 (1) ➔ D선단 −2 (-1)" */
+/** 예: "생명력 3 ➔ C함대 −2 (1) ➔ D함대 −2 (-1)" */
 export function trailText(e: GameEvent): string | undefined {
   if (!e.demand) return undefined;
   return [`생명력 ${e.demand}`, ...trailSteps(e).map((s) => `${s.label} −${s.amount} (${s.after})`)].join(' ➔ ');
@@ -109,7 +109,7 @@ export function describeEvent(e: GameEvent): {
   const team = e.team ? teamName(e.team) : '';
   const agenda = e.agenda ? `${agendaTitle(e.agenda)}` : '';
   const reward = e.reward ? `고국으로 ${e.reward}해리 전진${e.loot ? ' · 특수 무기 1개 획득' : ''}` : '';
-  // 헤르메스의 투척 창으로 가로챈 처치: 보상은 가로챈 선단에게
+  // 헤르메스의 투척 창으로 가로챈 처치: 보상은 가로챈 함대에게
   if (e.stolenBy && e.agenda) {
     const thief = teamName(e.stolenBy);
     return {

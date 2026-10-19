@@ -255,7 +255,7 @@ export function scout(state: EngineState, team: TeamId, tableNo: number): { stat
   const { pub, secret } = turn.s;
   const base = { round: pub.round, table: tableNo };
   if (pub.stage !== 'submit') return { state, result: { ...base, error: '제출 시간에만 사용할 수 있어요' } };
-  if (!pub.teams[team]) return { state, result: { ...base, error: '게임에 참여하지 않은 선단이에요' } };
+  if (!pub.teams[team]) return { state, result: { ...base, error: '게임에 참여하지 않은 함대예요' } };
   if (turn.team(team).score < SCOUT_COST) return { state, result: { ...base, error: '더 물러설 수 없어요' } };
   if (!turn.isOpen(tableNo)) return { state, result: { ...base, error: '역경이 없는 해역이에요' } };
   turn.team(team).score -= SCOUT_COST;
@@ -276,7 +276,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   pub.events = [];
   const n = pub.order.length;
 
-  // 순풍(새치기): 고국에 가까운 선단 우선(동점이면 원래 순번), 겹치면 가장 가까운 다음 빈자리
+  // 순풍(새치기): 고국에 가까운 함대 우선(동점이면 원래 순번), 겹치면 가장 가까운 다음 빈자리
   const wantsCutIn = pub.order.filter((t) => (subs[t]?.cutIn ?? 0) > 0);
   const cutters = wantsCutIn
     .filter((t) => turn.team(t).score >= CUT_IN_COST)
@@ -309,7 +309,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     return sub && sub.card !== 'promo' && sub.card !== 'hold' ? sub : undefined;
   };
 
-  // ① 포세이돈의 삼지창(동결): 순번과 관계없이 가장 먼저 적용, 쓴 선단은 다음 날 그 해역 우선권
+  // ① 포세이돈의 삼지창(동결): 순번과 관계없이 가장 먼저 적용, 쓴 함대는 다음 날 그 해역 우선권
   const lastPriority = secret.priority ?? [];
   secret.priority = [];
   const held = new Set<TeamId>();
@@ -359,7 +359,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
       turn.note(t, '제출하지 않아 오늘은 쉬었어요');
       continue;
     }
-    // 추가 카드: 쇠사슬은 이 선단 차례에 공개, 삼지창은 위에서 처리
+    // 추가 카드: 쇠사슬은 이 함대 차례에 공개, 삼지창은 위에서 처리
     const x = extraOf(t);
     if (x?.card === 'hold' && !held.has(t)) turn.note(t, '포세이돈의 삼지창을 쓸 수 없어 무효가 됐어요');
     if (x?.card === 'hold' && held.has(t)) {

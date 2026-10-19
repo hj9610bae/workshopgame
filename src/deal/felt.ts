@@ -1,4 +1,4 @@
-/* 현장 진행 화면(board.html)이 쓰는 '탐험 해역'·선단 자리 그림 조각 */
+/* 현장 진행 화면(board.html)이 쓰는 '탐험 해역'·함대 자리 그림 조각 */
 import { esc } from '../ui';
 import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, TIER_LABEL, distanceOf, type TeamId } from './data';
 import type { GameEvent, TableState } from './types';
@@ -88,28 +88,72 @@ export function deck(queue: number): string {
 
 export interface SeatLook {
   active?: TeamId;
-  /** 선단 이름 아래 작은 표시 (제출 상태 등) */
+  /** 함대 이름 옆 작은 표시 (제출 상태 등) */
   status?: Partial<Record<TeamId, string>>;
   deltas?: Partial<Record<TeamId, number>>;
+  /** 배 위치를 기억해 움직임을 그리는 단위 (게임 화면·설명·최종 결과가 서로 섞이지 않게) */
+  key?: string;
 }
 
-/** 공격 순서대로 늘어선 선단 자리. 점수는 고국과의 거리(해리)로 보여 줌 */
-export function seats(order: TeamId[], scores: Partial<Record<TeamId, number>>, look: SeatLook = {}): string {
-  const items = order
+/** 지난번에 그린 배의 가로 위치(%). 거리가 바뀌면 그 자리에서 새 자리로 항해해 오게 */
+const lastX = new Map<string, number>();
+
+/** 눈금 간격: 지도에 6칸 안팎이 되도록 1·2·5·10… 중에서 */
+function tickStep(range: number): number {
+  const raw = range / 6;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 5, 10].map((m) => m * pow).find((v) => v >= raw) ?? 10 * pow;
+}
+
+export const distanceLabel = (d: number): string => (d < 0 ? `내륙 ${-d}해리` : d === 0 ? '항구 도착' : `${d}해리`);
+
+/**
+ * 공격 순서대로 한 줄씩, 고국과의 거리만큼 떨어진 자리에 배를 그린 바다 지도.
+ * 왼쪽 끝이 이타카 섬(0 = 항구, 음수 = 섬 안쪽), 오른쪽 끝이 트로이 전장.
+ * 축척은 그날 함대들의 거리와 항구가 화면에 꽉 차도록 매번 맞춤 (간격은 실제 거리 차이에 비례)
+ */
+export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>, look: SeatLook = {}): string {
+  const key = look.key ?? 'game';
+  const dist = order.map((t) => distanceOf(scores[t] ?? 0));
+  const near = Math.min(0, ...dist);
+  const far = Math.max(0, ...dist);
+  const span = Math.max(far - near, 6);
+  const lo = near - Math.max(2, span * 0.15);
+  const hi = far + Math.max(1.5, span * 0.1);
+  const x = (d: number) => ((d - lo) / (hi - lo)) * 100;
+  const port = x(0);
+  const step = tickStep(hi - lo);
+  const ticks: string[] = [];
+  for (let v = Math.ceil(lo / step) * step; v < hi; v += step) {
+    if (v !== 0) ticks.push(`<span class="sea-tick" style="--x:${x(v).toFixed(2)}%">${v}</span>`);
+  }
+  const ships = order
     .map((t, i) => {
-      // d 는 전진 거리 변화: 전진하면 고국과의 거리가 줄어듦
-      const d = look.deltas?.[t] ?? 0;
-      const delta = d ? `<span class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '−' : '+'}${Math.abs(d)}</span>` : '';
+      const d = dist[i];
+      const px = x(d);
+      const id = `${key}:${t}`;
+      const prev = lastX.get(id);
+      lastX.set(id, px);
+      const sail = prev !== undefined && Math.abs(prev - px) > 0.05;
+      // delta 는 전진 거리 변화: 전진하면 고국과의 거리가 줄어듦
+      const dd = look.deltas?.[t] ?? 0;
+      const delta = dd ? `<span class="delta ${dd > 0 ? 'up' : 'down'}">${dd > 0 ? '−' : '+'}${Math.abs(dd)}</span>` : '';
       const status = look.status?.[t];
-      return `<li class="seat${look.active === t ? ' active' : ''}">
-        <span class="seat-pos">${i + 1}</span>
-        <div class="seat-name">${esc(teamName(t))}</div>
-        <div class="seat-score"><span class="coin">🧭</span><strong>${distanceOf(scores[t] ?? 0)}</strong><small>해리</small>${delta}</div>
-        ${status ? `<div class="seat-status">${status}</div>` : ''}
+      const style = `--i:${i};--x:${px.toFixed(2)}%${sail ? `;--from:${prev!.toFixed(2)}%` : ''}`;
+      return `<li class="ship${look.active === t ? ' active' : ''}${sail ? ' sail' : ''}" style="${style}">
+        <span class="ship-pos">${i + 1}</span><span class="ship-icon" aria-hidden="true">⛵</span>
+        <b class="ship-name">${esc(teamName(t))}</b><span class="ship-dist">${distanceLabel(d)}</span>${delta}
+        ${status ? `<span class="ship-status">${status}</span>` : ''}
       </li>`;
     })
     .join('');
-  return `<ol class="seats">${items}</ol>`;
+  return `<section class="sea" style="--rows:${order.length};--port:${port.toFixed(2)}%">
+    <div class="sea-land"><span>🏝️ 이타카 섬</span></div>
+    <div class="sea-port"><span>⚓ 이타카 항구 0</span></div>
+    <div class="sea-troy"><span>⚔️ 트로이 전장</span></div>
+    <div class="sea-ticks">${ticks.join('')}</div>
+    <ol class="sea-ships">${ships}</ol>
+  </section>`;
 }
 
 /** 처치된 역경의 공격 이력: 처음 생명력부터 한 단계씩 깎여 온 과정 */

@@ -181,7 +181,7 @@ body.live button.small {
     inset 0 0 0 3px var(--wood-light),
     inset 0 0 50px rgba(0, 0, 0, 0.45),
     0 12px 30px rgba(0, 0, 0, 0.5);
-  min-height: 46vh;
+  min-height: 40vh;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -680,65 +680,150 @@ body.live button.small {
   color: #ffb3bf;
 }
 
-/* 팀 자리 */
-.seats {
+/* 바다 지도: 왼쪽 이타카 섬 ← 바다 → 오른쪽 트로이 전장 */
+.sea {
+  --row: 2.2em;
+  position: relative;
+  height: calc(var(--rows) * var(--row) + 3.2em);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(170deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 22px),
+    linear-gradient(90deg, #1f7fb5, #145a8a 55%, #0e3f66);
+  border: 3px solid #0b3150;
+}
+
+.sea-land {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--port);
+  background: linear-gradient(90deg, #4f8a3c, #7da650 70%, #e2cf96);
+  transition: width 1.2s ease-in-out;
+}
+
+.sea-land span,
+.sea-troy span {
+  position: absolute;
+  top: 6px;
+  font-weight: 900;
+  font-size: 0.95em;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.sea-land span {
+  left: 10px;
+}
+
+.sea-port {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--port);
+  border-left: 3px dashed var(--gold);
+  transition: left 1.2s ease-in-out;
+}
+
+.sea-port span {
+  position: absolute;
+  bottom: 4px;
+  left: 6px;
+  font-size: 0.8em;
+  font-weight: 800;
+  color: var(--gold);
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.sea-troy {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 9%;
+  background: linear-gradient(90deg, transparent, rgba(160, 40, 40, 0.55));
+}
+
+.sea-troy span {
+  right: 10px;
+}
+
+.sea-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 1.2em;
+}
+
+.sea-tick {
+  position: absolute;
+  left: var(--x);
+  transform: translateX(-50%);
+  font-size: 0.72em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.sea-ships {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
 }
 
-.seat {
-  position: relative;
-  padding: 12px 14px 12px 52px;
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, #2b3152, var(--surface));
-  border: 3px solid transparent;
-  transition: transform 0.3s;
-}
-
-.seat.active {
-  border-color: var(--gold);
-  transform: translateY(-6px);
-  box-shadow: 0 0 24px rgba(255, 207, 63, 0.45);
-}
-
-.seat-pos {
+.ship {
   position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1.9em;
-  height: 1.9em;
+  top: calc(1.9em + var(--i) * var(--row));
+  left: var(--x);
+  /* 왼쪽 끝에선 왼쪽 정렬, 오른쪽 끝에선 오른쪽 정렬이 되도록 위치 비율만큼 당김 */
+  transform: translateX(calc(var(--x) * -1));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: calc(var(--row) - 0.4em);
+  padding: 0 12px 0 4px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(9, 20, 40, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.ship.sail {
+  animation: sail 1.4s ease-in-out both;
+}
+
+@keyframes sail {
+  from {
+    left: var(--from);
+    transform: translateX(calc(var(--from) * -1));
+  }
+}
+
+.ship.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 18px rgba(255, 207, 63, 0.6);
+}
+
+.ship-pos {
+  width: 1.6em;
+  height: 1.6em;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: var(--accent);
   color: var(--accent-text);
   font-weight: 900;
+  font-size: 0.85em;
 }
 
-.seat-name {
+.ship-icon {
+  font-size: 1.15em;
+}
+
+.ship-name {
+  font-size: 1.05em;
+}
+
+.ship-dist {
   font-weight: 800;
-  font-size: 1.15rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.seat-score {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 1.4rem;
-}
-
-.seat-score small {
-  margin-left: -4px;
-  font-size: 0.75rem;
-  color: var(--muted);
+  color: var(--gold);
 }
 
 .delta {
@@ -759,8 +844,8 @@ body.live button.small {
   color: #fff;
 }
 
-.seat-status {
-  font-size: 0.85rem;
+.ship-status {
+  font-size: 0.8em;
   color: var(--muted);
 }
 
@@ -1501,4 +1586,56 @@ button.dot-btn.on {
 .reveal-card.tier-high {
   outline: 3px solid #d63a3a;
   outline-offset: 2px;
+}
+
+/* 설명 슬라이드의 예시 바다 지도 */
+.slide-sea {
+  width: min(1100px, 100%);
+  margin: 18px auto 0;
+  text-align: left;
+}
+
+.final-board .sea {
+  width: min(1200px, 100%);
+  margin: 0 auto 16px;
+}
+
+.slide-sea .sea {
+  font-size: 1rem;
+}
+
+.final-board .sea {
+  --row: 2.1em;
+}
+
+@media (max-height: 950px) {
+  .sea {
+    --row: 1.9em;
+  }
+}
+
+/* 1366×768 같은 낮은 화면: 바다 지도를 납작하게 */
+@media (max-height: 800px) {
+  .sea {
+    --row: 1.6em;
+    font-size: 0.8rem;
+    height: calc(var(--rows) * var(--row) + 2.8em);
+  }
+
+  .felt {
+    padding: 14px 18px;
+    gap: 10px;
+  }
+
+  .agenda-card .pictogram {
+    font-size: 1.8rem;
+  }
+
+  .agenda-card h3 {
+    font-size: 1.2rem;
+  }
+}
+
+.sea .delta {
+  font-size: 0.85em;
 }

@@ -4,9 +4,9 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
+import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
 import { agendaTitle, beginSubmit, createGame, finish, ranking, resolveRound, revealNext, scout, startRound, type EngineState } from './deal/engine';
-import { deck, feltTable, seats, trailStrip, type TableLook } from './deal/felt';
+import { deck, distanceLabel, feltTable, seaMap, trailStrip, type TableLook } from './deal/felt';
 import {
   beatConsole,
   closeConsole,
@@ -63,7 +63,7 @@ function homeView(): string {
     const on = picked.has(t);
     return `<li class="pick${on ? ' on' : ''}">
       <button class="pick-toggle" data-action="toggle-team" data-team="${t}">${on ? '✅' : '⬜'} ${t}</button>
-      <input data-name="${t}" value="${esc(game.names[t] ?? '')}" placeholder="${t}선단" maxlength="12" ${on ? '' : 'disabled'} />
+      <input data-name="${t}" value="${esc(game.names[t] ?? '')}" placeholder="${t}함대" maxlength="12" ${on ? '' : 'disabled'} />
     </li>`;
   }).join('');
   const resume = game.engine
@@ -72,17 +72,17 @@ function homeView(): string {
   return `<section class="home-board">
     <div class="hero">
       <div class="hero-chips">${['⛵', '🗡️', '🐉', '🧭'].map((c) => `<span>${c}</span>`).join('')}</div>
-      <h1>⛵ 오디세이아 : 귀환의 항해</h1>
+      <h1>오디세이아 : 귀환의 항해</h1>
       <p class="muted">${ROUNDS}일간의 항해 · 한 화면 현장 진행</p>
       <button class="tutorial-btn" data-action="tutorial">📖 항해 설명 보기</button>
       <button class="secondary practice-home" data-action="practice">🎲 바로 연습 항해 (하루, 무작위 역경)</button>
     </div>
     <div class="card setup">
-      <h2>참가 선단</h2>
+      <h2>참가 함대</h2>
       <ul class="picks">${rows}</ul>
-      <p class="muted small">선단 이름은 비워 두면 'A선단'처럼 표시돼요.</p>
+      <p class="muted small">함대 이름은 비워 두면 'A함대'처럼 표시돼요.</p>
       ${resume}
-      <button data-action="new-game" ${picked.size ? '' : 'disabled'}>▶ 출항 (${picked.size}선단)</button>
+      <button data-action="new-game" ${picked.size ? '' : 'disabled'}>▶ 출항 (${picked.size}함대)</button>
     </div>
   </section>`;
 }
@@ -91,7 +91,7 @@ function homeView(): string {
 
 function tutorialView(): string {
   const step = steps[tutorialIndex];
-  const body = `<section class="slide"><h1>${esc(step.title)}</h1>${step.html}</section>`;
+  const body = `<section class="slide"><h1>${esc(step.title)}</h1>${step.html}${step.sea ? exampleSea() : ''}</section>`;
   const dots = steps
     .map((_, i) => `<button class="dot-btn${i === tutorialIndex ? ' on' : ''}" data-action="tut-go" data-index="${i}" aria-label="${i + 1}번째 장면"></button>`)
     .join('');
@@ -112,6 +112,13 @@ function tutorialView(): string {
       ${last ? '<button data-action="practice">연습 항해 시작 ▶</button>' : '<button data-action="tut-next">다음 ▶</button>'}
     </footer>
   </div>`;
+}
+
+/** 설명용 바다 지도: 고국에 가까운 순으로 늘어선 예시 */
+function exampleSea(): string {
+  const dist: Record<TeamId, number> = { A: -2, B: 3, C: 7, D: 10, E: 15 };
+  const scores = Object.fromEntries(TEAM_IDS.map((t) => [t, START_DISTANCE + START_SCORE - dist[t]]));
+  return `<div class="slide-sea">${seaMap([...TEAM_IDS], scores, { key: 'tutorial' })}</div>`;
 }
 
 function stopAutoplay() {
@@ -178,7 +185,7 @@ function banner(): string {
   switch (pub.stage) {
     case 'order': {
       const news = pub.events.map((e) => describeEvent(e)).map((d) => `<li>${d.icon} ${esc(d.title)}${d.detail ? ` <span class="muted">${esc(d.detail)}</span>` : ''}</li>`);
-      const tie = pub.round === 1 ? '1일차 순서는 추첨!' : '고국에 가까운 선단부터. 같으면 지난 날 뒤 순번이 먼저.';
+      const tie = pub.round === 1 ? '1일차 순서는 추첨!' : '고국에 가까운 함대부터. 같으면 지난 날 뒤 순번이 먼저.';
       return `<div class="banner calm"><h2>${pub.round}일차 순서 발표</h2><p>${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p>
         ${news.length ? `<ul class="news">${news.join('')}</ul>` : ''}<p class="muted small">${tie}</p></div>`;
     }
@@ -188,15 +195,15 @@ function banner(): string {
           <h2>📝 포스트잇에 적어 내세요</h2>
           <div class="big-timer" data-timer></div>
           <p class="scout-now">🔮 <b>${SCOUT_NAME}</b>를 쓰려면 <b>지금</b> 진행자에게 오세요! <span>(${SCOUT_COST}해리 후퇴, 해역 1곳의 남은 생명력)</span></p>
-          <p class="muted">${done}/${pub.teamIds.length}선단 입력 완료</p>
+          <p class="muted">${done}/${pub.teamIds.length}함대 입력 완료</p>
         </div>
         <div class="guide-example">
           <div class="postit">
-            <div class="postit-team">A선단</div>
+            <div class="postit-team">A함대</div>
             <div class="postit-line"><span>해역</span><b>2번</b></div>
             <div class="postit-line"><span>무기</span><b>${CARDS.basic.name}</b></div>
             <div class="postit-line opt"><span>순풍</span><b>1번째</b><em>(쓸 때만)</em></div>
-            <div class="postit-line opt"><span>추가</span><b>무기명 3번</b><em>(가진 선단만)</em></div>
+            <div class="postit-line opt"><span>추가</span><b>무기명 3번</b><em>(가진 함대만)</em></div>
           </div>
           <p class="muted small">이렇게 적어 주세요</p>
         </div>
@@ -249,7 +256,7 @@ function gameView(): string {
       </section>
       <aside class="rail">${deck(eventQueue())}${eventRail()}</aside>
     </div>
-    ${seats(pub.order, snap.scores, seatLook())}
+    ${seaMap(pub.order, snap.scores, seatLook())}
     ${showDock() ? dock() : ''}`;
 }
 
@@ -274,7 +281,7 @@ function dock(): string {
     case 'submit': {
       const done = pub.teamIds.filter((t) => game.subs[t]?.table).length;
       main = `${inputPanel()}
-        <button class="wide" data-action="resolve">⚔️ 공격 공개 ▶${done < pub.teamIds.length ? ` <span class="small">(미입력 ${pub.teamIds.length - done}선단은 쉼)</span>` : ''}</button>`;
+        <button class="wide" data-action="resolve">⚔️ 공격 공개 ▶${done < pub.teamIds.length ? ` <span class="small">(미입력 ${pub.teamIds.length - done}함대는 쉼)</span>` : ''}</button>`;
       break;
     }
     case 'reveal': {
@@ -364,13 +371,13 @@ function scoutModal(): string {
     <h2>🔮 ${esc(teamName(s.team))} ${SCOUT_NAME}</h2>
     <p>${s.table}번 해역 · ${esc(agendaTitle(s.agenda))} · 남은 생명력</p>
     <div class="scout-num"><span class="masked">?</span><strong>${s.remaining}</strong></div>
-    <p class="muted">📢 선단 대표가 직접 <b>누르고 있는 동안</b>만 숫자가 보여요. 손을 떼면 다시 가려져요.</p>
+    <p class="muted">📢 함대 대표가 직접 <b>누르고 있는 동안</b>만 숫자가 보여요. 손을 떼면 다시 가려져요.</p>
     <button class="secondary peek-btn" data-peek>👁 누르고 있기</button>
     <button data-action="scout-close">닫기</button>
   </div></div>`;
 }
 
-/** 진행자 창 전용: 남은 생명력, 보유 무기, 선단별 결과 기록 */
+/** 진행자 창 전용: 남은 생명력, 보유 무기, 함대별 결과 기록 */
 function secretPanel(): string {
   const s = eng();
   const tables = s.pub.tables
@@ -396,7 +403,7 @@ function secretPanel(): string {
   return `<section class="secret card">
     <div><h3>남은 / 처음 생명력</h3><ul class="plain">${tables}</ul>${practice ? `<p class="muted small">내일 날아갈 투척 창: ${practice}</p>` : ''}</div>
     <div><h3>보유 특수 무기</h3><ul class="plain">${hands}</ul></div>
-    <div class="log"><h3>선단별 결과 (선단에게 알려 주세요)</h3><ul class="plain">${log || '<li class="muted">아직 없어요</li>'}</ul></div>
+    <div class="log"><h3>함대별 결과 (함대에게 알려 주세요)</h3><ul class="plain">${log || '<li class="muted">아직 없어요</li>'}</ul></div>
   </section>`;
 }
 
@@ -409,16 +416,17 @@ function rankView(): string {
   const winners = rows.filter((r) => r.rank === 1);
   const medal = ['🥇', '🥈', '🥉'];
   const list = rows
-    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceOf(r.score)}해리</span><span class="muted">처치 ${r.deals}회</span></li>`)
+    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">처치 ${r.deals}회</span></li>`)
     .join('');
   const best = winners[0] ? distanceOf(winners[0].score) : START_DISTANCE;
   const where = best <= 0 ? `고국 이타카에 도착해 내륙 ${-best}해리까지 들어간` : `고국까지 ${best}해리를 남긴`;
   return `<section class="final-board">
     <div class="confetti">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
     <h1>🏆 최종 결과 · 고국과의 거리</h1>
+    ${seaMap(rows.map((r) => r.team), Object.fromEntries(rows.map((r) => [r.team, r.score])), { key: 'final' })}
     <ol class="podium">${list}</ol>
     <blockquote class="closing">
-      "${ROUNDS}일간의 험난한 항해가 모두 끝났습니다! 오늘 가장 먼저 귀환한 선단은 ${where}
+      "${ROUNDS}일간의 험난한 항해가 모두 끝났습니다! 오늘 가장 먼저 귀환한 함대는 ${where}
       ${winners.map((w) => esc(teamName(w.team))).join(', ')}입니다! 축하드립니다!<br />
       이번 항해에서는 역경의 남은 생명력을 가늠하고 마지막 일격을 넣는 타이밍이 핵심이었습니다.
       실제 교섭에서도 큰 역경을 함께 깎아 내는 끈기와, 제시안을 내는 '타이밍 전략'이 성공적인 타결을 만든다는 점을 기억해 주시기 바랍니다!"
@@ -427,7 +435,7 @@ function rankView(): string {
   </section>`;
 }
 
-/** 모든 역경의 생명력·실제 교섭 안건·처치한 선단 */
+/** 모든 역경의 생명력·실제 교섭 안건·처치한 함대 */
 function agendaReveal(): string {
   const { pub } = eng();
   const dealtBy = new Map(pub.tables.flatMap((t) => t.done ?? []).map((d) => [d.agenda, d.team]));
@@ -445,7 +453,7 @@ function agendaReveal(): string {
     <h1>🗺️ 항해 일지 · 역경 뒤의 교섭 안건</h1>
     <ol class="reveal-grid">${cards}</ol>
     <blockquote class="closing lesson">
-      혼자서는 쓰러뜨릴 수 없는 <b>거대한 역경</b>도, 여러 선단이 조금씩 깎아 두면 결국 쓰러집니다.<br />
+      혼자서는 쓰러뜨릴 수 없는 <b>거대한 역경</b>도, 여러 함대가 조금씩 깎아 두면 결국 쓰러집니다.<br />
       남은 힘을 읽고 <b>마지막 일격의 타이밍</b>을 잡는 것, 그것이 교섭의 기술입니다.
     </blockquote>
     ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="final-tab">◀ 순위 보기</button>' + (isConsole ? '' : '<button class="secondary narrow" data-action="home">처음 화면</button>') + '</div>' : ''}
@@ -455,7 +463,7 @@ function agendaReveal(): string {
 /* ───────── 그리기 ───────── */
 
 function draw() {
-  // 튜토리얼 설명문은 A~E 선단 기준이라 이름 바꾸기를 적용하지 않음
+  // 튜토리얼 설명문은 A~E 함대 기준이라 이름 바꾸기를 적용하지 않음
   setTeamNames(mode === 'tutorial' ? {} : game.names);
   useSetup(game.engine?.setup);
   if (mode === 'tutorial') return render(app, tutorialView());
@@ -615,7 +623,7 @@ function act(action: string, el: HTMLElement) {
       const n = eng().pub.teamIds.length;
       const subs = Object.fromEntries(Object.entries(game.subs).filter(([, s]) => s?.table));
       const missing = n - Object.keys(subs).length;
-      if (missing && !confirm(`${missing}선단이 입력되지 않았어요. 이 선단들은 오늘 쉬는 것으로 처리할까요?`)) return;
+      if (missing && !confirm(`${missing}함대가 입력되지 않았어요. 이 함대들은 오늘 쉬는 것으로 처리할까요?`)) return;
       const noTable = Object.entries(subs).filter(([, s]) => s?.extra && !s.extra.table).map(([t]) => teamName(t as TeamId));
       if (noTable.length && !confirm(`${noTable.join(', ')}의 추가 카드 해역이 비어 있어요. 추가 카드 없이 진행할까요?`)) return;
       inputOpen = false;
