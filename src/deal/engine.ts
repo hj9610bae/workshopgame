@@ -1,5 +1,6 @@
 /*
- * 교섭의 도박사들 규칙 엔진 (docs/rules.md 구현).
+ * 오디세이아 규칙 엔진 (docs/rules.md 구현). 코드의 '안건·테이블·합의'는 규칙서의 '역경·해역·처치'.
+ * score 는 전진한 거리(높을수록 좋음)이고, 화면에는 distanceOf()로 '고국과의 거리'를 보여 줘요.
  * Firebase·화면과 무관한 순수 함수라서 테스트로 규칙을 검증할 수 있어요.
  * 모든 함수는 입력 상태를 바꾸지 않고 새 상태를 돌려줍니다.
  */
@@ -54,7 +55,7 @@ interface Deal {
 
 export const emptyHand = (): Hand => ({ blitz: 0, practice: 0, promo: 0, hold: 0 });
 
-export const agendaTitle = (id: number | undefined): string => (id ? AGENDAS[id]?.title ?? '?' : '빈 테이블');
+export const agendaTitle = (id: number | undefined): string => (id ? AGENDAS[id]?.title ?? '?' : '빈 해역');
 
 const emptyTable = () => ({ agenda: 0, frozen: false, promos: [] as TeamId[] });
 
@@ -144,7 +145,9 @@ class Turn {
     // 실무 교섭 병행: 이번 라운드 이 테이블의 합의는 먼저 건 팀이 가로챔
     const thief = this.steals.get(i)?.shift();
     const winner = thief ?? team;
-    this.team(winner).score += agenda.reward;
+    // 처치 보상(전진 거리) = 처음 생명력
+    const reward = this.setup.demand[agenda.id];
+    this.team(winner).score += reward;
     this.team(winner).deals += 1;
     if (loot) this.hand(winner)[loot] += 1;
     (pub.tables[i].done ??= []).push({ agenda: agenda.id, team: winner });
@@ -153,7 +156,7 @@ class Turn {
       winner,
       stolen: !!thief && thief !== team,
       agenda: agenda.id,
-      reward: agenda.reward,
+      reward,
       card: loot,
       demand: this.setup.demand[agenda.id],
       trail,
@@ -180,11 +183,11 @@ class Turn {
   }
 }
 
-/** 사회자 화면용 합의 사건: 어떤 특수 카드를 받았는지는 숨기고 받았다는 것만 */
+/** 사회자 화면용 처치 사건: 어떤 특수 무기를 받았는지는 숨기고 받았다는 것만 */
 const shown = ({ card, winner, stolen, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: true } : {}), ...(stolen ? { stolenBy: winner } : {}) });
 
 const dealText = (deal: Deal) =>
-  `${agendaTitle(deal.agenda)} 합의! 주도권 +${deal.reward}${deal.card ? ` · 특수 카드 [${CARDS[deal.card].name}] 획득 (${CARDS[deal.card].desc})` : ''}`;
+  `${agendaTitle(deal.agenda)} 처치! ${deal.reward}해리 전진${deal.card ? ` · 특수 무기 [${CARDS[deal.card].name}] 획득 (${CARDS[deal.card].desc})` : ''}`;
 
 function shuffle<T>(items: T[], rng: Rng): T[] {
   for (let i = items.length - 1; i > 0; i--) {
@@ -194,7 +197,7 @@ function shuffle<T>(items: T[], rng: Rng): T[] {
   return items;
 }
 
-/** 주도권 높은 순. 동점이면 지난 라운드 뒤 순번 우선. 1라운드는 무작위 */
+/** 고국에 가까운 순(전진 거리 큰 순). 동점이면 지난 날 뒤 순번 우선. 1일차는 무작위 */
 export function computeOrder(pub: PublicState, rng: Rng): TeamId[] {
   if (!pub.prevOrder.length) return shuffle([...pub.teamIds], rng);
   const score = (t: TeamId) => pub.teams[t]?.score ?? 0;
@@ -202,7 +205,7 @@ export function computeOrder(pub: PublicState, rng: Rng): TeamId[] {
   return [...pub.teamIds].sort((a, b) => score(b) - score(a) || prev(b) - prev(a));
 }
 
-/** 라운드 시작: ⓪ 최종 교섭 개시 → ① 실무 교섭 발동 → ② 순서 결정 */
+/** 하루 시작: ⓪ 최종 결전 개시 → ① 투척 창 발동 → ② 순서 결정 */
 export function startRound(state: EngineState, rng: Rng = Math.random): Step {
   const turn = new Turn(state, 'start');
   const { pub, secret } = turn.s;
@@ -222,11 +225,11 @@ export function startRound(state: EngineState, rng: Rng = Math.random): Step {
     const deal = turn.damage(table, 'practice', team);
     if (deal) {
       turn.event({ kind: 'practiceDeal', team, table, ...shown(deal) });
-      turn.note(team, `🤝 실무 교섭 병행 발동! ${dealText(deal)}`);
+      turn.note(team, `🎯 헤르메스의 투척 창 발동! ${dealText(deal)}`);
     } else if (before) {
-      turn.note(team, `🤝 실무 교섭 병행(못 가로챈 카드) 발동: ${table}번 테이블 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
+      turn.note(team, `🎯 투척 창(못 가로챈 창) 발동: ${table}번 해역 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
     } else {
-      turn.note(team, `실무 교섭 병행: ${table}번 테이블이 비어 있어 효과가 없었어요`, -1);
+      turn.note(team, `투척 창: ${table}번 해역이 비어 있어 효과가 없었어요`, -1);
     }
   }
   secret.practice = [];
@@ -246,15 +249,15 @@ export function beginSubmit(state: EngineState, now: number): EngineState {
   return next;
 }
 
-/** 속마음 스카우터: 주도권 −1, 테이블의 남은 요구 수치 확인 (제출 단계에서만) */
+/** 아폴론의 예지: 1해리 후퇴, 해역의 남은 생명력 확인 (제출 단계에서만) */
 export function scout(state: EngineState, team: TeamId, tableNo: number): { state: EngineState; result: ScoutResult } {
   const turn = new Turn(state, 'start');
   const { pub, secret } = turn.s;
   const base = { round: pub.round, table: tableNo };
   if (pub.stage !== 'submit') return { state, result: { ...base, error: '제출 시간에만 사용할 수 있어요' } };
-  if (!pub.teams[team]) return { state, result: { ...base, error: '게임에 참여하지 않은 팀이에요' } };
-  if (turn.team(team).score < SCOUT_COST) return { state, result: { ...base, error: '주도권이 부족해요' } };
-  if (!turn.isOpen(tableNo)) return { state, result: { ...base, error: '안건이 없는 테이블이에요' } };
+  if (!pub.teams[team]) return { state, result: { ...base, error: '게임에 참여하지 않은 선단이에요' } };
+  if (turn.team(team).score < SCOUT_COST) return { state, result: { ...base, error: '더 물러설 수 없어요' } };
+  if (!turn.isOpen(tableNo)) return { state, result: { ...base, error: '역경이 없는 해역이에요' } };
   turn.team(team).score -= SCOUT_COST;
   const i = tableNo - 1;
   return { state: turn.s, result: { ...base, agenda: pub.tables[i].agenda, remaining: secret.remaining[i] } };
@@ -266,14 +269,14 @@ function nearestFree(slots: (TeamId | undefined)[], want: number): number {
   return -1;
 }
 
-/** 제안 공개: 새치기 → ③ 보류 → ④ 순서대로 제안 → ⑤ 홍보물 → 보류 해제 */
+/** 공격 공개: 순풍(새치기) → 삼지창(동결) → 투척 창 → 순서대로 공격 → 쇠사슬 → 동결 해제 */
 export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Submission>>): Step {
   const turn = new Turn(state, 'reveal');
   const { pub, secret } = turn.s;
   pub.events = [];
   const n = pub.order.length;
 
-  // 새치기: 주도권 높은 팀 우선(동점이면 원래 순번), 겹치면 가장 가까운 다음 빈자리
+  // 순풍(새치기): 고국에 가까운 선단 우선(동점이면 원래 순번), 겹치면 가장 가까운 다음 빈자리
   const wantsCutIn = pub.order.filter((t) => (subs[t]?.cutIn ?? 0) > 0);
   const cutters = wantsCutIn
     .filter((t) => turn.team(t).score >= CUT_IN_COST)
@@ -292,10 +295,10 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   pub.order = order;
   turn.event({ kind: 'start', ...(changed ? { cutIn: true, order } : {}) });
   for (const t of wantsCutIn) {
-    turn.note(t, cutInPos.has(t) ? `⚡ 새치기: ${cutInPos.get(t)}번째로 제안 (주도권 −${CUT_IN_COST})` : '새치기 실패: 주도권이 부족해요');
+    turn.note(t, cutInPos.has(t) ? `💨 제피로스의 순풍: ${cutInPos.get(t)}번째로 공격 (${CUT_IN_COST}해리 후퇴)` : '순풍 실패: 더 물러설 수 없어요');
   }
 
-  // 추가 카드(홍보물·안건 보류)는 extra 로, 예전 방식처럼 주 카드로 낸 것도 같은 효과
+  // 추가 카드(쇠사슬·삼지창)는 extra 로, 주 카드 자리에 낸 것도 같은 효과
   const extraOf = (t: TeamId) => {
     const sub = subs[t];
     if (sub?.extra) return sub.extra;
@@ -306,7 +309,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     return sub && sub.card !== 'promo' && sub.card !== 'hold' ? sub : undefined;
   };
 
-  // ① 안건 보류: 순번과 관계없이 가장 먼저 적용, 보류한 팀은 다음 라운드 그 테이블 우선권
+  // ① 포세이돈의 삼지창(동결): 순번과 관계없이 가장 먼저 적용, 쓴 선단은 다음 날 그 해역 우선권
   const lastPriority = secret.priority ?? [];
   secret.priority = [];
   const held = new Set<TeamId>();
@@ -323,7 +326,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     }
   }
 
-  // ② 실무 교섭 병행: 이번 라운드 그 테이블의 합의를 가로챔 (순번과 관계없이 미리 걸어 둠)
+  // ② 헤르메스의 투척 창: 오늘 그 해역의 처치를 가로챔 (순번과 관계없이 미리 걸어 둠)
   for (const t of order) {
     const sub = mainOf(t);
     if (sub?.card !== 'practice' || !turn.has(t, 'practice') || !turn.isOpen(sub.table)) continue;
@@ -334,17 +337,17 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   }
   const stealing = new Set([...turn.steals.values()].flat());
 
-  // ③ 지난 라운드 보류 우선권: 그 테이블에 낸 제안을 가장 먼저
+  // ③ 지난 날 삼지창 우선권: 그 해역에 낸 공격을 가장 먼저
   const first = order.filter((t) => lastPriority.some((p) => p.team === t && mainOf(t)?.table === p.table));
   const sequence = [...first, ...order.filter((t) => !first.includes(t))];
 
   const dealEvent = (t: TeamId, tableNo: number, deal: Deal, kind: 'proposal' | 'promoDeal') => {
     turn.event({ kind, team: t, table: tableNo, ...(kind === 'proposal' ? { result: 'deal' as const } : {}), ...shown(deal) });
     if (deal.stolen) {
-      turn.note(deal.winner, `🤝 실무 교섭 병행으로 가로채기 성공! ${dealText(deal)}`);
-      turn.note(t, `${agendaTitle(deal.agenda)} 합의 막타를 쳤지만 실무 교섭 병행에 보상을 빼앗겼어요`);
+      turn.note(deal.winner, `🎯 투척 창으로 가로채기 성공! ${dealText(deal)}`);
+      turn.note(t, `${agendaTitle(deal.agenda)}에 마지막 일격을 넣었지만 투척 창에 보상을 빼앗겼어요`);
     } else {
-      turn.note(t, `${kind === 'promoDeal' ? '📣 홍보물 효과로 ' : '🎉 '}${dealText(deal)}`);
+      turn.note(t, `${kind === 'promoDeal' ? '⛓️ 쇠사슬 효과로 ' : '🎉 '}${dealText(deal)}`);
     }
   };
 
@@ -353,55 +356,55 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     const isFirst = first.includes(t) ? { first: true } : {};
     if (!sub) {
       turn.event({ kind: 'proposal', team: t, result: 'pass' });
-      turn.note(t, '제출하지 않아 이번 라운드는 패스했어요');
+      turn.note(t, '제출하지 않아 오늘은 쉬었어요');
       continue;
     }
-    // 추가 카드: 홍보물은 이 팀 차례에 부착 공개, 보류는 위에서 처리
+    // 추가 카드: 쇠사슬은 이 선단 차례에 공개, 삼지창은 위에서 처리
     const x = extraOf(t);
-    if (x?.card === 'hold' && !held.has(t)) turn.note(t, '안건 보류를 쓸 수 없어 무효가 됐어요');
+    if (x?.card === 'hold' && !held.has(t)) turn.note(t, '포세이돈의 삼지창을 쓸 수 없어 무효가 됐어요');
     if (x?.card === 'hold' && held.has(t)) {
-      turn.note(t, `⛔ ${x.table}번 테이블 보류 성공! 이번 라운드 이 테이블의 제안은 모두 무효${pub.round < ROUNDS ? ', 다음 라운드 이 테이블에 낸 우리 제안이 가장 먼저 적용돼요' : ''}`, -1);
+      turn.note(t, `🔱 ${x.table}번 해역 동결 성공! 오늘 이 해역의 공격은 모두 무효${pub.round < ROUNDS ? ', 내일 이 해역에 낸 우리 공격이 가장 먼저 적용돼요' : ''}`, -1);
     }
     if (x?.card === 'promo') {
       const table = pub.tables[x.table - 1];
       if (!turn.has(t, 'promo') || !turn.isOpen(x.table)) {
-        turn.note(t, '홍보물을 붙일 수 없어 무효가 됐어요 (카드는 돌려받았어요)');
+        turn.note(t, '쇠사슬을 걸 수 없어 무효가 됐어요 (무기는 돌려받았어요)');
       } else if (table.frozen) {
-        turn.note(t, `⛔ ${x.table}번 테이블이 보류되어 홍보물 무효 (카드는 돌려받았어요)`);
+        turn.note(t, `🔱 ${x.table}번 해역이 동결되어 쇠사슬 무효 (무기는 돌려받았어요)`);
       } else {
         turn.hand(t).promo -= 1;
         table.promos.push(t);
         turn.event({ kind: 'proposal', team: t, result: 'promo', table: x.table, agenda: table.agenda });
-        turn.note(t, `📣 ${x.table}번 테이블에 홍보물 부착 — 매 라운드 종료 시 −${CARDS.promo.power}`);
+        turn.note(t, `⛓️ ${x.table}번 해역에 아테나의 쇠사슬 — 매일 끝날 때 −${CARDS.promo.power}`);
       }
     }
     const main = mainOf(t);
     if (!main) {
-      // 추가 카드만 낸 경우 (예전 방식으로 주 카드 자리에 보류·홍보물을 쓴 경우)
+      // 추가 카드만 낸 경우 (주 카드 자리에 삼지창·쇠사슬을 쓴 경우)
       if (x?.card === 'hold') turn.event({ kind: 'proposal', team: t, result: held.has(t) ? 'done' : 'void', ...(held.has(t) ? {} : { reason: 'invalid' as const }) });
       continue;
     }
     const { table: tableNo, card } = main;
     if (card === 'practice' && stealing.has(t)) {
       turn.event({ kind: 'proposal', team: t, result: 'done', ...isFirst });
-      turn.note(t, `🤝 ${tableNo}번 테이블에 실무 교섭 병행 — 이번 라운드 이 테이블에서 합의가 나면 보상을 가로채요`);
+      turn.note(t, `🎯 ${tableNo}번 해역에 헤르메스의 투척 창 — 오늘 이 해역에서 역경이 쓰러지면 보상을 가로채요`);
       continue;
     }
     if (!turn.has(t, card)) {
       turn.event({ kind: 'proposal', team: t, result: 'void', reason: 'invalid' });
-      turn.note(t, '사용할 수 없는 카드라 무효가 됐어요');
+      turn.note(t, '가지고 있지 않은 무기라 무효가 됐어요');
       continue;
     }
-    const returned = card === 'basic' ? '' : ' (카드는 돌려받았어요)';
+    const returned = card === 'basic' ? '' : ' (무기는 돌려받았어요)';
     if (!turn.isOpen(tableNo)) {
       turn.event({ kind: 'proposal', team: t, result: 'void', reason: 'empty', table: tableNo });
-      turn.note(t, `${tableNo}번 테이블에 안건이 없어 무효${returned}`);
+      turn.note(t, `${tableNo}번 해역에 역경이 없어 무효${returned}`);
       continue;
     }
     const table = pub.tables[tableNo - 1];
     if (table.frozen) {
       turn.event({ kind: 'proposal', team: t, result: 'void', reason: 'hold', table: tableNo });
-      turn.note(t, `⛔ ${tableNo}번 테이블이 보류되어 무효${returned}`);
+      turn.note(t, `🔱 ${tableNo}번 해역이 동결되어 무효${returned}`);
       continue;
     }
     const before = table.agenda;
@@ -412,11 +415,11 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
       if (isFirst.first) pub.events[pub.events.length - 1].first = true;
     } else {
       turn.event({ kind: 'proposal', team: t, result: 'done', ...isFirst });
-      turn.note(t, `${tableNo}번 테이블 ${agendaTitle(before)}에 [${CARDS[card].name}] 적용 (−${CARDS[card].power})`);
+      turn.note(t, `${tableNo}번 해역 ${agendaTitle(before)}에 [${CARDS[card].name}] 적용 (−${CARDS[card].power})`);
     }
   }
 
-  // 라운드 종료: 홍보물 효과 (보류된 테이블은 쉼)
+  // 하루 끝: 쇠사슬 효과 (동결된 해역은 쉼)
   pub.tables.forEach((table, i) => {
     if (table.frozen) return;
     for (const owner of table.promos) {
@@ -426,14 +429,14 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     }
   });
 
-  // 가로채지 못한 실무 교섭 병행은 다음 라운드 시작 시 −6
+  // 가로채지 못한 투척 창은 다음 날 시작 시 −6
   for (const [i, teams] of turn.steals) {
     for (const t of teams) {
       if (pub.round < ROUNDS) {
         secret.practice.push({ team: t, table: i + 1 });
-        turn.note(t, `🤝 ${i + 1}번 테이블에서 가로챌 합의가 없었어요 — 다음 라운드 시작 시 −${CARDS.practice.power}`, -1);
+        turn.note(t, `🎯 ${i + 1}번 해역에서 가로챌 처치가 없었어요 — 내일 시작 시 −${CARDS.practice.power}`, -1);
       } else {
-        turn.note(t, `🤝 ${i + 1}번 테이블에서 가로챌 합의가 없었어요`, -1);
+        turn.note(t, `🎯 ${i + 1}번 해역에서 가로챌 처치가 없었어요`, -1);
       }
     }
   }
@@ -458,7 +461,7 @@ export function finish(state: EngineState): EngineState {
   return next;
 }
 
-/** 최종 순위: 주도권 → 합의 건수. 둘 다 같으면 공동 순위 */
+/** 최종 순위: 고국에 가까운 순(전진 거리 큰 순) → 처치 수. 둘 다 같으면 공동 순위 */
 export function ranking(pub: PublicState): { team: TeamId; score: number; deals: number; rank: number }[] {
   const rows = pub.teamIds
     .map((team) => ({ team, score: pub.teams[team]?.score ?? 0, deals: pub.teams[team]?.deals ?? 0, rank: 0 }))

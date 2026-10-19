@@ -1,19 +1,19 @@
-/* 현장 진행 화면(board.html)과 튜토리얼이 함께 쓰는 '교섭 테이블' 그림 조각 */
+/* 현장 진행 화면(board.html)이 쓰는 '탐험 해역'·선단 자리 그림 조각 */
 import { esc } from '../ui';
-import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, type TeamId } from './data';
+import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, TIER_LABEL, distanceOf, type TeamId } from './data';
 import type { GameEvent, TableState } from './types';
-import { activeSetup, rewardText, teamName, trailSteps } from './view';
+import { activeSetup, hpOf, rewardText, teamName, trailSteps } from './view';
 
 export interface TableLook {
-  /** 방금 합의된 안건 (테이블에는 이미 새 안건이 올라와 있음) */
+  /** 방금 처치된 역경 (해역에는 이미 새 역경이 올라와 있음) */
   deal?: { team: TeamId; agenda: number; reward: number };
-  /** 방금 새 안건이 들어옴 */
+  /** 방금 새 역경이 들어옴 */
   fresh?: boolean;
-  /** 방금 홍보물이 붙음 */
+  /** 방금 쇠사슬이 걸림 */
   promo?: boolean;
 }
 
-/** 이 테이블에서 합의되어 지나간 안건이 뒤로 희미하게 쌓인 모양 (최근 3장) */
+/** 이 해역에서 처치되어 지나간 역경이 뒤로 희미하게 쌓인 모양 (최근 3장) */
 function pile(table: TableState): { html: string; depth: number } {
   const done = table.done ?? [];
   const shown = done.slice(-3);
@@ -21,7 +21,7 @@ function pile(table: TableState): { html: string; depth: number } {
   const html = shown
     .map((d, k) => {
       const a = AGENDAS[d.agenda];
-      const label = `${k === 0 && more ? `+${more} · ` : ''}${a.icon} ${esc(a.title)} · ${esc(teamName(d.team))} ✔`;
+      const label = `${k === 0 && more ? `외 ${more}개 · ` : ''}${a.icon} ${esc(a.title)} · ${esc(teamName(d.team))} ✔`;
       return `<div class="past" style="--k:${shown.length - k}"><span>${label}</span></div>`;
     })
     .join('');
@@ -36,21 +36,21 @@ export function feltTable(table: TableState, index: number, round: number, look:
     .filter(Boolean)
     .join(' ');
   const stamp = look.deal
-    ? `<div class="deal-stamp"><span>합의!</span><small>${esc(teamName(look.deal.team))} +${look.deal.reward}</small></div>`
+    ? `<div class="deal-stamp"><span>처치!</span><small>${esc(teamName(look.deal.team))} ${look.deal.reward}해리 전진</small></div>`
     : '';
-  const head = `<div class="ftable-no">${no}번 테이블${isFinal ? ' · 최종 교섭' : ''}</div>`;
+  const head = `<div class="ftable-no">${no}번 해역${isFinal ? ' · 최종 결전' : ''}</div>`;
   if (!a) {
     const label = isFinal
       ? round < FINAL_OPEN_ROUND
-        ? `<div class="ftable-wait">🏁 ${FINAL_OPEN_ROUND}라운드 개시</div><div class="ftable-teaser">성과급 ${rewardText(FINAL_AGENDA)}</div>`
-        : '<div class="ftable-wait">최종 교섭 종료</div>'
+        ? `<div class="ftable-wait">👑 ${FINAL_OPEN_ROUND}일차 개시</div><div class="ftable-teaser">${esc(AGENDAS[FINAL_AGENDA].title)} · 생명력 ${hpOf(FINAL_AGENDA)}</div>`
+        : '<div class="ftable-wait">최종 결전 종료</div>'
       : '<div class="ftable-wait">대기열 소진</div>';
     const past = pile(table);
     return `<article class="${cls} empty">${head}<div class="stack" style="--n:${past.depth}">${past.html}<div class="ftable-slot">${label}</div></div>${stamp}</article>`;
   }
-  // 요구 수치는 블라인드라 카드에 숫자 없이 픽토그램과 노조 요구안만
+  // 처음 생명력은 공개, 남은 생명력은 비공개 (아폴론의 예지로만 확인)
   const promos = table.promos
-    .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">📣 ${esc(teamName(t))}</span>`)
+    .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">⛓️ ${esc(teamName(t))}</span>`)
     .join('');
   const past = pile(table);
   return `<article class="${cls}">
@@ -59,12 +59,12 @@ export function feltTable(table: TableState, index: number, round: number, look:
     <div class="agenda-card">
       <div class="pictogram" aria-hidden="true">${a.icon}</div>
       <h3>${esc(a.title)}</h3>
-      <p class="gap"><span>노조 요구</span>${esc(a.union)}</p>
-      <div class="reward">🏆 ${rewardText(a.id)}</div>
+      <p class="gap"><span>${TIER_LABEL[a.tier]} · ${esc(a.topic)}</span>❤️ 생명력 <b>${hpOf(a.id)}</b></p>
+      <div class="reward">⛵ ${rewardText(a.id)}</div>
     </div>
     </div>
     ${promos ? `<div class="stickers">${promos}</div>` : ''}
-    ${table.frozen ? '<div class="frozen-cover">⛔ 보류</div>' : ''}
+    ${table.frozen ? '<div class="frozen-cover">🔱 동결</div>' : ''}
     ${stamp}
   </article>`;
 }
@@ -72,7 +72,13 @@ export function feltTable(table: TableState, index: number, round: number, look:
 export function deck(queue: number): string {
   const rest = activeSetup().queue.slice(queue);
   const stack = rest.length ? Array.from({ length: Math.min(rest.length, 5) }, (_, i) => `<i style="--i:${i}"></i>`).join('') : '';
-  const list = rest.map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)}</li>`).join('');
+  // 역경이 많아 다음 8개까지만 이름을 보여 줌
+  const SHOW = 8;
+  const more = rest.length > SHOW ? `<li class="more">외 ${rest.length - SHOW}개</li>` : '';
+  const list = rest
+    .slice(0, SHOW)
+    .map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)} <small>❤️${hpOf(id)}</small></li>`)
+    .join('') + more;
   return `<div class="deck">
     <div class="deck-stack">${stack}<span class="deck-count">${rest.length}</span></div>
     <div class="deck-label">대기열</div>
@@ -82,22 +88,23 @@ export function deck(queue: number): string {
 
 export interface SeatLook {
   active?: TeamId;
-  /** 팀 이름 아래 작은 표시 (제출 상태 등) */
+  /** 선단 이름 아래 작은 표시 (제출 상태 등) */
   status?: Partial<Record<TeamId, string>>;
   deltas?: Partial<Record<TeamId, number>>;
 }
 
-/** 제안 순서대로 앉은 팀 자리 */
+/** 공격 순서대로 늘어선 선단 자리. 점수는 고국과의 거리(해리)로 보여 줌 */
 export function seats(order: TeamId[], scores: Partial<Record<TeamId, number>>, look: SeatLook = {}): string {
   const items = order
     .map((t, i) => {
+      // d 는 전진 거리 변화: 전진하면 고국과의 거리가 줄어듦
       const d = look.deltas?.[t] ?? 0;
-      const delta = d ? `<span class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d}</span>` : '';
+      const delta = d ? `<span class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '−' : '+'}${Math.abs(d)}</span>` : '';
       const status = look.status?.[t];
       return `<li class="seat${look.active === t ? ' active' : ''}">
         <span class="seat-pos">${i + 1}</span>
         <div class="seat-name">${esc(teamName(t))}</div>
-        <div class="seat-score"><span class="coin">💰</span><strong>${scores[t] ?? 0}</strong>${delta}</div>
+        <div class="seat-score"><span class="coin">🧭</span><strong>${distanceOf(scores[t] ?? 0)}</strong><small>해리</small>${delta}</div>
         ${status ? `<div class="seat-status">${status}</div>` : ''}
       </li>`;
     })
@@ -105,20 +112,16 @@ export function seats(order: TeamId[], scores: Partial<Record<TeamId, number>>, 
   return `<ol class="seats">${items}</ol>`;
 }
 
-/** 합의된 안건의 블라인드 해제: 실제 타결 내용과, 처음 요구 수치부터 한 단계씩 깎여 온 과정 */
+/** 처치된 역경의 공격 이력: 처음 생명력부터 한 단계씩 깎여 온 과정 */
 export function trailStrip(e: Pick<GameEvent, 'agenda' | 'demand' | 'trail'>): string {
   if (!e.demand) return '';
-  const a = e.agenda ? AGENDAS[e.agenda] : undefined;
-  const settled = a
-    ? `<div class="settled"><span class="settled-from">노조 요구 ${esc(a.union)}</span><span class="settled-arrow">➔</span><span class="settled-to">타결 <b>${esc(a.company)}</b></span></div>`
-    : '';
   const steps = trailSteps(e as GameEvent)
     .map(
       (s, i) => `<span class="trail-arrow" style="--d:${i + 1}">➔</span>
         <span class="trail-hit${s.after <= 0 ? ' last' : ''}" style="--d:${i + 1}"><small>${esc(s.label)}</small><b>−${s.amount}</b><em>${s.after}</em></span>`,
     )
     .join('');
-  return `${settled}<div class="trail">
-    <span class="trail-start"><small>블라인드 공개 · 요구 수치</small><b>${e.demand}</b></span>${steps}
+  return `<div class="trail">
+    <span class="trail-start"><small>처음 생명력</small><b>${e.demand}</b></span>${steps}
   </div>`;
 }

@@ -1,7 +1,7 @@
-/* ───────── 현장 진행 화면 (board.html) : 카드게임 테이블 느낌 ───────── */
+/* ───────── 현장 진행 화면 (board.html) : 갑판 위에서 내려다본 바다 ───────── */
 body.live {
-  --felt: #1d6b45;
-  --felt-dark: #0f4a2f;
+  --felt: #1b5e8a;
+  --felt-dark: #0d3a5c;
   --wood: #6b3f1f;
   --wood-light: #9a5f30;
   --paper: #fffaf0;
@@ -175,7 +175,7 @@ body.live button.small {
   position: relative;
   padding: 22px;
   border-radius: 28px;
-  background: radial-gradient(ellipse at center, #2a8a5a 0%, var(--felt) 45%, var(--felt-dark) 100%);
+  background: radial-gradient(ellipse at center, #2a80b4 0%, var(--felt) 45%, var(--felt-dark) 100%);
   border: 10px solid var(--wood);
   box-shadow:
     inset 0 0 0 3px var(--wood-light),
@@ -285,18 +285,19 @@ body.live button.small {
 .agenda-card h3 {
   margin: 0;
   font-size: 1.5rem;
+  word-break: keep-all;
 }
 
 .agenda-card .gap {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   color: #6c5f49;
   line-height: 1.35;
 }
 
 .agenda-card .gap span {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #a08f70;
 }
@@ -504,32 +505,7 @@ body.live button.small {
   color: var(--danger);
 }
 
-/* 합의 시 블라인드 해제: 실제 타결 내용 + 깎인 이력 */
-.settled {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 10px;
-  animation: pop 0.4s both 0.2s;
-}
-
-.settled-from {
-  opacity: 0.85;
-}
-
-.settled-arrow {
-  font-weight: 900;
-}
-
-.settled-to {
-  padding: 4px 12px;
-  border-radius: 10px;
-  background: var(--gold);
-  color: #2a2118;
-}
-
+/* 처치 시 공격 이력 */
 .trail {
   display: flex;
   flex-wrap: wrap;
@@ -660,6 +636,10 @@ body.live button.small {
   color: var(--text);
 }
 
+.deck-list small {
+  opacity: 0.8;
+}
+
 .rail-events {
   padding: 14px;
   border-radius: var(--radius);
@@ -753,6 +733,12 @@ body.live button.small {
   align-items: center;
   gap: 6px;
   font-size: 1.4rem;
+}
+
+.seat-score small {
+  margin-left: -4px;
+  font-size: 0.75rem;
+  color: var(--muted);
 }
 
 .delta {
@@ -1442,17 +1428,16 @@ button.dot-btn.on {
   animation-delay: calc(var(--i) * 0.12s);
 }
 
-.reveal-card.fake {
-  outline: 4px solid var(--gold);
-  outline-offset: 2px;
-}
-
 .reveal-head {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   font-size: 1.1rem;
+}
+
+.reveal-head b {
+  word-break: keep-all;
 }
 
 .reveal-head .pictogram {
@@ -1495,23 +1480,6 @@ button.dot-btn.on {
   color: #5d513d;
 }
 
-.fake-tag {
-  margin-top: 6px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #fff;
-}
-
-.fake-tag.hard {
-  background: #d63a3a;
-}
-
-.fake-tag.easy {
-  background: #2f9e62;
-}
-
 .closing.lesson {
   font-size: 1.4rem;
   margin-top: 20px;
@@ -1521,4 +1489,16 @@ button.dot-btn.on {
 .practice-home {
   max-width: 520px;
   margin: 10px auto 0;
+}
+
+/* 항해 일지: 역경 뒤의 실제 교섭 안건 */
+.reveal-topic {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #8a7a5c;
+}
+
+.reveal-card.tier-high {
+  outline: 3px solid #d63a3a;
+  outline-offset: 2px;
 }

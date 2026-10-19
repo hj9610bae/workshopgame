@@ -1,88 +1,108 @@
-/* 교섭의 도박사들: 고정 데이터. 숫자를 조정할 때는 docs/rules.md 도 함께 수정하세요. */
+/* 오디세이아 : 귀환의 항해 — 고정 데이터. 숫자를 조정할 때는 docs/rules.md 도 함께 수정하세요. */
 
 export const TEAM_IDS = ['A', 'B', 'C', 'D', 'E'] as const;
 export type TeamId = (typeof TEAM_IDS)[number];
 
-export const ROUNDS = 5;
+/** 10일간의 항해 */
+export const ROUNDS = 10;
+/**
+ * 엔진 내부 점수(전진한 거리). 화면에는 '고국과의 거리'(distanceOf)로 바꿔 보여 줌.
+ * 아이템 비용을 낼 만큼 점수가 남아 있어야 하는 규칙 때문에 0이 아닌 값에서 시작
+ */
 export const START_SCORE = 10;
+/** 출발 시 고국(이타카)까지의 거리 (해리) */
+export const START_DISTANCE = 15;
+/** 고국과의 거리: 작을수록(음수면 내륙까지) 좋음 */
+export const distanceOf = (score: number): number => START_DISTANCE + START_SCORE - score;
 export const SUBMIT_SECONDS = 180;
-/** 이 라운드 시작 시 4번 테이블(최종 교섭)이 열림 */
-export const FINAL_OPEN_ROUND = 4;
+/** 이 일차 시작 시 4번 해역(최종 결전)이 열림 */
+export const FINAL_OPEN_ROUND = 8;
 export const TABLE_COUNT = 4;
 export const SCOUT_COST = 1;
 export const CUT_IN_COST = 2;
+
+export const SCOUT_NAME = '아폴론의 예지';
+export const CUT_IN_NAME = '제피로스의 순풍';
 
 export type CardId = 'basic' | 'blitz' | 'practice' | 'promo' | 'hold';
 export type SpecialCardId = Exclude<CardId, 'basic'>;
 
 export const CARDS: Record<CardId, { name: string; power: number; desc: string }> = {
-  basic: { name: '기본 제시안', power: 2, desc: '요구 수치 2 감소 · 매 라운드 사용' },
-  blitz: { name: '전격 타결', power: 6, desc: '요구 수치 6 감소 · 1회용' },
+  basic: { name: '단검', power: 2, desc: '생명력 2 감소 · 매일 사용' },
+  blitz: { name: '아폴론의 전갈 화살', power: 6, desc: '생명력 6 감소 · 1회용' },
   practice: {
-    name: '실무 교섭 병행',
+    name: '헤르메스의 투척 창',
     power: 6,
-    desc: '이번 라운드 그 테이블에서 합의가 나면 보상을 가로챔. 못 가로채면 다음 라운드 시작 시 6 감소 · 비공개',
+    desc: '오늘 그 해역에서 역경이 쓰러지면 전진 보상을 가로챔. 못 가로채면 다음 날 시작 시 6 감소 · 비공개',
   },
-  promo: { name: '홍보물 발행', power: 1, desc: '제시안과 함께 추가로 냄. 테이블에 부착, 매 라운드 종료 시 1 감소' },
+  promo: { name: '아테나의 쇠사슬', power: 1, desc: '공격 무기와 함께 추가로 냄. 해역에 걸어 두면 매일 끝날 때 1 감소' },
   hold: {
-    name: '안건 보류',
+    name: '포세이돈의 삼지창',
     power: 0,
-    desc: '제시안과 함께 추가로 냄. 이번 라운드 그 테이블의 모든 제안 무효 + 다음 라운드 그 테이블에 낸 우리 제안을 가장 먼저 적용',
+    desc: '공격 무기와 함께 추가로 냄. 오늘 그 해역을 동결해 모든 공격 무효 + 다음 날 그 해역에 낸 우리 공격을 가장 먼저 적용',
   },
 };
 
-/** 제시안과 함께 '추가 카드'로 내는 특수 카드 */
+/** 공격 무기와 함께 '추가 카드'로 내는 특수 무기 */
 export type ExtraCardId = 'promo' | 'hold';
 export const EXTRA_CARDS: ExtraCardId[] = ['promo', 'hold'];
 
 export const SPECIAL_CARDS: SpecialCardId[] = ['blitz', 'practice', 'promo', 'hold'];
 
+/** 난이도 구간: 하(소형) · 중 · 상(대형) */
+export type Tier = 'low' | 'mid' | 'high';
+export const TIER_LABEL: Record<Tier, string> = { low: '🟢 하', mid: '🟡 중', high: '🔴 상' };
+
+/** 신화 속 역경 (규칙 엔진에서는 '안건') */
 export interface Agenda {
   id: number;
-  /** 제목에 맞는 픽토그램 */
+  /** 픽토그램 */
   icon: string;
   title: string;
-  /** 노조 요구안 (테이블에 공개) */
-  union: string;
-  /** 회사 제시안 = 실제 타결 내용 (합의되는 순간 공개) */
-  company: string;
+  /** 이 역경에 겹쳐 둔 실제 교섭 안건 */
+  topic: string;
+  /** 처음 생명력 (공개). 처치하면 이만큼 고국으로 전진 */
   demand: number;
-  reward: number;
-  /** 겉보기와 실제가 다른 안건: hard = 보상은 작은데 수치가 큼(난항), easy = 보상은 큰데 수치가 작음(원만) */
-  fake?: 'hard' | 'easy';
+  tier: Tier;
 }
 
 const list: Agenda[] = [
-  { id: 3, icon: '🩺', title: '검진비', union: '10만 원 인상', company: '(수면비) 5만 원 인상', demand: 2, reward: 2 },
-  { id: 5, icon: '👶', title: '난임시술', union: '본인부담금 100% & 100만 원 인상', company: '100% 지원', demand: 3, reward: 2 },
-  { id: 8, icon: '🏃', title: '체육대회', union: '체육대회 실시', company: '가족초청 행사 실시', demand: 3, reward: 3 },
-  { id: 12, icon: '🔌', title: '전기차', union: '충전소 확대', company: '사내 완속 충전기 추가 설치', demand: 8, reward: 2, fake: 'hard' },
-  { id: 2, icon: '💪', title: '근속/건강', union: '41,182원 인상', company: '수당 5,045원 인상', demand: 5, reward: 4 },
-  { id: 7, icon: '✈️', title: '해외연수', union: '해외연수 재개', company: '2027년 조건부 시행', demand: 5, reward: 4 },
-  { id: 4, icon: '🎁', title: '복지포인트', union: '80만P 인상', company: '선택형 10만P 인상', demand: 6, reward: 4 },
-  { id: 6, icon: '⏰', title: '근무제도', union: '상주 자율근무제', company: '상주 휴식플러스제', demand: 6, reward: 5 },
-  { id: 9, icon: '🏦', title: '복지기금', union: '200억 출연', company: '후생제도 개선 TF 구성', demand: 3, reward: 7, fake: 'easy' },
-  { id: 10, icon: '📋', title: '제도개선', union: '전사제도개선위', company: '임금제도개선위 구성', demand: 8, reward: 6 },
-  { id: 1, icon: '💵', title: '기본급', union: '179,320원 인상', company: '80,000원 인상', demand: 10, reward: 8 },
-  { id: 11, icon: '💰', title: '성과급', union: "'25년 대비 150%", company: '300%+500만 원+30만 원', demand: 12, reward: 10 },
+  { id: 1, icon: '🌸', title: '망각의 로투스 섬', topic: '검진비', demand: 2, tier: 'low' },
+  { id: 2, icon: '🌬️', title: '아이올로스의 바람 자루', topic: '난임시술', demand: 3, tier: 'low' },
+  { id: 3, icon: '🏛️', title: '외경의 거대 충전소', topic: '전기차', demand: 4, tier: 'mid' },
+  { id: 4, icon: '🐖', title: '키르케의 환락', topic: '체육대회', demand: 3, tier: 'low' },
+  { id: 5, icon: '🍇', title: '디오니소스의 포도밭', topic: '휴게실 개선', demand: 2, tier: 'low' },
+  { id: 6, icon: '📜', title: '헤르메스의 기상 계약', topic: '안무/안전구', demand: 3, tier: 'low' },
+  { id: 7, icon: '🐮', title: '태양신의 금기된 소', topic: '근속/건강', demand: 5, tier: 'mid' },
+  { id: 8, icon: '🧜‍♀️', title: '세이렌의 달콤한 노래', topic: '해외연수', demand: 5, tier: 'mid' },
+  { id: 9, icon: '🌀', title: '카리브디스의 소용돌이', topic: '복지포인트', demand: 6, tier: 'mid' },
+  { id: 10, icon: '👹', title: '식인 거인 라이스트리곤', topic: '제도개선위', demand: 8, tier: 'high' },
+  { id: 11, icon: '🌊', title: '포세이돈의 풍랑', topic: '근무제도', demand: 6, tier: 'mid' },
+  { id: 12, icon: '🦉', title: '미네르바의 밤안개', topic: '유급휴가 확대', demand: 5, tier: 'mid' },
+  { id: 13, icon: '🛡️', title: '아레스의 군신 장막', topic: '사내 복지제도', demand: 6, tier: 'mid' },
+  { id: 14, icon: '🪨', title: '머리 여섯의 괴물 스킬라', topic: '사내복지기금', demand: 8, tier: 'high' },
+  { id: 15, icon: '🐉', title: '히드라의 아홉 머리', topic: '통상임금 확장', demand: 9, tier: 'high' },
+  { id: 16, icon: '👁️', title: '외눈박이 거인 키클롭스', topic: '기본급', demand: 10, tier: 'high' },
+  { id: 17, icon: '🌋', title: '헤파이스토스의 거대 용암', topic: '임금피크제 폐지', demand: 10, tier: 'high' },
+  { id: 18, icon: '👑', title: '이타카의 최종 결전', topic: '성과급', demand: 12, tier: 'high' },
 ];
 
 export const AGENDAS: Record<number, Agenda> = Object.fromEntries(list.map((a) => [a.id, a]));
 
-/** 1~3번 테이블의 처음 안건 */
-export const INITIAL_TABLES = [3, 5, 8];
-/** 1~3번 테이블에서 합의되면 순서대로 보충되는 대기열 */
-export const QUEUE = [12, 2, 7, 4, 6, 9, 10, 1];
-/** 4라운드에 4번 테이블로 열리는 최종 교섭 안건 */
-export const FINAL_AGENDA = 11;
+/** 1~3번 해역의 처음 역경 */
+export const INITIAL_TABLES = [1, 2, 3];
+/** 1~3번 해역에서 처치되면 순서대로 들어오는 대기열 */
+export const QUEUE = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+/** FINAL_OPEN_ROUND 일차에 4번 해역으로 열리는 최종 결전 */
+export const FINAL_AGENDA = 18;
 
-/** 전리품(특수 카드)은 안건과 따로 정하고, 테이블에 오르는 순서대로 앞쪽 안건에 하나씩 붙임. 화면에는 '특수 카드'로만 표시 */
+/** 전리품(특수 무기)은 역경과 따로 정하고, 해역에 오르는 순서대로 앞쪽 역경에 하나씩 붙임. 화면에는 '특수 무기'로만 표시 */
 export const LOOT_ORDER: SpecialCardId[] = ['promo', 'hold', 'blitz', 'blitz', 'practice'];
 export const LOOT: Partial<Record<number, SpecialCardId>> = Object.fromEntries(
   [...INITIAL_TABLES, ...QUEUE].slice(0, LOOT_ORDER.length).map((id, i) => [id, LOOT_ORDER[i]]),
 );
 
-/** 안건 배치·요구 수치·전리품. 실제 게임은 SETUP, 연습 게임은 무작위로 만든 배치를 씀 */
+/** 역경 배치·생명력·전리품. 실제 게임은 SETUP, 연습 게임은 무작위로 만든 배치를 씀. 처치 보상(전진 거리) = 처음 생명력 */
 export interface Setup {
   tables: number[];
   queue: number[];
@@ -97,5 +117,5 @@ export const SETUP: Setup = {
   loot: LOOT,
 };
 
-/** 마지막에 공개하는 안건 순서 (테이블에 오르는 순서, 성과급 마지막) */
+/** 마지막에 공개하는 역경 순서 (해역에 오르는 순서, 최종 결전 마지막) */
 export const ALL_AGENDAS = [...INITIAL_TABLES, ...QUEUE, FINAL_AGENDA];

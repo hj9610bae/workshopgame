@@ -4,7 +4,7 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, SUBMIT_SECONDS, TEAM_IDS, type CardId, type ExtraCardId, type TeamId } from './deal/data';
+import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
 import { agendaTitle, beginSubmit, createGame, finish, ranking, resolveRound, revealNext, scout, startRound, type EngineState } from './deal/engine';
 import { deck, feltTable, seats, trailStrip, type TableLook } from './deal/felt';
 import {
@@ -22,7 +22,7 @@ import {
 } from './deal/local';
 import { practiceSetup, tutorialSteps } from './deal/tutorial';
 import type { GameEvent, ScoutResult, Stage, Submission } from './deal/types';
-import { STAGE_LABEL, describeEvent, formatTimer, setTeamNames, snapshot, teamName, useSetup } from './deal/view';
+import { STAGE_LABEL, describeEvent, formatTimer, hpOf, setTeamNames, snapshot, teamName, useSetup } from './deal/view';
 import { esc, onAction, render, toast } from './ui';
 
 const app = document.querySelector<HTMLElement>('#app')!;
@@ -50,7 +50,7 @@ function save(next: LocalGame) {
 }
 
 const eng = (): EngineState => game.engine!;
-/** 연습 게임: 무작위 배치(setup)로 1라운드만 */
+/** 연습 항해: 무작위 배치(setup)로 하루만 */
 const isPractice = (): boolean => !!game.engine?.setup;
 const stage = (): Stage => game.engine?.pub.stage ?? 'lobby';
 /** 진행자 창이 따로 열려 있으면 프로젝터 화면에는 조작 버튼을 숨김 */
@@ -63,26 +63,26 @@ function homeView(): string {
     const on = picked.has(t);
     return `<li class="pick${on ? ' on' : ''}">
       <button class="pick-toggle" data-action="toggle-team" data-team="${t}">${on ? '✅' : '⬜'} ${t}</button>
-      <input data-name="${t}" value="${esc(game.names[t] ?? '')}" placeholder="${t}팀" maxlength="12" ${on ? '' : 'disabled'} />
+      <input data-name="${t}" value="${esc(game.names[t] ?? '')}" placeholder="${t}선단" maxlength="12" ${on ? '' : 'disabled'} />
     </li>`;
   }).join('');
   const resume = game.engine
-    ? `<button class="secondary" data-action="resume">이어서 진행 <span class="small">(${game.engine.pub.stage === 'final' ? '최종 결과' : `${game.engine.pub.round}라운드`})</span></button>`
+    ? `<button class="secondary" data-action="resume">이어서 진행 <span class="small">(${game.engine.pub.stage === 'final' ? '최종 결과' : `${game.engine.pub.round}일차`})</span></button>`
     : '';
   return `<section class="home-board">
     <div class="hero">
-      <div class="hero-chips">${['🃏', '💰', '🤝', '🎲'].map((c) => `<span>${c}</span>`).join('')}</div>
-      <h1>💼 교섭의 도박사들</h1>
-      <p class="muted">Deal or No Deal · 한 화면 현장 진행</p>
-      <button class="tutorial-btn" data-action="tutorial">📖 게임 설명 보기</button>
-      <button class="secondary practice-home" data-action="practice">🎲 바로 연습 게임 (1라운드, 무작위 안건)</button>
+      <div class="hero-chips">${['⛵', '🗡️', '🐉', '🧭'].map((c) => `<span>${c}</span>`).join('')}</div>
+      <h1>⛵ 오디세이아 : 귀환의 항해</h1>
+      <p class="muted">${ROUNDS}일간의 항해 · 한 화면 현장 진행</p>
+      <button class="tutorial-btn" data-action="tutorial">📖 항해 설명 보기</button>
+      <button class="secondary practice-home" data-action="practice">🎲 바로 연습 항해 (하루, 무작위 역경)</button>
     </div>
     <div class="card setup">
-      <h2>참가 팀</h2>
+      <h2>참가 선단</h2>
       <ul class="picks">${rows}</ul>
-      <p class="muted small">팀 이름은 비워 두면 'A팀'처럼 표시돼요.</p>
+      <p class="muted small">선단 이름은 비워 두면 'A선단'처럼 표시돼요.</p>
       ${resume}
-      <button data-action="new-game" ${picked.size ? '' : 'disabled'}>▶ 새 게임 시작 (${picked.size}팀)</button>
+      <button data-action="new-game" ${picked.size ? '' : 'disabled'}>▶ 출항 (${picked.size}선단)</button>
     </div>
   </section>`;
 }
@@ -98,7 +98,7 @@ function tutorialView(): string {
   const last = tutorialIndex === steps.length - 1;
   return `<div class="tutorial">
     <header class="topbar">
-      <div class="brand">📖 게임 설명</div>
+      <div class="brand">📖 항해 설명</div>
       <div class="round-pill">${tutorialIndex + 1} / ${steps.length}</div>
       <div class="tools">
         <button class="small secondary" data-action="tut-auto">${autoplay ? '⏸ 자동 재생 멈춤' : '▶ 자동 재생'}</button>
@@ -109,7 +109,7 @@ function tutorialView(): string {
     <footer class="tut-nav">
       <button class="secondary" data-action="tut-prev" ${tutorialIndex ? '' : 'disabled'}>◀ 이전</button>
       <div class="dots">${dots}</div>
-      ${last ? '<button data-action="practice">연습 게임 시작 ▶</button>' : '<button data-action="tut-next">다음 ▶</button>'}
+      ${last ? '<button data-action="practice">연습 항해 시작 ▶</button>' : '<button data-action="tut-next">다음 ▶</button>'}
     </footer>
   </div>`;
 }
@@ -127,10 +127,13 @@ function goTutorial(i: number) {
 
 /* ───────── 게임 화면 ───────── */
 
+/** 입력 버튼에 쓰는 역경 이름 */
+const shortTitle = (id: number): string => (AGENDAS[id] ? `${AGENDAS[id].icon} ${AGENDAS[id].title}` : agendaTitle(id));
+
 function roundText(): string {
   const { pub } = eng();
-  if (isPractice()) return `🎲 연습 게임 · ${STAGE_LABEL[pub.stage]}`;
-  return pub.stage === 'final' ? '최종 결과' : `라운드 ${pub.round}/${ROUNDS} · ${STAGE_LABEL[pub.stage]}`;
+  if (isPractice()) return `🎲 연습 항해 · ${STAGE_LABEL[pub.stage]}`;
+  return pub.stage === 'final' ? '최종 결과' : `${pub.round}일차/${ROUNDS} · ${STAGE_LABEL[pub.stage]}`;
 }
 
 function topbar(): string {
@@ -142,7 +145,7 @@ function topbar(): string {
       </div>`
     : '';
   return `<header class="topbar">
-    <div class="brand">${isConsole ? '🖥 진행자 창' : '💼 교섭의 도박사들'}</div>
+    <div class="brand">${isConsole ? '🖥 진행자 창' : '⛵ 오디세이아'}</div>
     <div class="round-pill">${roundText()}</div>
     <div class="timer" data-timer></div>
     ${tools}
@@ -175,8 +178,8 @@ function banner(): string {
   switch (pub.stage) {
     case 'order': {
       const news = pub.events.map((e) => describeEvent(e)).map((d) => `<li>${d.icon} ${esc(d.title)}${d.detail ? ` <span class="muted">${esc(d.detail)}</span>` : ''}</li>`);
-      const tie = pub.round === 1 ? '1라운드 순서는 추첨!' : '주도권이 높은 팀부터. 동점이면 지난 라운드 뒤 순번이 먼저.';
-      return `<div class="banner calm"><h2>${pub.round}라운드 순서 발표</h2><p>${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p>
+      const tie = pub.round === 1 ? '1일차 순서는 추첨!' : '고국에 가까운 선단부터. 같으면 지난 날 뒤 순번이 먼저.';
+      return `<div class="banner calm"><h2>${pub.round}일차 순서 발표</h2><p>${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p>
         ${news.length ? `<ul class="news">${news.join('')}</ul>` : ''}<p class="muted small">${tie}</p></div>`;
     }
     case 'submit':
@@ -184,16 +187,16 @@ function banner(): string {
         <div class="guide-main">
           <h2>📝 포스트잇에 적어 내세요</h2>
           <div class="big-timer" data-timer></div>
-          <p class="scout-now">🔍 <b>스카우터</b>를 쓰려면 <b>지금</b> 진행자에게 오세요! <span>(주도권 −${SCOUT_COST}, 테이블 1곳의 남은 수치)</span></p>
-          <p class="muted">${done}/${pub.teamIds.length}팀 입력 완료</p>
+          <p class="scout-now">🔮 <b>${SCOUT_NAME}</b>를 쓰려면 <b>지금</b> 진행자에게 오세요! <span>(${SCOUT_COST}해리 후퇴, 해역 1곳의 남은 생명력)</span></p>
+          <p class="muted">${done}/${pub.teamIds.length}선단 입력 완료</p>
         </div>
         <div class="guide-example">
           <div class="postit">
-            <div class="postit-team">A팀</div>
-            <div class="postit-line"><span>테이블</span><b>2번</b></div>
-            <div class="postit-line"><span>카드</span><b>기본 제시안</b></div>
-            <div class="postit-line opt"><span>새치기</span><b>1번째</b><em>(쓸 때만)</em></div>
-            <div class="postit-line opt"><span>추가</span><b>카드명 3번</b><em>(가진 팀만)</em></div>
+            <div class="postit-team">A선단</div>
+            <div class="postit-line"><span>해역</span><b>2번</b></div>
+            <div class="postit-line"><span>무기</span><b>${CARDS.basic.name}</b></div>
+            <div class="postit-line opt"><span>순풍</span><b>1번째</b><em>(쓸 때만)</em></div>
+            <div class="postit-line opt"><span>추가</span><b>무기명 3번</b><em>(가진 선단만)</em></div>
           </div>
           <p class="muted small">이렇게 적어 주세요</p>
         </div>
@@ -216,9 +219,9 @@ function eventRail(): string {
     .slice(0, pub.revealed)
     .map((e) => describeEvent(e))
     .reverse()
-    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}${d.settled ? `<small>${esc(d.settled)}</small>` : ''}${d.trail ? `<small>${esc(d.trail)}</small>` : ''}</li>`)
+    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}${d.trail ? `<small>${esc(d.trail)}</small>` : ''}</li>`)
     .join('');
-  return `<div class="rail-events"><h3>이번 라운드</h3><ol>${items}</ol></div>`;
+  return `<div class="rail-events"><h3>오늘의 항해</h3><ol>${items}</ol></div>`;
 }
 
 function seatLook() {
@@ -254,7 +257,7 @@ function gameView(): string {
 function eventQueue(): number {
   const { pub } = eng();
   let q = pub.queue;
-  // 아직 공개되지 않은 사건 중 1~3번 테이블 합의 수만큼 되돌림
+  // 아직 공개되지 않은 사건 중 1~3번 해역 처치 수만큼 되돌림
   for (const e of pub.events.slice(pub.revealed)) if (e.agenda && e.reward && e.table && e.table <= 3) q -= 1;
   return Math.max(0, q);
 }
@@ -271,7 +274,7 @@ function dock(): string {
     case 'submit': {
       const done = pub.teamIds.filter((t) => game.subs[t]?.table).length;
       main = `${inputPanel()}
-        <button class="wide" data-action="resolve">📨 제안 공개 ▶${done < pub.teamIds.length ? ` <span class="small">(미입력 ${pub.teamIds.length - done}팀은 패스)</span>` : ''}</button>`;
+        <button class="wide" data-action="resolve">⚔️ 공격 공개 ▶${done < pub.teamIds.length ? ` <span class="small">(미입력 ${pub.teamIds.length - done}선단은 쉼)</span>` : ''}</button>`;
       break;
     }
     case 'reveal': {
@@ -282,9 +285,9 @@ function dock(): string {
           ? `<div class="row"><button class="wide" data-action="reveal">다음 공개 ▶ <span class="small">(${left})</span></button>
              <button class="secondary narrow" data-action="reveal-all">모두 공개</button></div>`
           : isPractice()
-            ? '<button class="wide" data-action="practice-end">🏁 연습 끝 · 실제 게임 준비하기</button>'
+            ? '<button class="wide" data-action="practice-end">🏁 연습 끝 · 실제 항해 준비하기</button>'
             : pub.round < ROUNDS
-            ? `<button class="wide" data-action="next-round">${next}라운드 시작 ▶${next === FINAL_OPEN_ROUND ? ' 🏁 최종 교섭 개시!' : ''}</button>`
+            ? `<button class="wide" data-action="next-round">${next}일차 출항 ▶${next === FINAL_OPEN_ROUND ? ' 👑 최종 결전 개시!' : ''}</button>`
             : '<button class="wide" data-action="finish">🏆 최종 결과 발표</button>';
       break;
     }
@@ -303,7 +306,7 @@ function inputPanel(): string {
   }
   const rows = pub.order.map((t, pos) => inputRow(t, pos)).join('');
   const close = isConsole ? '' : '<button class="secondary narrow" data-action="input-toggle">🙈 입력 패널 닫기</button>';
-  return `<div class="input-panel"><div class="input-head"><h3>제출 용지 입력</h3>${close}</div>${rows}</div>`;
+  return `<div class="input-panel"><div class="input-head"><h3>포스트잇 입력</h3>${close}</div>${rows}</div>`;
 }
 
 function inputRow(t: TeamId, pos: number): string {
@@ -314,7 +317,7 @@ function inputRow(t: TeamId, pos: number): string {
   const btn = (action: string, value: string | number, label: string, on: boolean, enabled = true) =>
     `<button class="pill${on ? ' on' : ''}" data-action="${action}" data-team="${t}" data-value="${value}" ${enabled ? '' : 'disabled'}>${label}</button>`;
   const tableBtns = pub.tables
-    .map((tb, i) => btn('sub-table', i + 1, `${i + 1}번 <small>${esc(agendaTitle(tb.agenda))}</small>`, sub?.table === i + 1, tb.agenda > 0))
+    .map((tb, i) => btn('sub-table', i + 1, `${i + 1}번 <small>${esc(shortTitle(tb.agenda))}</small>`, sub?.table === i + 1, tb.agenda > 0))
     .join('');
   const mainCards: CardId[] = ['basic', 'blitz', 'practice'];
   const cards = mainCards
@@ -324,15 +327,15 @@ function inputRow(t: TeamId, pos: number): string {
       return btn('sub-card', c, label, (sub?.card ?? 'basic') === c && !!sub?.table, n > 0);
     })
     .join('');
-  // 추가 카드(홍보물·안건 보류)는 제시안과 함께 1장
+  // 추가 카드(쇠사슬·삼지창)는 공격 무기와 함께 1장
   const extra = sub?.extra;
   const extras = [
     btn('sub-extra', '', '안 함', !extra),
     ...EXTRA_CARDS.map((c) => btn('sub-extra', c, `${CARDS[c].name} ×${hand?.[c] ?? 0}`, extra?.card === c, (hand?.[c] ?? 0) > 0)),
   ].join('');
   const extraTables = extra
-    ? `<div class="in-group"><span class="in-label">추가 카드 테이블</span>${pub.tables
-        .map((tb, i) => btn('sub-extra-table', i + 1, `${i + 1}번 <small>${esc(agendaTitle(tb.agenda))}</small>`, extra.table === i + 1, tb.agenda > 0))
+    ? `<div class="in-group"><span class="in-label">추가 카드 해역</span>${pub.tables
+        .map((tb, i) => btn('sub-extra-table', i + 1, `${i + 1}번 <small>${esc(shortTitle(tb.agenda))}</small>`, extra.table === i + 1, tb.agenda > 0))
         .join('')}</div>`
     : '';
   const cuts = [
@@ -340,17 +343,17 @@ function inputRow(t: TeamId, pos: number): string {
     ...pub.order.map((_, i) => btn('sub-cut', i + 1, `${i + 1}번째`, sub?.cutIn === i + 1, score >= CUT_IN_COST)),
   ].join('');
   const scouts = pub.tables.map((tb, i) => btn('scout', i + 1, `${i + 1}번`, false, tb.agenda > 0 && score >= SCOUT_COST)).join('');
-  const extraText = extra ? ` · + ${CARDS[extra.card].name} ${extra.table ? `${extra.table}번` : '(테이블 선택!)'}` : '';
-  const state = sub?.table ? `✅ ${sub.table}번 · ${CARDS[sub.card].name}${extraText}${sub.cutIn ? ` · 새치기 ${sub.cutIn}번째` : ''}` : '⌛ 미입력 (패스)';
+  const extraText = extra ? ` · + ${CARDS[extra.card].name} ${extra.table ? `${extra.table}번` : '(해역 선택!)'}` : '';
+  const state = sub?.table ? `✅ ${sub.table}번 · ${CARDS[sub.card].name}${extraText}${sub.cutIn ? ` · 순풍 ${sub.cutIn}번째` : ''}` : '⌛ 미입력 (쉼)';
   return `<div class="in-row${sub?.table ? ' done' : ''}">
-    <div class="in-team"><b>${pos + 1}. ${esc(teamName(t))}</b><span>💰 ${score}</span><span class="in-state">${state}</span>
+    <div class="in-team"><b>${pos + 1}. ${esc(teamName(t))}</b><span>🧭 ${distanceOf(score)}해리</span><span class="in-state">${state}</span>
       ${sub ? `<button class="pill ghost" data-action="sub-clear" data-team="${t}">지우기</button>` : ''}</div>
-    <div class="in-group"><span class="in-label">테이블</span>${tableBtns}</div>
-    <div class="in-group"><span class="in-label">카드</span>${cards}</div>
+    <div class="in-group"><span class="in-label">해역</span>${tableBtns}</div>
+    <div class="in-group"><span class="in-label">무기</span>${cards}</div>
     <div class="in-group"><span class="in-label">추가 카드</span>${extras}</div>
     ${extraTables || '<div></div>'}
-    <div class="in-group"><span class="in-label">새치기 −${CUT_IN_COST}</span>${cuts}</div>
-    <div class="in-group"><span class="in-label">🔍 스카우터 −${SCOUT_COST}</span>${scouts}</div>
+    <div class="in-group"><span class="in-label">💨 순풍 +${CUT_IN_COST}해리</span>${cuts}</div>
+    <div class="in-group"><span class="in-label">🔮 예지 +${SCOUT_COST}해리</span>${scouts}</div>
   </div>`;
 }
 
@@ -358,30 +361,30 @@ function scoutModal(): string {
   if (!scoutShown) return '';
   const s = scoutShown;
   return `<div class="modal-back"><div class="modal" data-peek-box>
-    <h2>🔍 ${esc(teamName(s.team))} 스카우터 결과</h2>
-    <p>${s.table}번 테이블 · ${esc(agendaTitle(s.agenda))}</p>
+    <h2>🔮 ${esc(teamName(s.team))} ${SCOUT_NAME}</h2>
+    <p>${s.table}번 해역 · ${esc(agendaTitle(s.agenda))} · 남은 생명력</p>
     <div class="scout-num"><span class="masked">?</span><strong>${s.remaining}</strong></div>
-    <p class="muted">📢 팀 대표가 직접 <b>누르고 있는 동안</b>만 숫자가 보여요. 손을 떼면 다시 가려져요.</p>
+    <p class="muted">📢 선단 대표가 직접 <b>누르고 있는 동안</b>만 숫자가 보여요. 손을 떼면 다시 가려져요.</p>
     <button class="secondary peek-btn" data-peek>👁 누르고 있기</button>
     <button data-action="scout-close">닫기</button>
   </div></div>`;
 }
 
-/** 진행자 창 전용: 남은 수치, 보유 카드, 팀별 결과 기록 */
+/** 진행자 창 전용: 남은 생명력, 보유 무기, 선단별 결과 기록 */
 function secretPanel(): string {
   const s = eng();
   const tables = s.pub.tables
     .map((t, i) => {
       if (!t.agenda) return `<li><b>${i + 1}번</b> ${esc(agendaTitle(t.agenda))} <strong class="secret-num">-</strong></li>`;
       const hits = (s.secret.trail?.[i] ?? []).map((h) => `${esc(teamName(h.team))} −${h.amount}`).join(', ');
-      return `<li><b>${i + 1}번</b> ${esc(agendaTitle(t.agenda))} <strong class="secret-num">${s.secret.remaining[i]} / ${AGENDAS[t.agenda].demand}</strong>${hits ? `<br><span class="muted small">${hits}</span>` : ''}</li>`;
+      return `<li><b>${i + 1}번</b> ${esc(agendaTitle(t.agenda))} <strong class="secret-num">${s.secret.remaining[i]} / ${hpOf(t.agenda)}</strong>${hits ? `<br><span class="muted small">${hits}</span>` : ''}</li>`;
     })
     .join('');
   const hands = s.pub.teamIds
     .map((t) => {
       const h = s.hands[t];
       const cards = h ? (Object.keys(h) as (keyof typeof h)[]).filter((c) => h[c] > 0).map((c) => `${CARDS[c].name} ${h[c]}`) : [];
-      return `<li><b>${esc(teamName(t))}</b> ${cards.length ? cards.join(' · ') : '<span class="muted">기본 제시안만</span>'}</li>`;
+      return `<li><b>${esc(teamName(t))}</b> ${cards.length ? cards.join(' · ') : `<span class="muted">${CARDS.basic.name}만</span>`}</li>`;
     })
     .join('');
   const practice = s.secret.practice.map((p) => `${esc(teamName(p.team))} → ${p.table}번`).join(', ');
@@ -391,9 +394,9 @@ function secretPanel(): string {
     .map((l) => `<li><span class="muted">R${l.round}</span> <b>${esc(teamName(l.team))}</b> ${esc(l.text)}</li>`)
     .join('');
   return `<section class="secret card">
-    <div><h3>남은 / 처음 요구 수치</h3><ul class="plain">${tables}</ul>${practice ? `<p class="muted small">예약된 실무 교섭: ${practice}</p>` : ''}</div>
-    <div><h3>보유 특수 카드</h3><ul class="plain">${hands}</ul></div>
-    <div class="log"><h3>팀별 결과 (팀에게 알려 주세요)</h3><ul class="plain">${log || '<li class="muted">아직 없어요</li>'}</ul></div>
+    <div><h3>남은 / 처음 생명력</h3><ul class="plain">${tables}</ul>${practice ? `<p class="muted small">내일 날아갈 투척 창: ${practice}</p>` : ''}</div>
+    <div><h3>보유 특수 무기</h3><ul class="plain">${hands}</ul></div>
+    <div class="log"><h3>선단별 결과 (선단에게 알려 주세요)</h3><ul class="plain">${log || '<li class="muted">아직 없어요</li>'}</ul></div>
   </section>`;
 }
 
@@ -406,43 +409,44 @@ function rankView(): string {
   const winners = rows.filter((r) => r.rank === 1);
   const medal = ['🥇', '🥈', '🥉'];
   const list = rows
-    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${r.score}점</span><span class="muted">합의 ${r.deals}건</span></li>`)
+    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceOf(r.score)}해리</span><span class="muted">처치 ${r.deals}회</span></li>`)
     .join('');
+  const best = winners[0] ? distanceOf(winners[0].score) : START_DISTANCE;
+  const where = best <= 0 ? `고국 이타카에 도착해 내륙 ${-best}해리까지 들어간` : `고국까지 ${best}해리를 남긴`;
   return `<section class="final-board">
     <div class="confetti">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
-    <h1>🏆 최종 결과</h1>
+    <h1>🏆 최종 결과 · 고국과의 거리</h1>
     <ol class="podium">${list}</ol>
     <blockquote class="closing">
-      "5라운드에 걸친 치열한 교섭이 모두 끝났습니다! 오늘 최종 우승은 총 주도권 ${winners[0]?.score ?? 0}점을 확보한
+      "${ROUNDS}일간의 험난한 항해가 모두 끝났습니다! 오늘 가장 먼저 귀환한 선단은 ${where}
       ${winners.map((w) => esc(teamName(w.team))).join(', ')}입니다! 축하드립니다!<br />
-      이번 게임에서는 노조의 요구 수치를 가늠하고 합의(막타)를 이끌어내는 타이밍이 핵심이었습니다.
-      실제 교섭장에서도 회사의 제시안을 내는 시점과 비공개 채널을 가동하는 '타이밍 전략'이 성공적인 타결을 만든다는 점을 기억해 주시기 바랍니다!"
+      이번 항해에서는 역경의 남은 생명력을 가늠하고 마지막 일격을 넣는 타이밍이 핵심이었습니다.
+      실제 교섭에서도 큰 역경을 함께 깎아 내는 끈기와, 제시안을 내는 '타이밍 전략'이 성공적인 타결을 만든다는 점을 기억해 주시기 바랍니다!"
     </blockquote>
-    ${showDock() ? '<div class="row center-row"><button class="narrow" data-action="final-tab">🔓 안건별 요구 수치 공개 ▶</button></div>' : ''}
+    ${showDock() ? '<div class="row center-row"><button class="narrow" data-action="final-tab">🗺️ 항해 일지 보기 ▶</button></div>' : ''}
   </section>`;
 }
 
-/** 모든 안건의 실제 요구 수치·보상·결과. 겉보기와 다른 안건을 강조해 메시지 전달 */
+/** 모든 역경의 생명력·실제 교섭 안건·처치한 선단 */
 function agendaReveal(): string {
   const { pub } = eng();
   const dealtBy = new Map(pub.tables.flatMap((t) => t.done ?? []).map((d) => [d.agenda, d.team]));
   const cards = ALL_AGENDAS.map((id, i) => {
     const a = AGENDAS[id];
     const team = dealtBy.get(id);
-    const tag = a.fake === 'hard' ? '<div class="fake-tag hard">😰 작아 보여도 난항</div>' : a.fake === 'easy' ? '<div class="fake-tag easy">🤝 커 보여도 원만</div>' : '';
-    return `<li class="reveal-card${a.fake ? ` fake ${a.fake}` : ''}" style="--i:${i}">
+    return `<li class="reveal-card tier-${a.tier}" style="--i:${i}">
       <div class="reveal-head"><span class="pictogram">${a.icon}</span><b>${esc(a.title)}</b></div>
-      <div class="reveal-nums"><span><small>요구 수치</small><strong>${a.demand}</strong></span><span><small>보상</small><strong>+${a.reward}</strong></span></div>
-      <div class="reveal-result">${team ? `✔ ${esc(teamName(team))} 합의` : '미합의'}</div>
-      ${tag}
+      <div class="reveal-topic">${TIER_LABEL[a.tier]} · ${esc(a.topic)}</div>
+      <div class="reveal-nums"><span><small>생명력</small><strong>${hpOf(id)}</strong></span></div>
+      <div class="reveal-result">${team ? `⚔️ ${esc(teamName(team))} 처치` : '살아남음'}</div>
     </li>`;
   }).join('');
   return `<section class="agenda-reveal">
-    <h1>🔓 안건별 실제 요구 수치</h1>
+    <h1>🗺️ 항해 일지 · 역경 뒤의 교섭 안건</h1>
     <ol class="reveal-grid">${cards}</ol>
     <blockquote class="closing lesson">
-      별것 아닌 안건이라도 실제 교섭에서는 <b>난항</b>을 겪을 수 있고,<br />
-      중요한 안건이라도 <b>원만한 노사관계</b>를 바탕으로 쉽게 합의할 수 있습니다.
+      혼자서는 쓰러뜨릴 수 없는 <b>거대한 역경</b>도, 여러 선단이 조금씩 깎아 두면 결국 쓰러집니다.<br />
+      남은 힘을 읽고 <b>마지막 일격의 타이밍</b>을 잡는 것, 그것이 교섭의 기술입니다.
     </blockquote>
     ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="final-tab">◀ 순위 보기</button>' + (isConsole ? '' : '<button class="secondary narrow" data-action="home">처음 화면</button>') + '</div>' : ''}
   </section>`;
@@ -451,12 +455,12 @@ function agendaReveal(): string {
 /* ───────── 그리기 ───────── */
 
 function draw() {
-  // 튜토리얼 설명문은 A~E 팀 기준이라 이름 바꾸기를 적용하지 않음
+  // 튜토리얼 설명문은 A~E 선단 기준이라 이름 바꾸기를 적용하지 않음
   setTeamNames(mode === 'tutorial' ? {} : game.names);
   useSetup(game.engine?.setup);
   if (mode === 'tutorial') return render(app, tutorialView());
   if (mode === 'home' || !game.engine) {
-    if (isConsole) return render(app, '<section class="card center"><h2>🖥 진행자 창</h2><p>프로젝터 화면에서 게임을 시작하면 여기에 입력 패널이 나와요.</p></section>');
+    if (isConsole) return render(app, '<section class="card center"><h2>🖥 진행자 창</h2><p>프로젝터 화면에서 출항하면 여기에 입력 패널이 나와요.</p></section>');
     return render(app, homeView());
   }
   render(app, gameView());
@@ -514,7 +518,7 @@ function act(action: string, el: HTMLElement) {
       mode = 'game';
       return draw();
     case 'new-game': {
-      if (game.engine && game.engine.pub.stage !== 'final' && !confirm('진행 중인 게임을 지우고 새로 시작할까요?')) return;
+      if (game.engine && game.engine.pub.stage !== 'final' && !confirm('진행 중인 항해를 지우고 새로 출항할까요?')) return;
       const teams = TEAM_IDS.filter((t) => picked.has(t));
       const step = startRound(createGame(teams));
       mode = 'game';
@@ -531,7 +535,7 @@ function act(action: string, el: HTMLElement) {
       tutorialIndex = 0;
       return draw();
     case 'practice': {
-      if (game.engine && !isPractice() && game.engine.pub.stage !== 'final' && !confirm('진행 중인 실제 게임을 지우고 연습 게임을 시작할까요?')) return;
+      if (game.engine && !isPractice() && game.engine.pub.stage !== 'final' && !confirm('진행 중인 실제 항해를 지우고 연습 항해를 시작할까요?')) return;
       stopAutoplay();
       const teams = TEAM_IDS.filter((t) => picked.has(t));
       const step = startRound(createGame(teams.length ? teams : TEAM_IDS, practiceSetup()));
@@ -597,11 +601,11 @@ function act(action: string, el: HTMLElement) {
     }
     case 'scout': {
       const table = Number(value);
-      if (!confirm(`${teamName(team)} 주도권 ${SCOUT_COST}점을 써서 ${table}번 테이블을 확인할까요?`)) return;
+      if (!confirm(`${teamName(team)}: ${SCOUT_COST}해리 물러나서 ${table}번 해역의 남은 생명력을 확인할까요?`)) return;
       const { state, result } = scout(eng(), team, table);
       if (result.error) return toast(result.error);
       scoutShown = { ...result, team };
-      const entry = { round: state.pub.round, team, text: `🔍 스카우터: ${table}번 ${agendaTitle(result.agenda)} 남은 수치 ${result.remaining}` };
+      const entry = { round: state.pub.round, team, text: `🔮 ${SCOUT_NAME}: ${table}번 ${agendaTitle(result.agenda)} 남은 생명력 ${result.remaining}` };
       return save(commit(game, { engine: state, log: [...game.log, entry] }));
     }
     case 'scout-close':
@@ -611,9 +615,9 @@ function act(action: string, el: HTMLElement) {
       const n = eng().pub.teamIds.length;
       const subs = Object.fromEntries(Object.entries(game.subs).filter(([, s]) => s?.table));
       const missing = n - Object.keys(subs).length;
-      if (missing && !confirm(`${missing}팀이 입력되지 않았어요. 이 팀들은 이번 라운드 패스로 처리할까요?`)) return;
+      if (missing && !confirm(`${missing}선단이 입력되지 않았어요. 이 선단들은 오늘 쉬는 것으로 처리할까요?`)) return;
       const noTable = Object.entries(subs).filter(([, s]) => s?.extra && !s.extra.table).map(([t]) => teamName(t as TeamId));
-      if (noTable.length && !confirm(`${noTable.join(', ')}의 추가 카드 테이블이 비어 있어요. 추가 카드 없이 진행할까요?`)) return;
+      if (noTable.length && !confirm(`${noTable.join(', ')}의 추가 카드 해역이 비어 있어요. 추가 카드 없이 진행할까요?`)) return;
       inputOpen = false;
       scoutShown = null;
       const step = resolveRound(eng(), subs);
