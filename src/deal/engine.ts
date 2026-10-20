@@ -78,7 +78,7 @@ export function createGame(teamIds: readonly TeamId[], setup?: Setup): EngineSta
       events: [],
       revealed: 0,
     },
-    secret: { remaining: [...tables.map((a) => demand[a]), 0], trail: [[], [], [], []], practice: [] },
+    secret: { remaining: [...tables.map((a) => demand[a]), 0], trail: [[], [], [], []], practice: [], history: [] },
     hands: Object.fromEntries(teamIds.map((t) => [t, emptyHand()])),
     ...(setup ? { setup } : {}),
   };
@@ -99,6 +99,7 @@ class Turn {
     // Firebase 는 빈 배열을 저장하지 않고, 예전에 저장된 게임에는 이력이 없음
     const trail = this.s.secret.trail ?? [];
     this.s.secret.trail = this.s.pub.tables.map((_, i) => trail[i] ?? []);
+    this.s.secret.history ??= [];
   }
 
   get setup(): Setup {
@@ -153,6 +154,8 @@ class Turn {
     this.team(winner).deals += 1;
     if (loot) this.hand(winner)[loot] += 1;
     (pub.tables[i].done ??= []).push({ agenda: agenda.id, team: winner });
+    // 항해 일지용 공격 이력 (게임이 끝난 뒤에만 공개)
+    secret.history!.push({ agenda: agenda.id, trail: [...secret.trail[i]] });
     this.refill(i);
     return {
       winner,
@@ -366,11 +369,10 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     turn.hand(t).hold -= 1;
     held.add(t);
     if (pub.round < ROUNDS) secret.priority.push({ team: t, table: x.table });
+    // 삼지창은 쓴 함대를 공개 (같은 해역에 두 함대가 쓰면 둘 다 발표)
     const table = pub.tables[x.table - 1];
-    if (!table.frozen) {
-      table.frozen = true;
-      turn.event({ kind: 'hold', table: x.table, agenda: table.agenda });
-    }
+    table.frozen = true;
+    turn.event({ kind: 'hold', team: t, table: x.table, agenda: table.agenda });
   }
 
   // ② 헤르메스의 투척 창: 오늘 그 해역의 돌파를 가로챔 (순번과 관계없이 미리 걸어 둠)

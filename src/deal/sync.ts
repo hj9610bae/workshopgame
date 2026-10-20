@@ -90,6 +90,7 @@ export function normHostRoom(raw: any): HostRoom | null {
       trail: Array.from({ length: 4 }, (_, i) => raw.secret?.trail?.[i] ?? []),
       practice: raw.secret?.practice ?? [],
       priority: raw.secret?.priority ?? [],
+      history: raw.secret?.history ?? [],
     },
     teams: raw.teams ?? {},
     hands: Object.fromEntries(TEAM_IDS.map((t) => [t, normHand(raw.private?.[t]?.hand)])),

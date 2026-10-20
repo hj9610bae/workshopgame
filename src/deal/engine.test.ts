@@ -53,6 +53,20 @@ describe('규칙서 5장 예시 1일차', () => {
     expect(state.pub.events.every((e) => !('trail' in e) && !('demand' in e))).toBe(true);
   });
 
+  it('돌파된 역경의 공격 이력은 비공개 history 에 남음 (항해 일지용)', () => {
+    expect(state.secret.history).toEqual([
+      { agenda: 1, trail: [{ team: 'A', card: 'basic', amount: 2 }] },
+      {
+        agenda: 2,
+        trail: [
+          { team: 'C', card: 'basic', amount: 2 },
+          { team: 'D', card: 'basic', amount: 2 },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(state.pub)).not.toContain('trail');
+  });
+
   it('돌파되지 않은 역경의 이력은 비공개 상태로만 쌓이고, 새 역경은 이력이 비어서 시작', () => {
     expect(state.secret.trail[0]).toEqual([{ team: 'B', card: 'basic', amount: 2 }]);
     expect(state.secret.trail[1]).toEqual([]);
@@ -97,7 +111,15 @@ describe('특수 무기', () => {
     expect(state.hands.E!.hold).toBe(0);
     expect(state.pub.tables[1].frozen).toBe(false);
     expect(notes.A?.[0].text).toContain('동결');
-    expect(state.pub.events.find((e) => e.kind === 'hold')?.team).toBeUndefined();
+    // 삼지창은 쓴 함대를 공개
+    expect(state.pub.events.find((e) => e.kind === 'hold')?.team).toBe('E');
+  });
+
+  it('같은 해역에 두 함대가 삼지창을 쓰면 둘 다 공개', () => {
+    const s = withHand('E', 'hold');
+    s.hands.D!.hold = 1;
+    const { state } = resolveRound(s, { D: { table: 1, card: 'hold', cutIn: 0 }, E: { table: 1, card: 'hold', cutIn: 0 } });
+    expect(state.pub.events.filter((e) => e.kind === 'hold').map((e) => e.team)).toEqual(['D', 'E']);
   });
 
   it('헤르메스의 투척 창: 오늘 그 해역의 돌파를 순번과 관계없이 가로챔', () => {

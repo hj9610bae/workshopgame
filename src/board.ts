@@ -4,7 +4,7 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, RESCUE_DISTANCE, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
+import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, RESCUE_DISTANCE, RESCUE_ROUND, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
 import { agendaTitle, beginSubmit, canOpenRescue, createGame, finish, openRescue, pickRescue, ranking, rescuedTeam, resolveRound, revealNext, scout, settleRescue, startRound, type EngineState } from './deal/engine';
 import { deck, distanceLabel, feltTable, seaMap, type TableLook } from './deal/felt';
 import {
@@ -298,7 +298,8 @@ function banner(): string {
       </div>`;
     }
     case 'reveal': {
-      if (pub.rescue) return rescueBanner();
+      // 구조선 배너는 이벤트가 열린 그날 공개 단계에만 (8일차부터는 평소 사건 배너)
+      if (pub.rescue && pub.round === RESCUE_ROUND) return rescueBanner();
       const e = latestEvent();
       if (!e) return '';
       const d = describeEvent(e);
@@ -524,23 +525,30 @@ function rankView(): string {
   </section>`;
 }
 
-/** 모든 역경의 생명력·실제 교섭 안건·돌파한 함대 */
+/** 항해 일지: 모든 역경의 생명력·공격 이력·돌파한 함대 (게임이 끝난 뒤라 비공개였던 이력도 공개) */
 function agendaReveal(): string {
-  const { pub } = eng();
+  const { pub, secret } = eng();
   const dealtBy = new Map(pub.tables.flatMap((t) => t.done ?? []).map((d) => [d.agenda, d.team]));
+  const slainTrail = new Map((secret.history ?? []).map((h) => [h.agenda, h.trail]));
+  // 끝까지 버틴 역경은 해역에 남은 이력
+  const aliveTrail = new Map(pub.tables.map((t, i) => [t.agenda, secret.trail?.[i] ?? []]));
   const { tables, queue } = activeSetup();
   const cards = [...tables, ...queue, FINAL_AGENDA].map((id, i) => {
     const a = AGENDAS[id];
     const team = dealtBy.get(id);
-    return `<li class="reveal-card tier-${a.tier}" style="--i:${i}">
-      <div class="reveal-head"><span class="pictogram">${a.icon}</span><b>${esc(a.title)}</b></div>
-      <div class="reveal-topic">${TIER_LABEL[a.tier]}${a.topic ? ` · ${esc(a.topic)}` : ''}</div>
-      <div class="reveal-nums"><span><small>생명력</small><strong>${hpOf(id)}</strong></span></div>
-      <div class="reveal-result">${team ? `⚔️ ${esc(teamName(team))} 돌파` : '살아남음'}</div>
+    const trail = slainTrail.get(id) ?? aliveTrail.get(id);
+    const hits = (trail ?? [])
+      .map((h, k, all) => `<li class="${team && k === all.length - 1 ? 'last' : ''}">${esc(teamName(h.team))} ${CARDS[h.card].icon}<b>−${h.amount}</b></li>`)
+      .join('');
+    const result = team ? `⚔️ ${esc(teamName(team))} 돌파` : trail ? '살아남음' : '등장하지 않음';
+    return `<li class="reveal-card${team ? '' : ' alive'}" style="--i:${i}">
+      <div class="reveal-head"><span class="pictogram">${a.icon}</span><b>${esc(a.title)}</b><span class="reveal-hp">❤️${hpOf(id)}</span></div>
+      ${hits ? `<ol class="reveal-trail">${hits}</ol>` : '<p class="reveal-trail none">공격 없음</p>'}
+      <div class="reveal-result">${result}</div>
     </li>`;
   }).join('');
   return `<section class="agenda-reveal">
-    <h1>🗺️ 항해 일지 · 역경 뒤의 교섭 안건</h1>
+    <h1>🗺️ 항해 일지 · 역경별 공격 기록</h1>
     <ol class="reveal-grid">${cards}</ol>
     <blockquote class="closing lesson">
       혼자서는 쓰러뜨릴 수 없는 <b>거대한 역경</b>도, 여러 함대가 조금씩 깎아 두면 결국 쓰러집니다.<br />

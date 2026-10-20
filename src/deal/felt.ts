@@ -58,7 +58,8 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
   const no = index + 1;
   const isFinal = index === 3;
   const a = AGENDAS[table.agenda];
-  const cls = ['ftable', isFinal ? 'final' : '', table.frozen ? 'frozen' : '', look.fresh ? 'fresh' : '']
+  // t1~t3: 해역마다 다른 테두리 색 (board.css)
+  const cls = ['ftable', `t${no}`, isFinal ? 'final' : '', table.frozen ? 'frozen' : '', look.fresh ? 'fresh' : '']
     .filter(Boolean)
     .join(' ');
   const stamp = look.deal

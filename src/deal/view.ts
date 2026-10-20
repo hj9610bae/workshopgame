@@ -98,9 +98,9 @@ export function weaponPhrase(card: CardId): string {
   return `${c.icon} ${card === 'basic' ? '기본' : '특수'} 무기 ${c.name}${ro(c.name)}`;
 }
 
-/** 특수 무기는 다른 함대가 효과를 모르니 돌파 발표에 짧은 효과 설명을 붙임 */
+/** 특수 무기는 다른 함대가 효과를 모르니 돌파 발표에 짧은 효과 설명을 붙임 (쇠사슬은 걸 때 이미 효과를 발표해서 생략) */
 const effectNote = (card: CardId | undefined): string =>
-  card && card !== 'basic' ? `${CARDS[card].icon} ${CARDS[card].name}: ${CARDS[card].effect} · ` : '';
+  card && card !== 'basic' && card !== 'promo' ? `${CARDS[card].icon} ${CARDS[card].name}: ${CARDS[card].effect} · ` : '';
 
 /** 공개 화면에 띄울 사건 문장 */
 export function describeEvent(e: GameEvent): {
@@ -133,7 +133,7 @@ export function describeEvent(e: GameEvent): {
         ? { icon: '🌬️', title: '제피로스의 순풍! 공격 순서가 바뀌었어요', detail: e.order?.map(teamName).join(' → ') }
         : { icon: '⚔️', title: '공격을 공개합니다' };
     case 'hold':
-      return { icon: '🔱', title: `${e.table}번 해역 동결! 포세이돈의 삼지창`, detail: '오늘 이 해역에 대한 공격은 모두 무효', tone: 'bad' };
+      return { icon: '🔱', title: `${team ? `${team}, ` : ''}포세이돈의 삼지창으로 ${e.table}번 해역 동결!`, detail: '오늘 이 해역에 대한 공격은 모두 무효', tone: 'bad' };
     case 'promoDeal':
       return { icon: '⛓️', title: `${team}, ${weaponPhrase('promo')} ${agenda} 돌파!`, detail: `${effectNote('promo')}${reward}`, tone: 'deal' };
     case 'end':

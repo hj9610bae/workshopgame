@@ -94,6 +94,8 @@ export interface SecretState {
   practice: { team: TeamId; table: number }[];
   /** 다음 라운드에 그 테이블에 낸 제안을 가장 먼저 적용받는 팀 (지난 라운드 안건 보류). 예전 저장 게임엔 없음 */
   priority?: { team: TeamId; table: number }[];
+  /** 돌파된 역경의 공격 이력 (돌파 순). 최종 결과 뒤 항해 일지에서만 공개. 예전 저장 게임엔 없음 */
+  history?: { agenda: number; trail: Hit[] }[];
 }
 
 export type Hand = Record<SpecialCardId, number>;

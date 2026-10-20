@@ -22,8 +22,9 @@ body.live {
   --success: var(--mint);
   --felt: var(--navy-2);
   --felt-dark: var(--navy);
-  /* 역경·무기 카드: 밤바다 위의 짙은 남색 카드 + 금테 */
+  /* 역경·무기 카드: 짙은 남색~다크 브라운 + 양피지·패브릭 결 + 금테 */
   --paper: #222d52;
+  --card-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .85 0 0 0 0 .7 0 0 0 0 .45 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --ink: var(--text);
   --ink-muted: #aeb7d3;
   --deal: var(--mint);
@@ -341,7 +342,9 @@ body.live:has(.home-board) {
   flex: 1;
   padding: 14px 14px 12px;
   border-radius: 14px;
-  background: var(--paper);
+  background:
+    var(--card-grain),
+    linear-gradient(160deg, #222d52, #2b2420);
   color: var(--ink);
   border: 1px solid rgba(212, 175, 55, 0.55);
   box-shadow:
@@ -1652,34 +1655,50 @@ button.dot-btn.on {
   font-size: 1.6rem;
 }
 
-.reveal-nums {
-  display: flex;
-  justify-content: center;
-  gap: 18px;
+.reveal-hp {
+  margin-left: 4px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--red);
+  white-space: nowrap;
+}
+
+/* 공격 이력: 함대 · 무기 · 감소량 (돌파한 마지막 일격은 금색) */
+.reveal-trail {
+  list-style: none;
   margin: 6px 0;
-}
-
-.reveal-nums span {
+  padding: 0;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.75rem;
 }
 
-.reveal-nums small {
-  font-size: 0.7rem;
-  color: var(--ink-muted);
+.reveal-trail li {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--navy);
+  border: 1px solid var(--border);
+  white-space: nowrap;
 }
 
-.reveal-nums strong {
-  font-size: 1.7rem;
-  line-height: 1.1;
-}
-
-.reveal-nums span:first-child strong {
+.reveal-trail li b {
+  margin-left: 2px;
   color: var(--red);
 }
 
-.reveal-nums span:last-child strong {
-  color: var(--mint);
+.reveal-trail li.last {
+  border-color: var(--gold);
+  box-shadow: 0 0 8px rgba(244, 196, 48, 0.45);
+}
+
+.reveal-trail.none {
+  color: var(--ink-muted);
+}
+
+.reveal-card.alive {
+  opacity: 0.75;
 }
 
 .reveal-result {
@@ -1697,18 +1716,6 @@ button.dot-btn.on {
 .practice-home {
   max-width: 520px;
   margin: 10px auto 0;
-}
-
-/* 항해 일지: 역경 뒤의 실제 교섭 안건 */
-.reveal-topic {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--ink-muted);
-}
-
-.reveal-card.tier-high {
-  outline: 3px solid var(--red);
-  outline-offset: 2px;
 }
 
 /* 설명 슬라이드의 예시 바다 지도 */
@@ -1781,7 +1788,7 @@ button.dot-btn.on {
   right: 0;
   top: 0;
   padding: 0 16px 10vh;
-  animation: credits-roll 34s linear forwards;
+  animation: credits-roll 24s linear forwards;
 }
 
 /* 아래에서 올라와 마지막(SPECIAL THANKS)이 화면 가운데쯤에서 멈춤 */
@@ -1973,4 +1980,47 @@ button.dot-btn.on {
 
 .agenda-card.weapon.secret .hp b {
   color: var(--gold);
+}
+
+/* ───── 해역 카드: 반투명 유리 + 금빛 라인 + 해역별 오라 ───── */
+.ftable .agenda-card {
+  --aura: rgba(212, 175, 55, 0.5);
+  --edge: var(--gold-deep);
+  background:
+    var(--card-grain),
+    linear-gradient(160deg, rgba(34, 45, 82, 0.62), rgba(52, 38, 26, 0.58));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px solid var(--edge);
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 196, 48, 0.35),
+    0 0 22px var(--aura),
+    0 10px 18px rgba(0, 0, 0, 0.45);
+}
+
+/* 1번: 은은한 붉은빛·황금빛 오라 */
+.ftable.t1 .agenda-card {
+  --edge: #e0a03a;
+  --aura: rgba(230, 110, 60, 0.45);
+}
+
+/* 2번: 위협적인 버건디·어두운 보라 */
+.ftable.t2 .agenda-card {
+  --edge: #8e2f5e;
+  --aura: rgba(110, 40, 140, 0.55);
+}
+
+/* 3번: 신비로운 신록·에메랄드 */
+.ftable.t3 .agenda-card {
+  --edge: #2fb67c;
+  --aura: rgba(47, 182, 124, 0.45);
+}
+
+/* 4번(최종 결전): 금빛 */
+.ftable.final .agenda-card {
+  --edge: var(--gold);
+  --aura: rgba(244, 196, 48, 0.55);
+  background:
+    var(--card-grain),
+    linear-gradient(160deg, rgba(59, 50, 22, 0.75), rgba(92, 74, 23, 0.7));
 }
