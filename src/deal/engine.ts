@@ -11,9 +11,12 @@ import {
   FINAL_AGENDA,
   FINAL_OPEN_ROUND,
   INITIAL_TABLES,
+  RESCUE_DISTANCE,
+  RESCUE_ROUND,
   ROUNDS,
   SCOUT_COST,
   SETUP,
+  START_DISTANCE,
   START_SCORE,
   SUBMIT_SECONDS,
   type CardId,
@@ -21,7 +24,7 @@ import {
   type SpecialCardId,
   type TeamId,
 } from './data';
-import type { GameEvent, Hand, Note, PublicState, ScoutResult, SecretState, Submission } from './types';
+import type { GameEvent, Hand, Note, PublicState, RescueState, ScoutResult, SecretState, Submission } from './types';
 
 export interface EngineState {
   pub: PublicState;
@@ -195,12 +198,57 @@ function shuffle<T>(items: T[], rng: Rng): T[] {
   return items;
 }
 
+/** 구조선을 타고 귀환한 함대 (남은 항해에 참여하지 않음) */
+export const rescuedTeam = (pub: PublicState): TeamId | undefined => (pub.rescue?.boarded ? pub.rescue.chosen : undefined);
+
+/** 오늘 항해하는 함대 (구조선을 탄 함대 제외) */
+export const sailingTeams = (pub: PublicState): TeamId[] => pub.teamIds.filter((t) => t !== rescuedTeam(pub));
+
 /** 고국에 가까운 순(전진 거리 큰 순). 동점이면 지난 날 뒤 순번 우선. 1일차는 무작위 */
 export function computeOrder(pub: PublicState, rng: Rng): TeamId[] {
-  if (!pub.prevOrder.length) return shuffle([...pub.teamIds], rng);
+  const teams = sailingTeams(pub);
+  if (!pub.prevOrder.length) return shuffle(teams, rng);
   const score = (t: TeamId) => pub.teams[t]?.score ?? 0;
   const prev = (t: TeamId) => pub.prevOrder.indexOf(t);
-  return [...pub.teamIds].sort((a, b) => score(b) - score(a) || prev(b) - prev(a));
+  return teams.sort((a, b) => score(b) - score(a) || prev(b) - prev(a));
+}
+
+/* ───── 구조선 hidden event: RESCUE_ROUND 공개가 끝난 뒤, 4번 해역이 생기기 전 ───── */
+
+/** 구조선 이벤트를 열 수 있는 때 (연습 항해 제외, 그날 공개가 모두 끝난 뒤, 아직 안 열었을 때) */
+export const canOpenRescue = (s: EngineState): boolean =>
+  !s.setup?.practice && s.pub.round === RESCUE_ROUND && s.pub.stage === 'reveal' && s.pub.revealed >= s.pub.events.length && !s.pub.rescue;
+
+/** 구조선 등장: 지금 1등(공동 1등 포함)을 뺀 함대가 후보 */
+export function openRescue(state: EngineState): EngineState {
+  if (!canOpenRescue(state)) return state;
+  const next = structuredClone(state);
+  const candidates = ranking(next.pub)
+    .filter((r) => r.rank > 1)
+    .map((r) => r.team);
+  next.pub.rescue = { phase: 'offer', candidates };
+  return next;
+}
+
+/** 가위바위보로 탑승 기회를 얻은 함대 (다시 고를 수 있음) */
+export function pickRescue(state: EngineState, team: TeamId | undefined): EngineState {
+  const r = state.pub.rescue;
+  if (r?.phase !== 'offer' || (team && !r.candidates.includes(team))) return state;
+  const next = structuredClone(state);
+  next.pub.rescue = { ...r, chosen: team };
+  if (!team) delete next.pub.rescue.chosen;
+  return next;
+}
+
+/** 탑승(이타카 내륙 RESCUE_DISTANCE 해리로 이동, 남은 항해 불참) 또는 거절. chosen 없이 부르면 이벤트 건너뜀 */
+export function settleRescue(state: EngineState, boarded: boolean): EngineState {
+  const r = state.pub.rescue;
+  if (r?.phase !== 'offer') return state;
+  const next = structuredClone(state);
+  const rescue: RescueState = { ...r, phase: 'done', boarded: boarded && !!r.chosen };
+  next.pub.rescue = rescue;
+  if (rescue.boarded) next.pub.teams[r.chosen!]!.score = START_DISTANCE + START_SCORE - RESCUE_DISTANCE;
+  return next;
 }
 
 /** 하루 시작: ⓪ 최종 결전 개시 → ① 투척 창 발동 → ② 순서 결정 */
@@ -254,6 +302,7 @@ export function scout(state: EngineState, team: TeamId, tableNo: number): { stat
   const base = { round: pub.round, table: tableNo };
   if (pub.stage !== 'submit') return { state, result: { ...base, error: '제출 시간에만 사용할 수 있어요' } };
   if (!pub.teams[team]) return { state, result: { ...base, error: '게임에 참여하지 않은 함대예요' } };
+  if (team === rescuedTeam(pub)) return { state, result: { ...base, error: '구조선을 타고 귀환한 함대예요' } };
   if (turn.team(team).score < SCOUT_COST) return { state, result: { ...base, error: '더 물러설 수 없어요' } };
   if (!turn.isOpen(tableNo)) return { state, result: { ...base, error: '역경이 없는 해역이에요' } };
   turn.team(team).score -= SCOUT_COST;

@@ -15,9 +15,15 @@ export const START_DISTANCE = 15;
 /** 고국과의 거리: 작을수록(음수면 내륙까지) 좋음 */
 export const distanceOf = (score: number): number => START_DISTANCE + START_SCORE - score;
 export const SUBMIT_SECONDS = 180;
+/** 설명 뒤 연습 항해 일수 (거리는 실제 게임에 이어지지 않음) */
+export const PRACTICE_DAYS = 2;
 /** 이 일차 순서 발표 때 4번 해역(최종 결전)이 생김. 그 전에는 화면에 4번 해역이 없음 */
 export const FINAL_OPEN_ROUND = 8;
 export const TABLE_COUNT = 4;
+/** 이 일차 공개가 끝난 뒤 구조선 hidden event (4번 해역이 생기기 전) */
+export const RESCUE_ROUND = 7;
+/** 구조선에 타면 도착하는 고국과의 거리 (음수 = 이타카 내륙). scripts/balance-sim.ts rescue 결과로 정함 */
+export const RESCUE_DISTANCE = -3;
 export const SCOUT_COST = 1;
 export const CUT_IN_COST = 2;
 

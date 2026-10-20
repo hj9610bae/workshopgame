@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FINAL_AGENDA, FINAL_OPEN_ROUND, ROUNDS, START_DISTANCE, TEAM_IDS, distanceOf, type TeamId } from './data';
-import { beginSubmit, createGame, finish, ranking, resolveRound, scout, startRound, type EngineState } from './engine';
+import { FINAL_AGENDA, FINAL_OPEN_ROUND, RESCUE_DISTANCE, RESCUE_ROUND, ROUNDS, START_DISTANCE, TEAM_IDS, distanceOf, type TeamId } from './data';
+import { beginSubmit, canOpenRescue, createGame, finish, openRescue, pickRescue, ranking, resolveRound, scout, settleRescue, startRound, type EngineState } from './engine';
 import type { Submission } from './types';
 
 /** shuffle 이 원래 순서를 유지하도록 하는 난수 → 1라운드 순서 A,B,C,D,E */
@@ -312,5 +312,53 @@ describe('고국과의 거리', () => {
     expect(distanceOf(state.pub.teams.A!.score)).toBe(START_DISTANCE + 2);
     const after = resolveRound(round1(), { A: basic(1) }).state;
     expect(distanceOf(after.pub.teams.A!.score)).toBe(START_DISTANCE - 2);
+  });
+});
+
+describe('구조선 hidden event', () => {
+  /** RESCUE_ROUND 공개가 끝난 상태. A가 1등, 나머지는 동점 */
+  function day7(): EngineState {
+    let s = startRound(createGame(TEAM_IDS), keepOrder).state;
+    for (let d = 1; d < RESCUE_ROUND; d++) s = startRound(resolveRound(beginSubmit(s, 0), {}).state, keepOrder).state;
+    s = resolveRound(beginSubmit(s, 0), {}).state;
+    s.pub.revealed = s.pub.events.length;
+    s.pub.teams.A!.score = 20;
+    s.pub.teams.B!.score = 15;
+    return s;
+  }
+
+  it('7일차 공개가 끝난 뒤에만 열리고, 1등을 뺀 함대가 후보', () => {
+    const s = day7();
+    expect(s.pub.round).toBe(RESCUE_ROUND);
+    expect(canOpenRescue(s)).toBe(true);
+    expect(canOpenRescue({ ...s, pub: { ...s.pub, revealed: 0 } })).toBe(false);
+    const o = openRescue(s);
+    expect(o.pub.rescue).toEqual({ phase: 'offer', candidates: ['B', 'C', 'D', 'E'] });
+    expect(canOpenRescue(o)).toBe(false);
+    expect(pickRescue(o, 'A')).toBe(o);
+  });
+
+  it('탑승: 이타카 내륙 3해리로 가고, 8일차부터 순서에서 빠지며 제출·예지도 무시', () => {
+    const s = settleRescue(pickRescue(openRescue(day7()), 'E'), true);
+    expect(distanceOf(s.pub.teams.E!.score)).toBe(RESCUE_DISTANCE);
+    const d8 = startRound(s).state;
+    expect(d8.pub.round).toBe(FINAL_OPEN_ROUND);
+    expect(d8.pub.order).not.toContain('E');
+    expect(d8.pub.order).toHaveLength(4);
+    const sub = beginSubmit(d8, 0);
+    expect(scout(sub, 'E', 1).result.error).toBeDefined();
+    const { state } = resolveRound(sub, { E: basic(1) });
+    expect(state.pub.events.some((e) => e.team === 'E')).toBe(false);
+    expect(ranking(finish(state).pub).map((r) => r.team)).toContain('E');
+  });
+
+  it('거절하거나 건너뛰면 아무 변화 없이 계속 항해', () => {
+    const base = day7();
+    const declined = settleRescue(pickRescue(openRescue(base), 'C'), false);
+    expect(declined.pub.rescue).toMatchObject({ phase: 'done', chosen: 'C', boarded: false });
+    expect(scores(declined)).toEqual(scores(base));
+    expect(startRound(declined).state.pub.order).toHaveLength(5);
+    const skipped = settleRescue(openRescue(base), true);
+    expect(skipped.pub.rescue).toMatchObject({ phase: 'done', boarded: false });
   });
 });

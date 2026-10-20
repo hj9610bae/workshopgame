@@ -4,8 +4,8 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, CARDS, FINAL_AGENDA, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
-import { agendaTitle, beginSubmit, createGame, finish, ranking, resolveRound, revealNext, scout, startRound, type EngineState } from './deal/engine';
+import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, RESCUE_DISTANCE, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
+import { agendaTitle, beginSubmit, canOpenRescue, createGame, finish, openRescue, pickRescue, ranking, rescuedTeam, resolveRound, revealNext, scout, settleRescue, startRound, type EngineState } from './deal/engine';
 import { deck, distanceLabel, feltTable, seaMap, type TableLook } from './deal/felt';
 import {
   beatConsole,
@@ -50,7 +50,7 @@ function save(next: LocalGame) {
 }
 
 const eng = (): EngineState => game.engine!;
-/** 연습 항해: 무작위 배치(setup)로 하루만 */
+/** 연습 항해: 무작위 배치(setup)로 PRACTICE_DAYS 일만 */
 const isPractice = (): boolean => !!game.engine?.setup?.practice;
 const stage = (): Stage => game.engine?.pub.stage ?? 'lobby';
 /** 진행자 창이 따로 열려 있으면 프로젝터 화면에는 조작 버튼을 숨김 */
@@ -75,7 +75,7 @@ function homeView(): string {
       <h1>오디세이아 : 귀환의 항해</h1>
       <p class="muted">${ROUNDS}일간의 항해 · 한 화면 현장 진행</p>
       <button class="tutorial-btn" data-action="tutorial">📖 항해 설명 보기</button>
-      <button class="secondary practice-home" data-action="practice">🎲 바로 연습 항해 (하루, 무작위 역경)</button>
+      <button class="secondary practice-home" data-action="practice">🎲 바로 연습 항해 (${PRACTICE_DAYS}일, 무작위 역경)</button>
     </div>
     <div class="card setup">
       <h2>참가 함대</h2>
@@ -138,7 +138,7 @@ const shortTitle = (id: number): string => (AGENDAS[id] ? `${AGENDAS[id].icon} $
 
 function roundText(): string {
   const { pub } = eng();
-  if (isPractice()) return `🎲 연습 항해 · ${STAGE_LABEL[pub.stage]}`;
+  if (isPractice()) return `🎲 연습 항해 ${pub.round}일차/${PRACTICE_DAYS}일차 · ${STAGE_LABEL[pub.stage]}`;
   return pub.stage === 'final' ? '최종 결과' : `${pub.round}일차/${ROUNDS}일차 · ${STAGE_LABEL[pub.stage]}`;
 }
 
@@ -164,6 +164,51 @@ function visibleTables(): number[] {
   return pub.tables.map((_, i) => i).filter((i) => i < INITIAL_TABLES.length || pub.round >= FINAL_OPEN_ROUND);
 }
 
+/** 바다 지도에 그릴 함대: 오늘 공격 순서 + 구조선으로 귀환한 함대(맨 아래, 닻 표시) */
+function seaOrder(): TeamId[] {
+  const { pub } = eng();
+  const rescued = rescuedTeam(pub);
+  return rescued ? [...pub.order.filter((t) => t !== rescued), rescued] : pub.order;
+}
+
+/** 구조선 hidden event 배너 (프로젝터) */
+function rescueBanner(): string {
+  const { pub } = eng();
+  const r = pub.rescue!;
+  const name = (t: TeamId) => esc(teamName(t));
+  const deal = `구조선에 타면 <b>이타카 내륙 ${-RESCUE_DISTANCE}해리</b>에 확실히 도착해요. 대신 <b>내일부터 남은 항해에는 참여할 수 없어요.</b> (공격 불가)`;
+  if (r.phase === 'offer' && !r.chosen) {
+    return `<div class="banner pop rescue"><div class="banner-icon">🚢</div><h2>히든 이벤트! 고국으로 가는 구조선이 나타났다</h2>
+      <p>${deal}</p>
+      <p>탑승 기회: 1등을 뺀 <b>${r.candidates.map(name).join(' · ')}</b> 중 <b>가위바위보</b>로 이긴 한 함대!</p></div>`;
+  }
+  if (r.phase === 'offer') {
+    const now = distanceLabel(distanceOf(pub.teams[r.chosen!]!.score));
+    return `<div class="banner pop rescue"><div class="banner-icon">🚢</div><h2>${name(r.chosen!)}, 구조선에 타시겠어요?</h2>
+      <p>${deal}</p>
+      <p>지금 <b>${now}</b> → 탑승하면 <b>내륙 ${-RESCUE_DISTANCE}해리 확정</b> · 거절하면 남은 항해를 계속</p></div>`;
+  }
+  if (r.boarded) {
+    return `<div class="banner pop rescue deal"><div class="banner-icon">🚢</div><h2>${name(r.chosen!)}, 구조선 탑승! 이타카 내륙 ${-RESCUE_DISTANCE}해리에 귀환</h2>
+      <p>남은 항해에는 참여하지 않아요. 나머지 함대는 항해를 계속합니다.</p></div>`;
+  }
+  return `<div class="banner pop rescue"><div class="banner-icon">🌊</div><h2>${r.chosen ? `${name(r.chosen)}가 구조선을 거절했어요` : '구조선이 떠났어요'}</h2>
+    <p>모든 함대가 항해를 계속합니다.</p></div>`;
+}
+
+/** 진행자용 구조선 조작: 가위바위보 승자 고르기 → 탑승/거절 */
+function rescueControls(): string {
+  const r = eng().pub.rescue!;
+  const picks = r.candidates
+    .map((t) => `<button class="pill${r.chosen === t ? ' on' : ''}" data-action="rescue-pick" data-team="${t}">${esc(teamName(t))}</button>`)
+    .join('');
+  const off = r.chosen ? '' : 'disabled';
+  return `<div class="rescue-ctl"><div class="in-group"><span class="in-label">✊✌️✋ 가위바위보 승리</span>${picks}</div>
+    <div class="row"><button class="wide" data-action="rescue-board" ${off}>🚢 탑승</button>
+      <button class="secondary narrow" data-action="rescue-decline" ${off}>거절 (항해 계속)</button>
+      <button class="secondary narrow" data-action="rescue-skip">이벤트 건너뛰기</button></div></div>`;
+}
+
 /** 공개 중인 마지막 사건 (공개 단계에서만) */
 function latestEvent(): GameEvent | undefined {
   const { pub } = eng();
@@ -186,7 +231,7 @@ function tableLooks(): TableLook[] {
 
 function banner(): string {
   const { pub } = eng();
-  const done = pub.teamIds.filter((t) => game.subs[t]?.table).length;
+  const done = pub.order.filter((t) => game.subs[t]?.table).length;
   switch (pub.stage) {
     case 'order': {
       const news = pub.events.map((e) => describeEvent(e)).map((d) => `<li>${d.icon} ${esc(d.title)}${d.detail ? ` <span class="muted">${esc(d.detail)}</span>` : ''}</li>`);
@@ -200,7 +245,7 @@ function banner(): string {
           <h2>📝 포스트잇에 적어 내세요</h2>
           <div class="big-timer" data-timer></div>
           <p class="scout-now">🔮 <b>${SCOUT_NAME}</b>를 쓰려면 <b>지금</b> 진행자에게 오세요! <span>(${SCOUT_COST}해리 후퇴, 해역 1곳의 남은 생명력)</span></p>
-          <p class="muted">${done}/${pub.teamIds.length}함대 입력 완료</p>
+          <p class="muted">${done}/${pub.order.length}함대 입력 완료</p>
         </div>
         <div class="guide-example">
           <div class="postit">
@@ -214,6 +259,7 @@ function banner(): string {
         </div>
       </div>`;
     case 'reveal': {
+      if (pub.rescue) return rescueBanner();
       const e = latestEvent();
       if (!e) return '';
       const d = describeEvent(e);
@@ -227,11 +273,13 @@ function banner(): string {
 function seatLook() {
   const { pub } = eng();
   const status: Partial<Record<TeamId, string>> = {};
-  if (pub.stage === 'submit') for (const t of pub.teamIds) status[t] = game.subs[t]?.table ? '✅ 입력 완료' : '⌛ 대기';
+  if (pub.stage === 'submit') for (const t of pub.order) status[t] = game.subs[t]?.table ? '✅ 입력 완료' : '⌛ 대기';
+  const rescued = rescuedTeam(pub);
+  if (rescued) status[rescued] = '🚢 구조선으로 귀환';
   const e = latestEvent();
   const prevScores = pub.stage === 'reveal' ? pub.events[pub.revealed - 2]?.scores : undefined;
   const deltas = e && prevScores ? Object.fromEntries(pub.teamIds.map((t) => [t, (e.scores[t] ?? 0) - (prevScores[t] ?? 0)])) : {};
-  return { status, deltas, active: e?.team };
+  return { status, deltas, active: e?.team, docked: rescued ? [rescued] : [] };
 }
 
 function gameView(): string {
@@ -250,7 +298,7 @@ function gameView(): string {
       </section>
       <aside class="rail">${deck(eventQueue())}</aside>
     </div>
-    ${seaMap(pub.order, snap.scores, seatLook())}
+    ${seaMap(seaOrder(), snap.scores, seatLook())}
     ${showDock() ? dock() : ''}`;
 }
 
@@ -273,9 +321,9 @@ function dock(): string {
       main = `<button class="wide" data-action="submit">📝 제출 받기 시작 (${SUBMIT_SECONDS / 60}분) ▶</button>`;
       break;
     case 'submit': {
-      const done = pub.teamIds.filter((t) => game.subs[t]?.table).length;
+      const done = pub.order.filter((t) => game.subs[t]?.table).length;
       main = `${inputPanel()}
-        <button class="wide" data-action="resolve">⚔️ 공격 공개 ▶${done < pub.teamIds.length ? ` <span class="small">(미입력 ${pub.teamIds.length - done}함대는 쉼)</span>` : ''}</button>`;
+        <button class="wide" data-action="resolve">⚔️ 공격 공개 ▶${done < pub.order.length ? ` <span class="small">(미입력 ${pub.order.length - done}함대는 쉼)</span>` : ''}</button>`;
       break;
     }
     case 'reveal': {
@@ -285,10 +333,16 @@ function dock(): string {
         left > 0
           ? `<div class="row"><button class="wide" data-action="reveal">다음 공개 ▶ <span class="small">(${left})</span></button>
              <button class="secondary narrow" data-action="reveal-all">모두 공개</button></div>`
-          : isPractice()
+          : isPractice() && pub.round >= PRACTICE_DAYS
             ? '<button class="wide" data-action="practice-end">🏁 연습 끝 · 실제 항해 준비하기</button>'
+            : isPractice()
+            ? `<button class="wide" data-action="next-round">🎲 연습 ${next}일차 출항 ▶</button>`
+            : canOpenRescue(eng())
+            ? '<button class="wide" data-action="rescue-open">🚢 히든 이벤트: 구조선 등장 ▶</button>'
+            : pub.rescue?.phase === 'offer'
+            ? rescueControls()
             : pub.round < ROUNDS
-            ? `<button class="wide" data-action="next-round">${next}일차 출항 ▶${next === FINAL_OPEN_ROUND ? ' 👑 최종 결전 개시!' : ''}</button>`
+            ? `<button class="wide" data-action="next-round">${next}일차 출항 ▶</button>`
             : '<button class="wide" data-action="finish">🏆 최종 결과 발표</button>';
       break;
     }
@@ -404,7 +458,7 @@ function secretPanel(): string {
 }
 
 function finalView(): string {
-  return game.agendasShown ? agendaReveal() : rankView();
+  return game.creditsShown ? credits() : game.agendasShown ? agendaReveal() : rankView();
 }
 
 function rankView(): string {
@@ -412,7 +466,7 @@ function rankView(): string {
   const winners = rows.filter((r) => r.rank === 1);
   const medal = ['🥇', '🥈', '🥉'];
   const list = rows
-    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">돌파 ${r.deals}회</span></li>`)
+    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">돌파 ${r.deals}회${r.team === rescuedTeam(eng().pub) ? ' · 🚢 구조선 귀환' : ''}</span></li>`)
     .join('');
   const best = winners[0] ? distanceOf(winners[0].score) : START_DISTANCE;
   const where = best <= 0 ? `고국 이타카에 도착해 내륙 ${-best}해리까지 들어간` : `고국까지 ${best}해리를 남긴`;
@@ -453,7 +507,28 @@ function agendaReveal(): string {
       혼자서는 쓰러뜨릴 수 없는 <b>거대한 역경</b>도, 여러 함대가 조금씩 깎아 두면 결국 쓰러집니다.<br />
       남은 힘을 읽고 <b>마지막 일격의 타이밍</b>을 잡는 것, 그것이 교섭의 기술입니다.
     </blockquote>
-    ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="final-tab">◀ 순위 보기</button>' + (isConsole ? '' : '<button class="secondary narrow" data-action="home">처음 화면</button>') + '</div>' : ''}
+    ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="final-tab">◀ 순위 보기</button><button class="narrow" data-action="credits">🎬 엔딩 크레딧 ▶</button></div>' : ''}
+  </section>`;
+}
+
+/** 마지막 페이지: 영화처럼 아래에서 위로 올라가는 엔딩 크레딧 */
+const CREDITS: [string, string[]][] = [
+  ['PROJECT LEADERS', ['Original Concept Brought By<b>이주영 매니저</b>', 'Odyssey Universe Created By<b>정현목 매니저</b>']],
+  ['WORLD BUILDING & GAME DESIGN', ['Storyline & Game Simulation By<b>이주영 매니저</b>', 'Event & Feature Developed By<b>이주영 매니저 & 정현목 매니저</b>']],
+  ['PRESENTATION & PRODUCTION', ['AI Design & Visualizing By<b>이주영 매니저</b>', 'Stage Layout & Game Balancing By<b>이주영 매니저</b>']],
+  ['SPECIAL THANKS TO', ['<b>거친 바다를 헤치고 귀환에 성공한<br />모든 참가자 여러분</b>']],
+];
+
+function credits(): string {
+  const groups = CREDITS.map(([head, lines]) => `<div class="credit-group"><h3>[ ${head} ]</h3>${lines.map((l) => `<p>${l}</p>`).join('')}</div>`).join('');
+  return `<section class="credits">
+    <div class="credits-roll">
+      <div class="credits-mark">🎬 ENDING CREDITS</div>
+      <h1>&lt; 오디세이아 : 귀환의 항해 &gt;</h1>
+      ${groups}
+      <div class="credits-end">⛵</div>
+    </div>
+    ${showDock() ? '<div class="row center-row credits-nav"><button class="secondary narrow" data-action="credits">◀ 항해 일지</button><button class="secondary narrow" data-action="credits-replay">↻ 다시 재생</button>' + (isConsole ? '' : '<button class="secondary narrow" data-action="home">처음 화면</button>') + '</div>' : ''}
   </section>`;
 }
 
@@ -502,6 +577,11 @@ const ALLOWED: Record<string, Stage[]> = {
   'reveal-all': ['reveal'],
   'next-round': ['reveal'],
   'practice-end': ['reveal'],
+  'rescue-open': ['reveal'],
+  'rescue-pick': ['reveal'],
+  'rescue-board': ['reveal'],
+  'rescue-decline': ['reveal'],
+  'rescue-skip': ['reveal'],
   finish: ['reveal'],
 };
 
@@ -618,7 +698,7 @@ function act(action: string, el: HTMLElement) {
       scoutShown = null;
       return draw();
     case 'resolve': {
-      const n = eng().pub.teamIds.length;
+      const n = eng().pub.order.length;
       const subs = Object.fromEntries(Object.entries(game.subs).filter(([, s]) => s?.table));
       const missing = n - Object.keys(subs).length;
       if (missing && !confirm(`${missing}함대가 입력되지 않았어요. 이 함대들은 오늘 쉬는 것으로 처리할까요?`)) return;
@@ -634,13 +714,41 @@ function act(action: string, el: HTMLElement) {
       return save(commit(game, { engine: revealNext(eng(), action === 'reveal-all') }));
     case 'next-round': {
       if (eng().pub.revealed < eng().pub.events.length) return;
+      // 구조선 이벤트를 마쳐야 다음 날로
+      if (canOpenRescue(eng()) || eng().pub.rescue?.phase === 'offer') return;
       const step = startRound(eng());
       return save(commit(game, { engine: step.state, log: [...game.log, ...logNotes(step)] }));
     }
     case 'finish':
-      return save(commit(game, { engine: finish(eng()), agendasShown: false }));
+      return save(commit(game, { engine: finish(eng()), agendasShown: false, creditsShown: false }));
+    case 'rescue-open':
+      return save(commit(game, { engine: openRescue(eng()) }));
+    case 'rescue-pick':
+      return save(commit(game, { engine: pickRescue(eng(), team) }));
+    case 'rescue-board': {
+      const chosen = eng().pub.rescue?.chosen;
+      if (!chosen || !confirm(`${teamName(chosen)}: 구조선에 타면 이타카 내륙 ${-RESCUE_DISTANCE}해리로 가고, 남은 항해에는 참여하지 않아요. 탑승할까요?`)) return;
+      return save(commit(game, { engine: settleRescue(eng(), true) }));
+    }
+    case 'rescue-decline':
+      return save(commit(game, { engine: settleRescue(eng(), false) }));
+    case 'rescue-skip':
+      if (!confirm('구조선 이벤트를 건너뛸까요? (아무도 타지 않음)')) return;
+      return save(commit(game, { engine: settleRescue(pickRescue(eng(), undefined), false) }));
     case 'final-tab':
-      return save({ ...game, agendasShown: !game.agendasShown });
+      return save({ ...game, agendasShown: !game.agendasShown, creditsShown: false });
+    case 'credits':
+      return save({ ...game, agendasShown: true, creditsShown: !game.creditsShown });
+    case 'credits-replay': {
+      // 애니메이션을 처음부터 다시: 크레딧 요소를 새로 그림
+      const roll = app.querySelector<HTMLElement>('.credits-roll');
+      if (roll) {
+        roll.style.animation = 'none';
+        void roll.offsetHeight;
+        roll.style.animation = '';
+      }
+      return;
+    }
   }
 }
 
@@ -650,10 +758,13 @@ function primaryAction(): string | null {
   if (mode !== 'game' || !game.engine || !showDock()) return null;
   const { pub } = eng();
   if (pub.stage === 'order') return 'submit';
-  if (pub.stage === 'final') return game.agendasShown ? null : 'final-tab';
+  if (pub.stage === 'final') return !game.agendasShown ? 'final-tab' : !game.creditsShown ? 'credits' : null;
   if (pub.stage === 'reveal') {
     if (pub.revealed < pub.events.length) return 'reveal';
-    return isPractice() ? null : pub.round < ROUNDS ? 'next-round' : 'finish';
+    if (isPractice()) return pub.round < PRACTICE_DAYS ? 'next-round' : null;
+    if (canOpenRescue(eng())) return 'rescue-open';
+    if (pub.rescue?.phase === 'offer') return null;
+    return pub.round < ROUNDS ? 'next-round' : 'finish';
   }
   return null;
 }

@@ -1524,3 +1524,118 @@ button.dot-btn.on {
 .sea .delta {
   font-size: 0.85em;
 }
+
+/* ───── 엔딩 크레딧 (마지막 페이지) ───── */
+.credits {
+  position: relative;
+  flex: 1;
+  min-height: calc(100dvh - 90px);
+  overflow: hidden;
+  border-radius: 18px;
+  background: radial-gradient(ellipse at 50% 120%, #0d3a5c 0%, #05080f 60%);
+  text-align: center;
+}
+
+.credits-roll {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: 0 16px 10vh;
+  animation: credits-roll 34s linear forwards;
+}
+
+/* 아래에서 올라와 마지막(SPECIAL THANKS)이 화면 가운데쯤에서 멈춤 */
+@keyframes credits-roll {
+  from {
+    transform: translateY(80dvh);
+  }
+  to {
+    transform: translateY(calc(-100% + 75dvh));
+  }
+}
+
+.credits-mark {
+  font-size: 1.1rem;
+  letter-spacing: 0.3em;
+  color: #9fb3c8;
+}
+
+.credits h1 {
+  margin: 0.4em 0 1.6em;
+  font-size: 2.8rem;
+  color: var(--gold);
+}
+
+.credit-group {
+  margin: 0 auto 3.2em;
+}
+
+.credit-group h3 {
+  margin: 0 0 0.9em;
+  font-size: 1.15rem;
+  letter-spacing: 0.15em;
+  color: #d9b56a;
+}
+
+.credit-group p {
+  margin: 0 0 1.1em;
+  font-size: 1.05rem;
+  color: #c7d3e0;
+  line-height: 1.5;
+}
+
+.credit-group p b {
+  display: block;
+  font-size: 1.6rem;
+  color: #fff;
+}
+
+.credits-end {
+  font-size: 3rem;
+}
+
+.credits-nav {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  opacity: 0.35;
+  transition: opacity 0.2s;
+}
+
+.credits-nav:hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credits-roll {
+    animation: none;
+    position: static;
+    padding-top: 4vh;
+  }
+}
+
+/* ───── 구조선 hidden event ───── */
+.banner.rescue {
+  background: linear-gradient(135deg, #0f4c75, #1b6ca8);
+  border: 2px solid var(--gold);
+}
+
+.banner.rescue.deal {
+  background: linear-gradient(135deg, #1b6ca8, #2fa36b);
+}
+
+.banner.rescue .banner-icon {
+  animation: bob 2.4s ease-in-out infinite;
+}
+
+.rescue-ctl {
+  display: grid;
+  gap: 10px;
+}
+
+.rescue-ctl .in-label {
+  width: auto;
+  margin-right: 6px;
+}

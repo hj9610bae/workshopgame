@@ -1,16 +1,17 @@
 /*
  * 오디세이아 밸런스 시뮬레이션 (실제 엔진 + 단순 AI 함대, 변형마다 3000판).
- * 실행: npx tsx scripts/balance-sim.ts [size|order|tier]
+ * 실행: npx tsx scripts/balance-sim.ts [size|order|tier|rescue]
  *   size  : 역경 수·특수 무기 수 변형 (2026-10-20 첫 번째)
  *   order : 역경 순서 오름차순(지금) vs 무작위(최종 결전 제외, 전리품은 처음 나오는 5개에) vs 구간 안에서만 무작위 (기본값)
  *   tier  : 구간 안에서만 무작위 두 가지만
+ *   rescue: 구조선 hidden event (7일차 종료 후 한 함대를 목적지 거리로, 8~10일차 불참). 같은 난수로 '안 탐'·'탐'을 갈라 비교
  * AI: 남은 생명력을 노이즈(σ1.5) 섞어 추정, 쓰러뜨릴 수 있어 보이는 큰 역경을 노리고 아니면 보상/남은 비율이 큰 역경을 깎음.
  *     화살은 6 이하로 보이는 큰 역경에, 투척 창은 가장 큰 역경에, 쇠사슬은 얻자마자, 삼지창은 가끔. 순풍은 드물게(맨 뒤로).
  * v3.3부터 data.ts 기준 배치가 22개라 '지금'·'역경 +4' 이름의 변형은 v3.2(18개) 때 결과와 기준이 다름 (2026-10-20 결과는 docs/progress.md).
  * 추가 역경은 id 100+로 대기열 중간에 끼워 넣음. 4번 해역 개시일(FINAL_OPEN_ROUND)은 data.ts 값 그대로.
  */
-import { AGENDAS, FINAL_AGENDA, LOOT_ORDER, SETUP, TEAM_IDS, type SpecialCardId, type Setup, type TeamId } from '../src/deal/data';
-import { beginSubmit, createGame, resolveRound, startRound, type EngineState } from '../src/deal/engine';
+import { AGENDAS, FINAL_AGENDA, LOOT_ORDER, SETUP, START_DISTANCE, START_SCORE, TEAM_IDS, shuffledSetup, type SpecialCardId, type Setup, type TeamId } from '../src/deal/data';
+import { beginSubmit, createGame, ranking, resolveRound, startRound, type EngineState } from '../src/deal/engine';
 import type { Submission } from '../src/deal/types';
 
 let seed = 12345;
@@ -86,6 +87,45 @@ interface Stat {
   early: number;
 }
 
+/** AI 함대들의 오늘 제출 (skip: 제출하지 않는 함대, 예: 구조선을 탄 함대) */
+function decide(s: EngineState, setup: Setup, d: number, skip: ReadonlySet<TeamId> = new Set()): Partial<Record<TeamId, Submission>> {
+  const open = s.pub.tables.map((t, i) => (t.agenda ? i : -1)).filter((i) => i >= 0);
+  const subs: Partial<Record<TeamId, Submission>> = {};
+  const est = s.secret.remaining.map((r) => r + gauss() * SIGMA);
+  s.pub.order.forEach((t, pos) => {
+    if (!open.length || skip.has(t)) return;
+    const h = s.hands[t]!;
+    const reward = (i: number) => setup.demand[s.pub.tables[i].agenda];
+    const e = (i: number) => Math.max(1, Math.round(est[i]));
+    const last = d === DAYS;
+    let card: Submission['card'] = 'basic';
+    let killable = open.filter((i) => e(i) <= 2).sort((a, b) => reward(b) - reward(a));
+    if (!killable.length && h.blitz > 0) {
+      const k = open.filter((i) => e(i) <= 6 && (reward(i) >= 5 || last)).sort((a, b) => reward(b) - reward(a));
+      if (k.length) {
+        killable = k;
+        card = 'blitz';
+      }
+    }
+    let table: number;
+    if (killable.length && rnd() < 0.8) table = killable[0];
+    else table = open.map((i) => [i, reward(i) / e(i) + rnd() * 0.8] as const).sort((a, b) => b[1] - a[1])[0][0];
+    if (h.practice > 0 && (last || rnd() < 0.5)) {
+      card = 'practice';
+      table = [...open].sort((a, b) => reward(b) - reward(a))[0];
+    }
+    const sub: Submission = { table: table + 1, card, cutIn: 0 };
+    if (h.promo > 0) sub.extra = { card: 'promo', table: [...open].sort((a, b) => reward(b) - reward(a))[0] + 1 };
+    else if (h.hold > 0 && (last || rnd() < 0.4)) {
+      const o = open.filter((i) => i !== table);
+      if (o.length) sub.extra = { card: 'hold', table: o[0] + 1 };
+    }
+    if (pos === 0 && rnd() < 0.08 && s.pub.teams[t]!.score >= 2) sub.cutIn = s.pub.order.length;
+    subs[t] = sub;
+  });
+  return subs;
+}
+
 function play(setup: Setup): Stat {
   let s: EngineState = createGame(TEAM_IDS, setup);
   const slainBy: number[] = [];
@@ -101,39 +141,7 @@ function play(setup: Setup): Stat {
     s = beginSubmit(s, 0);
     const open = s.pub.tables.map((t, i) => (t.agenda ? i : -1)).filter((i) => i >= 0);
     if (open.filter((i) => i < 3).length < 3 && !emptyDay) emptyDay = d;
-    const subs: Partial<Record<TeamId, Submission>> = {};
-    const est = s.secret.remaining.map((r) => r + gauss() * SIGMA);
-    s.pub.order.forEach((t, pos) => {
-      if (!open.length) return;
-      const h = s.hands[t]!;
-      const reward = (i: number) => setup.demand[s.pub.tables[i].agenda];
-      const e = (i: number) => Math.max(1, Math.round(est[i]));
-      const last = d === DAYS;
-      let card: Submission['card'] = 'basic';
-      let killable = open.filter((i) => e(i) <= 2).sort((a, b) => reward(b) - reward(a));
-      if (!killable.length && h.blitz > 0) {
-        const k = open.filter((i) => e(i) <= 6 && (reward(i) >= 5 || last)).sort((a, b) => reward(b) - reward(a));
-        if (k.length) {
-          killable = k;
-          card = 'blitz';
-        }
-      }
-      let table: number;
-      if (killable.length && rnd() < 0.8) table = killable[0];
-      else table = open.map((i) => [i, reward(i) / e(i) + rnd() * 0.8] as const).sort((a, b) => b[1] - a[1])[0][0];
-      if (h.practice > 0 && (last || rnd() < 0.5)) {
-        card = 'practice';
-        table = [...open].sort((a, b) => reward(b) - reward(a))[0];
-      }
-      const sub: Submission = { table: table + 1, card, cutIn: 0 };
-      if (h.promo > 0) sub.extra = { card: 'promo', table: [...open].sort((a, b) => reward(b) - reward(a))[0] + 1 };
-      else if (h.hold > 0 && (last || rnd() < 0.4)) {
-        const o = open.filter((i) => i !== table);
-        if (o.length) sub.extra = { card: 'hold', table: o[0] + 1 };
-      }
-      if (pos === 0 && rnd() < 0.08 && s.pub.teams[t]!.score >= 2) sub.cutIn = s.pub.order.length;
-      subs[t] = sub;
-    });
+    const subs = decide(s, setup, d);
     const before = handSum();
     const doneBefore = new Set(s.pub.tables.flatMap((t) => t.done ?? []).map((x) => x.agenda));
     s = resolveRound(s, subs).state;
@@ -188,7 +196,103 @@ function run(v: Variant) {
   console.log(`  최종 거리 1위 ${f(mean(st.map((x) => x.dist[0])))} · 2위 ${f(mean(st.map((x) => x.dist[1])))} · 꼴찌 ${f(mean(st.map((x) => x.dist[4])))}해리, 1·2위 차 ${f(mean(st.map((x) => x.dist[1] - x.dist[0])))}, 5일차 선두 우승 ${pct(st.map((x) => x.leaderDay5Wins))}, 돌파 0회 함대 ${(mean(st.map((x) => x.zeroTeams))).toFixed(2)}개`);
 }
 
+/* ───── 구조선 (hidden event): 7일차 종료 후 한 함대가 타면 이타카 항구(0해리)로, 8~10일차 불참 ───── */
+
+const RESCUE_DAY = 7;
+
+/** day 다음 날부터 DAYS 까지 진행 (rescued 는 제출 안 함) */
+function continueFrom(s0: EngineState, setup: Setup, rescued: ReadonlySet<TeamId>): EngineState {
+  let s = s0;
+  for (let d = RESCUE_DAY + 1; d <= DAYS; d++) {
+    s = beginSubmit(startRound(s, rnd).state, 0);
+    s = resolveRound(s, decide(s, setup, d, rescued)).state;
+  }
+  return s;
+}
+
+const rankOf = (s: EngineState, t: TeamId) => ranking(s.pub).find((r) => r.team === t)!.rank;
+const distOf = (s: EngineState, t: TeamId) => START_DISTANCE + START_SCORE - s.pub.teams[t]!.score;
+
+/** 구조선: 그 함대를 목적지 거리(dest)로 옮김 */
+function board(s0: EngineState, t: TeamId, dest: number): EngineState {
+  const s = structuredClone(s0);
+  s.pub.teams[t]!.score = START_DISTANCE + START_SCORE - dest;
+  return s;
+}
+
+interface RescueRow {
+  day7: number[];
+  stay: number[];
+  ride: number[];
+}
+
+/** 목적지: 해리 숫자, 또는 'second' = 7일차 2등 함대의 거리 (2등 자신이 타면 3등 거리) */
+type Dest = number | 'second';
+
+function rescueSim(n: number, dests: Dest[]) {
+  // byRank[dest][7일차 등수-1]
+  const rows = dests.map(() => Array.from({ length: 5 }, (): RescueRow => ({ day7: [], stay: [], ride: [] })));
+  const giftFirst: number[] = [], giftLastStay: number[] = [], giftLastRide: number[] = [], giftLastNoGift: number[] = [];
+  const firstInland: boolean[] = [];
+  for (let g = 0; g < n; g++) {
+    const setup = shuffledSetup(rnd);
+    let s: EngineState = createGame(TEAM_IDS, setup);
+    for (let d = 1; d <= RESCUE_DAY; d++) {
+      s = beginSubmit(startRound(s, rnd).state, 0);
+      s = resolveRound(s, decide(s, setup, d)).state;
+    }
+    // 7일차 순위 (동점은 순서대로 끊음)
+    const order7 = ranking(s.pub).map((r) => r.team);
+    firstInland.push(distOf(s, order7[0]) < 0);
+    const fork = seed;
+    seed = fork;
+    const stay = continueFrom(s, setup, new Set());
+    order7.forEach((t, r) => {
+      for (const [k, dest] of dests.entries()) {
+        seed = fork;
+        const to = dest === 'second' ? distOf(s, order7[t === order7[1] ? 2 : 1]) : dest;
+        const ride = continueFrom(board(s, t, to), setup, new Set([t]));
+        rows[k][r].day7.push(distOf(s, t));
+        rows[k][r].stay.push(rankOf(stay, t));
+        rows[k][r].ride.push(rankOf(ride, t));
+      }
+    });
+    // 안 C: 1등이 타면 꼴찌에게 특수 무기(화살) 1장
+    const first = order7[0], last = order7[4];
+    seed = fork;
+    const gifted = board(s, first, 0);
+    gifted.hands[last]!.blitz += 1;
+    const ride = continueFrom(gifted, setup, new Set([first]));
+    seed = fork;
+    const rideNoGift = continueFrom(board(s, first, 0), setup, new Set([first]));
+    giftFirst.push(rankOf(ride, first));
+    giftLastStay.push(rankOf(stay, last));
+    giftLastRide.push(rankOf(ride, last));
+    giftLastNoGift.push(rankOf(rideNoGift, last));
+  }
+  const avg = (a: number[]) => f(mean(a));
+  const dist = (a: number[]) => [1, 2, 3, 4, 5].map((r) => `${Math.round((100 * a.filter((x) => x === r).length) / a.length)}`.padStart(3)).join(' ');
+  const top3 = (a: number[]) => pct(a.map((x) => x <= 3));
+  console.log(`\n■ 구조선 (7일차 종료 후, ${n}판, 역경 22개·구간 안 무작위)`);
+  console.log(`  7일차 1등이 이미 이타카 내륙(0해리 미만)인 판: ${pct(firstInland)}`);
+  dests.forEach((dest, k) => {
+    console.log(`\n  [목적지 ${dest === 'second' ? '7일차 2등 함대의 위치' : `${dest}해리`}]  7일차 등수별 최종 등수 분포 (1~5등 %, 평균 등수, 3등 이내)`);
+    rows[k].forEach((row, r) => {
+      console.log(`  ${r + 1}등 (7일차 평균 ${avg(row.day7)}해리)  안 탐: ${dist(row.stay)} | 평균 ${avg(row.stay)} · 3등 이내 ${top3(row.stay)}   탐: ${dist(row.ride)} | 평균 ${avg(row.ride)} · 3등 이내 ${top3(row.ride)}`);
+    });
+    const rest = rows[k].slice(1);
+    const all = (key: 'stay' | 'ride') => rest.flatMap((r) => r[key]);
+    console.log(`  → 안 B (1등 외 4함대 중 가위바위보 1함대): 안 탐 평균 ${avg(all('stay'))} · 3등 이내 ${top3(all('stay'))}  /  탐 ${dist(all('ride'))} | 평균 ${avg(all('ride'))} · 3등 이내 ${top3(all('ride'))}`);
+  });
+  console.log(`\n  안 C (1등이 타면 꼴찌에게 아폴론의 전갈 화살 1장): 1등 최종 ${dist(giftFirst)} | 평균 ${avg(giftFirst)}`);
+  console.log(`     꼴찌 최종 평균 등수: 아무도 안 탐 ${avg(giftLastStay)} · 1등만 탐(선물 없음) ${avg(giftLastNoGift)} · 1등 탐 + 화살 ${avg(giftLastRide)}`);
+}
+
 const mode = process.argv[2] ?? 'order';
+if (mode === 'rescue') {
+  rescueSim(2000, process.argv[3] === 'second' ? ['second'] : [0, -3, 3, 'second']);
+  process.exit(0);
+}
 const variants: Variant[] =
   mode === 'tier'
     ? [

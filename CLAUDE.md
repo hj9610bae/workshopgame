@@ -12,6 +12,7 @@
   - **폰 제출(`host.html` + `play.html`)**: **현장에서 쓰지 않기로 함** (2026-10-15). 공용 코드가 컴파일되게만 유지하고 새 기능·컨셉 변경은 넣지 않음 (교섭 문구가 남아 있음)
 - 10일(`ROUNDS`), 역경 22개(최종 결전 포함). 실제 게임은 출항 때 `shuffledSetup()`(구간 하·중·상 안에서만 섞고 처음 5개에 전리품)을 `EngineState.setup`에 저장. `SETUP`은 테스트·설명 예시용 기준 배치. 연습 항해는 `Setup.practice`.
 - 최종 결전은 `FINAL_OPEN_ROUND`(8일차) 순서 발표 때 4번 해역. 그 전엔 4번 해역을 화면·입력 패널에 그리지 않음(`board.ts` `visibleTables`)
+- 구조선 hidden event: `RESCUE_ROUND`(7일차) 공개 뒤 `openRescue`→`pickRescue`→`settleRescue`(`pub.rescue`). 탄 함대는 `RESCUE_DISTANCE`(−3)로, `computeOrder`·`sailingTeams`에서 빠짐. 1~7일차 화면·버튼에 4번 해역 예고 금지
 - 점수: 엔진 `score`는 v2.4 주도권 그대로(시작 10, 높을수록 좋음). 화면은 `distanceOf(score)` = 고국과의 거리(시작 15해리, 낮을수록 좋음). 돌파 보상 = `Setup.demand`(처음 생명력)
 - 처음 생명력은 공개, 남은 생명력은 비공개. 공격 이력도 비공개: `secret.trail`에만 쌓이고 진행자 창에만 표시. 돌파 사건에는 마지막 일격 함대와 그 무기(`GameEvent.weapon`)만. 특수 무기면 `CARDS.effect` 짧은 설명을 붙임(`view.ts` `describeEvent`)
 - 역경 카드 `adversaryCard()`(`felt.ts`) = 픽토그램 + 역경 이름 + 생명력 + 전리품(전진 거리, 특수 무기 이름). 실제 게임·연습·설명 모두 이 양식. 무기 카드 `weaponCard()`도 같은 양식(픽토그램 + 이름 + `CARDS.powerText`). 구간·교섭 안건은 항해 일지에만. 안건 번호는 화면에 쓰지 않음

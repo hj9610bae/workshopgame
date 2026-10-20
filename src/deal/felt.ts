@@ -103,6 +103,8 @@ export interface SeatLook {
   /** 함대 이름 옆 작은 표시 (제출 상태 등) */
   status?: Partial<Record<TeamId, string>>;
   deltas?: Partial<Record<TeamId, number>>;
+  /** 구조선으로 귀환해 항해하지 않는 함대 (순번 대신 닻 표시) */
+  docked?: TeamId[];
   /** 배 위치를 기억해 움직임을 그리는 단위 (게임 화면·설명·최종 결과가 서로 섞이지 않게) */
   key?: string;
 }
@@ -153,7 +155,7 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
       const status = look.status?.[t];
       const style = `--i:${i};--x:${px.toFixed(2)}%${sail ? `;--from:${prev!.toFixed(2)}%` : ''}`;
       return `<li class="ship${look.active === t ? ' active' : ''}${sail ? ' sail' : ''}" style="${style}">
-        <span class="ship-pos">${i + 1}</span><span class="ship-icon" aria-hidden="true">⛵</span>
+        <span class="ship-pos">${look.docked?.includes(t) ? '⚓' : i + 1}</span><span class="ship-icon" aria-hidden="true">⛵</span>
         <b class="ship-name">${esc(teamName(t))}</b><span class="ship-dist">${distanceLabel(d)}</span>${delta}
         ${status ? `<span class="ship-status">${status}</span>` : ''}
       </li>`;

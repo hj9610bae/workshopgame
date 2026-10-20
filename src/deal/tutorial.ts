@@ -1,9 +1,9 @@
 /*
  * 항해 설명 슬라이드 + 연습 게임 배치.
- * 설명이 끝나면 실제 진행 화면으로 1일 연습 항해를 해요. 실제 첫 해역·전리품 위치가 드러나지 않게
+ * 설명이 끝나면 실제 진행 화면으로 PRACTICE_DAYS 일 연습 항해를 해요. 실제 첫 해역·전리품 위치가 드러나지 않게
  * 연습 게임은 역경 순서·전리품을 무작위로 정해요. (생명력은 처음부터 공개라 실제 값을 그대로 씀)
  */
-import { AGENDAS, CARDS, CUT_IN_COST, CUT_IN_NAME, FINAL_AGENDA, INITIAL_TABLES, LOOT, LOOT_ORDER, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, SUBMIT_SECONDS, type CardId, type Setup } from './data';
+import { AGENDAS, CARDS, PRACTICE_DAYS, CUT_IN_COST, CUT_IN_NAME, FINAL_AGENDA, INITIAL_TABLES, LOOT, LOOT_ORDER, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, SUBMIT_SECONDS, type CardId, type Setup } from './data';
 import { adversaryCard, weaponCard } from './felt';
 import type { Rng } from './engine';
 
@@ -137,9 +137,9 @@ export const INTRO_SLIDES: Slide[] = [
 
 export const OUTRO_SLIDE: Slide = {
   kind: 'slide',
-  title: '🎲 연습 항해로 하루 해 볼까요?',
+  title: `🎲 연습 항해로 ${PRACTICE_DAYS}일 해 볼까요?`,
   html: `<ul class="slide-list">
-      <li>실제 게임과 똑같은 화면으로 <b>하루만</b> 연습해요. 거리는 실제 게임에 이어지지 않아요.</li>
+      <li>실제 게임과 똑같은 화면으로 <b>${PRACTICE_DAYS}일</b> 연습해요. 거리는 실제 게임에 이어지지 않아요.</li>
       <li>연습 항해의 역경 순서·전리품 위치는 <b>무작위</b>라 실제 게임과 달라요.</li>
       <li>남은 생명력은 비밀! 역경이 돌파되면 <b>마지막으로 공격한 함대</b>만 공개돼요.</li>
     </ul>

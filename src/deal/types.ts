@@ -72,6 +72,16 @@ export interface PublicState {
   events: GameEvent[];
   /** 사회자 화면에 공개된 사건 수 */
   revealed: number;
+  /** 구조선 hidden event (RESCUE_ROUND 공개 뒤). 예전 저장 게임엔 없음 */
+  rescue?: RescueState;
+}
+
+/** 구조선: 1등을 뺀 함대(candidates) 중 가위바위보로 뽑힌 함대(chosen)가 탈지(boarded) 정함 */
+export interface RescueState {
+  phase: 'offer' | 'done';
+  candidates: TeamId[];
+  chosen?: TeamId;
+  boarded?: boolean;
 }
 
 /** Firebase rooms/{code}/secret — 사회자만 읽음 */
