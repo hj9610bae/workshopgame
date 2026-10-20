@@ -271,9 +271,9 @@ export function startRound(state: EngineState, rng: Rng = Math.random): Step {
     const deal = turn.damage(table, 'practice', team);
     if (deal) {
       turn.event({ kind: 'practiceDeal', team, table, ...shown(deal) });
-      turn.note(team, `🎯 헤르메스의 투척 창 발동! ${dealText(deal)}`);
+      turn.note(team, `⚡ 헤르메스의 투척 창 발동! ${dealText(deal)}`);
     } else if (before) {
-      turn.note(team, `🎯 투척 창(못 가로챈 창) 발동: ${table}번 해역 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
+      turn.note(team, `⚡ 투척 창(못 가로챈 창) 발동: ${table}번 해역 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
     } else {
       turn.note(team, `투척 창: ${table}번 해역이 비어 있어 효과가 없었어요`, -1);
     }
@@ -342,7 +342,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   pub.order = order;
   turn.event({ kind: 'start', ...(changed ? { cutIn: true, order } : {}) });
   for (const t of wantsCutIn) {
-    turn.note(t, cutInPos.has(t) ? `💨 제피로스의 순풍: ${cutInPos.get(t)}번째로 공격 (${CUT_IN_COST}해리 후퇴)` : '순풍 실패: 더 물러설 수 없어요');
+    turn.note(t, cutInPos.has(t) ? `🌬️ 제피로스의 순풍: ${cutInPos.get(t)}번째로 공격 (${CUT_IN_COST}해리 후퇴)` : '순풍 실패: 더 물러설 수 없어요');
   }
 
   // 추가 카드(쇠사슬·삼지창)는 extra 로, 주 카드 자리에 낸 것도 같은 효과
@@ -391,7 +391,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   const dealEvent = (t: TeamId, tableNo: number, deal: Deal, kind: 'proposal' | 'promoDeal') => {
     turn.event({ kind, team: t, table: tableNo, ...(kind === 'proposal' ? { result: 'deal' as const } : {}), ...shown(deal) });
     if (deal.stolen) {
-      turn.note(deal.winner, `🎯 투척 창으로 가로채기 성공! ${dealText(deal)}`);
+      turn.note(deal.winner, `⚡ 투척 창으로 가로채기 성공! ${dealText(deal)}`);
       turn.note(t, `${agendaTitle(deal.agenda)}에 마지막 일격을 넣었지만 투척 창에 보상을 빼앗겼어요`);
     } else {
       turn.note(t, `${kind === 'promoDeal' ? '⛓️ 쇠사슬 효과로 ' : '🎉 '}${dealText(deal)}`);
@@ -434,7 +434,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     const { table: tableNo, card } = main;
     if (card === 'practice' && stealing.has(t)) {
       turn.event({ kind: 'proposal', team: t, result: 'done', ...isFirst });
-      turn.note(t, `🎯 ${tableNo}번 해역에 헤르메스의 투척 창 — 오늘 이 해역에서 역경이 쓰러지면 보상을 가로채요`);
+      turn.note(t, `⚡ ${tableNo}번 해역에 헤르메스의 투척 창 — 오늘 이 해역에서 역경이 쓰러지면 보상을 가로채요`);
       continue;
     }
     if (!turn.has(t, card)) {
@@ -481,9 +481,9 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     for (const t of teams) {
       if (pub.round < ROUNDS) {
         secret.practice.push({ team: t, table: i + 1 });
-        turn.note(t, `🎯 ${i + 1}번 해역에서 가로챌 돌파가 없었어요 — 내일 시작 시 −${CARDS.practice.power}`, -1);
+        turn.note(t, `⚡ ${i + 1}번 해역에서 가로챌 돌파가 없었어요 — 내일 시작 시 −${CARDS.practice.power}`, -1);
       } else {
-        turn.note(t, `🎯 ${i + 1}번 해역에서 가로챌 돌파가 없었어요`, -1);
+        turn.note(t, `⚡ ${i + 1}번 해역에서 가로챌 돌파가 없었어요`, -1);
       }
     }
   }

@@ -1,15 +1,43 @@
-/* ───────── 현장 진행 화면 (board.html) : 갑판 위에서 내려다본 바다 ───────── */
+/* ───────── 현장 진행 화면 (board.html) ─────────
+ * 디자인 기획서: 네이비·밤바다 60% / 금·청동 30% / 빨강(생명력·위협)·민트(거리·순풍·승리) 10%
+ * 제목은 Cinzel + 명조, 본문·수치는 Pretendard
+ */
 body.live {
-  --felt: #1b5e8a;
-  --felt-dark: #0d3a5c;
-  --wood: #6b3f1f;
-  --wood-light: #9a5f30;
-  --paper: #fffaf0;
-  --ink: #2a2118;
-  --gold: #ffcf3f;
-  --deal: #ff5d73;
+  --navy: #0b132b;
+  --navy-2: #1c2541;
+  --navy-3: #2b3a67;
+  --gold-deep: #d4af37;
+  --gold: #f4c430;
+  --red: #e63946;
+  --mint: #48cae4;
+  --bg: var(--navy);
+  --surface: var(--navy-2);
+  --text: #f3f0e6;
+  --muted: #9aa6c4;
+  --accent: var(--gold-deep);
+  --accent-text: var(--navy);
+  --secondary: var(--navy-3);
+  --border: #33406e;
+  --danger: var(--red);
+  --success: var(--mint);
+  --felt: var(--navy-2);
+  --felt-dark: var(--navy);
+  /* 역경·무기 카드: 밤바다 위의 짙은 남색 카드 + 금테 */
+  --paper: #222d52;
+  --ink: var(--text);
+  --ink-muted: #aeb7d3;
+  --deal: var(--mint);
+  --font-title: 'Cinzel', 'Noto Serif KR', serif;
+  font-family: 'Pretendard Variable', Pretendard, system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   font-size: clamp(14px, 1.05vw, 24px);
-  background: radial-gradient(circle at 50% 0%, #26304f, var(--bg) 70%);
+  background: radial-gradient(circle at 50% 0%, var(--navy-2), var(--bg) 70%);
+}
+
+body.live h1,
+body.live .topbar .brand,
+body.live .agenda-card h3,
+body.live .item-card b {
+  font-family: var(--font-title);
 }
 
 body.live #app {
@@ -72,38 +100,80 @@ body.live button.small {
 }
 
 .hero {
+  position: relative;
+  z-index: 1;
   text-align: center;
 }
 
+.home-board .setup {
+  position: relative;
+  z-index: 1;
+}
+
 .hero h1 {
-  font-size: clamp(2rem, 4.5vw, 4rem);
-  margin: 8px 0;
+  font-size: clamp(2.2rem, 4.8vw, 4.4rem);
+  margin: 6px 0 4px;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 18px rgba(244, 196, 48, 0.25);
 }
 
-.hero-chips {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  font-size: 2.6rem;
+.laurel {
+  width: clamp(90px, 9vw, 150px);
+  color: var(--gold-deep);
 }
 
-.hero-chips span {
-  animation: bob 2.4s ease-in-out infinite;
+.cover-sub {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: clamp(1rem, 1.5vw, 1.4rem);
+  color: var(--text);
+  opacity: 0.85;
 }
 
-.hero-chips span:nth-child(2) {
-  animation-delay: 0.3s;
-}
-.hero-chips span:nth-child(3) {
-  animation-delay: 0.6s;
-}
-.hero-chips span:nth-child(4) {
-  animation-delay: 0.9s;
+/* 표지: 파도치는 밤바다 */
+body.live:has(.home-board) {
+  background:
+    radial-gradient(ellipse 60% 40% at 70% 12%, rgba(244, 196, 48, 0.12), transparent 70%),
+    linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 70%, #13203f 100%);
 }
 
-@keyframes bob {
-  50% {
-    transform: translateY(-10px);
+.cover-waves {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30vh;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0 60 Q150 10 300 60 T600 60 T900 60 T1200 60 V120 H0z' fill='%232b3a67' fill-opacity='.75'/%3E%3Cpath d='M0 60 Q150 10 300 60 T600 60 T900 60 T1200 60' fill='none' stroke='%23d4af37' stroke-opacity='.35' stroke-width='2'/%3E%3C/svg%3E") 0 20% / 1200px 80% repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0 70 Q150 30 300 70 T600 70 T900 70 T1200 70 V120 H0z' fill='%230b132b'/%3E%3Cpath d='M0 70 Q150 30 300 70 T600 70 T900 70 T1200 70' fill='none' stroke='%23f4c430' stroke-opacity='.5' stroke-width='2'/%3E%3C/svg%3E") 0 100% / 900px 60% repeat-x;
+  animation: waves 18s linear infinite;
+}
+
+@keyframes waves {
+  to {
+    background-position:
+      1200px 20%,
+      -900px 100%;
+  }
+}
+
+.cover-sign {
+  position: fixed;
+  right: 20px;
+  bottom: 14px;
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--gold-deep);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover-waves {
+    animation: none;
   }
 }
 
@@ -112,7 +182,7 @@ body.live button.small {
   margin: 24px auto 0;
   font-size: 1.3rem;
   padding: 20px;
-  background: linear-gradient(135deg, #ffd95e, #ff9d3f);
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
 }
 
 .setup h2 {
@@ -144,7 +214,7 @@ body.live button.small {
 
 .pick.on .pick-toggle {
   background: var(--success);
-  color: #08240f;
+  color: var(--navy);
 }
 
 .pick input {
@@ -184,11 +254,11 @@ body.live button.small {
     /* 경위선 */
     repeating-linear-gradient(0deg, transparent 0 63px, rgba(210, 236, 255, 0.13) 63px 64px),
     repeating-linear-gradient(90deg, transparent 0 63px, rgba(210, 236, 255, 0.13) 63px 64px),
-    radial-gradient(ellipse at 40% 35%, #2f8fc4 0%, var(--felt) 45%, var(--felt-dark) 100%);
-  border: 3px solid #d9b56a;
+    radial-gradient(ellipse at 40% 35%, #24346a 0%, var(--felt) 45%, var(--felt-dark) 100%);
+  border: 3px solid var(--gold-deep);
   box-shadow:
-    0 0 0 6px #10324f,
-    0 0 0 9px #d9b56a,
+    0 0 0 6px var(--navy),
+    0 0 0 9px var(--gold-deep),
     inset 0 0 60px rgba(0, 0, 0, 0.45),
     0 12px 30px rgba(0, 0, 0, 0.5);
   min-height: 40vh;
@@ -255,8 +325,8 @@ body.live button.small {
   padding: 3px 14px;
   border-radius: 999px;
   background: rgba(8, 30, 52, 0.75);
-  border: 2px solid #d9b56a;
-  color: #f3e1b0;
+  border: 2px solid var(--gold-deep);
+  color: var(--gold);
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -273,8 +343,9 @@ body.live button.small {
   border-radius: 14px;
   background: var(--paper);
   color: var(--ink);
+  border: 1px solid rgba(212, 175, 55, 0.55);
   box-shadow:
-    0 6px 0 #d9cdb3,
+    0 6px 0 var(--navy),
     0 10px 18px rgba(0, 0, 0, 0.45);
   text-align: center;
   display: flex;
@@ -304,8 +375,8 @@ body.live button.small {
   right: calc(var(--k) * 7px);
   padding: 2px 8px;
   border-radius: 12px 12px 0 0;
-  background: #d9ceb6;
-  color: #5d513d;
+  background: var(--navy-3);
+  color: var(--ink-muted);
   opacity: calc(0.95 - var(--k) * 0.2);
   font-size: 0.72rem;
   font-weight: 700;
@@ -317,9 +388,9 @@ body.live button.small {
 }
 
 .ftable.final .agenda-card {
-  background: linear-gradient(160deg, #fff6d6, #ffe18a);
+  background: linear-gradient(160deg, #3b3216, #5c4a17);
   box-shadow:
-    0 6px 0 #c9a23a,
+    0 6px 0 var(--gold-deep),
     0 10px 22px rgba(0, 0, 0, 0.45),
     0 0 30px rgba(255, 207, 63, 0.5);
 }
@@ -332,6 +403,7 @@ body.live button.small {
 
 .agenda-card h3 {
   margin: 0;
+  color: var(--gold);
   font-size: 1.5rem;
   word-break: keep-all;
 }
@@ -339,12 +411,12 @@ body.live button.small {
 .agenda-card .hp {
   margin: 0;
   font-size: 1.1rem;
-  color: #6c5f49;
+  color: var(--ink-muted);
 }
 
 .agenda-card .hp b {
   font-size: 1.5rem;
-  color: #d63a3a;
+  color: var(--red);
 }
 
 /* 전리품: 전진 거리 + 특수 무기 이름 */
@@ -355,15 +427,15 @@ body.live button.small {
   gap: 4px 8px;
   margin-top: auto;
   padding-top: 6px;
-  border-top: 2px dashed #e2d5b8;
+  border-top: 2px dashed rgba(212, 175, 55, 0.4);
   font-weight: 800;
-  color: #a1531b;
+  color: var(--mint);
 }
 
 .reward .loot {
   padding: 1px 8px;
   border-radius: 999px;
-  background: #3a3048;
+  background: var(--navy);
   color: var(--gold);
   font-size: 0.9em;
   white-space: nowrap;
@@ -372,15 +444,16 @@ body.live button.small {
 /* 무기 카드 (설명 화면): 역경 카드와 같은 양식 */
 .weapon-cards {
   display: flex;
+  width: 100%;
   justify-content: center;
   gap: 16px;
   max-width: 1300px;
 }
 
 .weapon-cards .agenda-card {
-  flex: 0 1 10.5em;
+  flex: 0 1 12.5em;
   min-width: 0;
-  border-top: 8px solid #8a4de0;
+  border-top: 8px solid var(--gold-deep);
   animation: deal-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 
@@ -398,7 +471,7 @@ body.live button.small {
 }
 
 .agenda-card.weapon.basic {
-  border-top-color: #4b8de0;
+  border-top-color: var(--mint);
 }
 
 .agenda-card.weapon .hp {
@@ -412,12 +485,13 @@ body.live button.small {
 }
 
 .agenda-card.weapon h3 {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
+  word-break: keep-all;
 }
 
 .agenda-card.weapon .reward {
   font-size: 0.8rem;
-  color: #6c5f49;
+  color: var(--ink-muted);
 }
 
 /* 설명 화면의 예시 해역 (게임 화면과 같은 지도 바탕) */
@@ -430,8 +504,8 @@ body.live button.small {
   background:
     repeating-linear-gradient(0deg, transparent 0 47px, rgba(210, 236, 255, 0.13) 47px 48px),
     repeating-linear-gradient(90deg, transparent 0 47px, rgba(210, 236, 255, 0.13) 47px 48px),
-    radial-gradient(ellipse at center, #2f8fc4 0%, var(--felt) 50%, var(--felt-dark) 100%);
-  border: 3px solid #d9b56a;
+    radial-gradient(ellipse at center, #24346a 0%, var(--felt) 50%, var(--felt-dark) 100%);
+  border: 3px solid var(--gold-deep);
   font-size: 0.85rem;
 }
 
@@ -466,18 +540,18 @@ body.live button.small {
   background: var(--paper);
   color: var(--ink);
   line-height: 1.35;
-  box-shadow: 0 6px 0 #d9cdb3, 0 10px 18px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 0 var(--navy), 0 10px 18px rgba(0, 0, 0, 0.4);
 }
 
 .item-card span:not(.pictogram) {
   font-size: 1.05rem;
-  color: #6c5f49;
+  color: var(--ink-muted);
 }
 
 .item-card em {
   font-style: normal;
   font-weight: 800;
-  color: #c0392b;
+  color: var(--red);
 }
 
 .stickers {
@@ -490,8 +564,8 @@ body.live button.small {
 .sticker {
   padding: 3px 8px;
   border-radius: 6px;
-  background: #ffe66d;
-  color: #3a2c00;
+  background: var(--gold);
+  color: var(--navy);
   font-size: 0.8rem;
   font-weight: 700;
   transform: rotate(-3deg);
@@ -519,7 +593,7 @@ body.live button.small {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: #cfe9da;
+  color: var(--ink-muted);
   text-align: center;
   padding: 10px;
 }
@@ -612,8 +686,8 @@ body.live button.small {
   padding: 16px 28px;
   border-radius: 20px;
   text-align: center;
-  background: rgba(10, 20, 15, 0.82);
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(11, 19, 43, 0.9);
+  border: 2px solid rgba(212, 175, 55, 0.45);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
@@ -640,8 +714,8 @@ body.live button.small {
 }
 
 .banner.deal {
-  background: linear-gradient(135deg, rgba(255, 93, 115, 0.95), rgba(255, 159, 63, 0.95));
-  border-color: #fff;
+  background: linear-gradient(135deg, rgba(28, 37, 65, 0.97), rgba(20, 95, 115, 0.97));
+  border-color: var(--mint);
 }
 
 .banner.bad {
@@ -699,13 +773,20 @@ body.live button.small {
   padding: 0 6px;
   border-radius: 999px;
   background: var(--gold);
-  color: #1a1a1a;
+  color: var(--navy);
 }
 
 .deck-list {
   margin: 8px 0 0;
   padding-left: 1.4em;
   font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.deck-more {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 
@@ -726,15 +807,15 @@ body.live button.small {
   overflow: hidden;
   background:
     repeating-linear-gradient(170deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 22px),
-    linear-gradient(90deg, #1f7fb5, #145a8a 55%, #0e3f66);
-  border: 3px solid #0b3150;
+    linear-gradient(90deg, #24346a, var(--navy-2) 55%, var(--navy));
+  border: 2px solid var(--gold-deep);
 }
 
 .sea-land {
   position: absolute;
   inset: 0 auto 0 0;
   width: var(--port);
-  background: linear-gradient(90deg, #4f8a3c, #7da650 70%, #e2cf96);
+  background: linear-gradient(90deg, #3a3418, #6b5a24 70%, var(--gold-deep));
   transition: width 1.2s ease-in-out;
 }
 
@@ -776,7 +857,7 @@ body.live button.small {
   position: absolute;
   inset: 0 0 0 auto;
   width: 9%;
-  background: linear-gradient(90deg, transparent, rgba(160, 40, 40, 0.55));
+  background: linear-gradient(90deg, transparent, rgba(230, 57, 70, 0.4));
 }
 
 .sea-troy span {
@@ -835,7 +916,7 @@ body.live button.small {
 
 .ship.active {
   border-color: var(--gold);
-  box-shadow: 0 0 18px rgba(255, 207, 63, 0.6);
+  box-shadow: 0 0 18px rgba(244, 196, 48, 0.6);
 }
 
 .ship-pos {
@@ -860,7 +941,7 @@ body.live button.small {
 
 .ship-dist {
   font-weight: 800;
-  color: var(--gold);
+  color: var(--mint);
 }
 
 .delta {
@@ -873,7 +954,7 @@ body.live button.small {
 
 .delta.up {
   background: var(--success);
-  color: #08240f;
+  color: var(--navy);
 }
 
 .delta.down {
@@ -1132,13 +1213,13 @@ body.console #app {
 }
 
 .podium .rank-1 {
-  background: linear-gradient(135deg, #ffd95e, #ff9d3f);
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
   color: var(--accent-text);
   font-size: 1.7rem;
 }
 
 .podium .rank-1 .muted {
-  color: #5b3d10;
+  color: var(--navy);
 }
 
 .podium .name {
@@ -1365,7 +1446,7 @@ button.dot-btn.on {
   margin-top: 18px;
   font-size: 1.3rem;
   padding: 18px;
-  background: linear-gradient(135deg, #7ee0a1, #2fbf71);
+  background: linear-gradient(135deg, #8fe3f1, var(--mint));
 }
 
 /* 최종 결과: 안건별 실제 요구 수치 공개 */
@@ -1393,7 +1474,7 @@ button.dot-btn.on {
   border-radius: 14px;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 5px 0 #d9cdb3, 0 8px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 5px 0 var(--navy), 0 8px 16px rgba(0, 0, 0, 0.35);
   animation: deal-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   animation-delay: calc(var(--i) * 0.12s);
 }
@@ -1428,7 +1509,7 @@ button.dot-btn.on {
 
 .reveal-nums small {
   font-size: 0.7rem;
-  color: #8a7a5c;
+  color: var(--ink-muted);
 }
 
 .reveal-nums strong {
@@ -1437,17 +1518,17 @@ button.dot-btn.on {
 }
 
 .reveal-nums span:first-child strong {
-  color: #d63a3a;
+  color: var(--red);
 }
 
 .reveal-nums span:last-child strong {
-  color: #a1531b;
+  color: var(--mint);
 }
 
 .reveal-result {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #5d513d;
+  color: var(--ink-muted);
 }
 
 .closing.lesson {
@@ -1465,11 +1546,11 @@ button.dot-btn.on {
 .reveal-topic {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #8a7a5c;
+  color: var(--ink-muted);
 }
 
 .reveal-card.tier-high {
-  outline: 3px solid #d63a3a;
+  outline: 3px solid var(--red);
   outline-offset: 2px;
 }
 
@@ -1532,7 +1613,8 @@ button.dot-btn.on {
   min-height: calc(100dvh - 90px);
   overflow: hidden;
   border-radius: 18px;
-  background: radial-gradient(ellipse at 50% 120%, #0d3a5c 0%, #05080f 60%);
+  background: #000;
+  font-family: var(--font-title);
   text-align: center;
 }
 
@@ -1558,7 +1640,7 @@ button.dot-btn.on {
 .credits-mark {
   font-size: 1.1rem;
   letter-spacing: 0.3em;
-  color: #9fb3c8;
+  color: var(--gold-deep);
 }
 
 .credits h1 {
@@ -1575,20 +1657,22 @@ button.dot-btn.on {
   margin: 0 0 0.9em;
   font-size: 1.15rem;
   letter-spacing: 0.15em;
-  color: #d9b56a;
+  color: var(--gold-deep);
+  font-weight: 800;
 }
 
 .credit-group p {
   margin: 0 0 1.1em;
   font-size: 1.05rem;
-  color: #c7d3e0;
+  color: rgba(212, 175, 55, 0.8);
   line-height: 1.5;
 }
 
 .credit-group p b {
   display: block;
   font-size: 1.6rem;
-  color: #fff;
+  font-weight: 900;
+  color: var(--gold);
 }
 
 .credits-end {
@@ -1618,12 +1702,12 @@ button.dot-btn.on {
 
 /* ───── 구조선 hidden event ───── */
 .banner.rescue {
-  background: linear-gradient(135deg, #0f4c75, #1b6ca8);
+  background: linear-gradient(135deg, var(--navy-2), var(--navy-3));
   border: 2px solid var(--gold);
 }
 
 .banner.rescue.deal {
-  background: linear-gradient(135deg, #1b6ca8, #2fa36b);
+  background: linear-gradient(135deg, var(--navy-2), #145f73);
 }
 
 .banner.rescue .banner-icon {

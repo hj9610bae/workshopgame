@@ -70,10 +70,11 @@ function homeView(): string {
     ? `<button class="secondary" data-action="resume">이어서 진행 <span class="small">(${game.engine.pub.stage === 'final' ? '최종 결과' : `${game.engine.pub.round}일차`})</span></button>`
     : '';
   return `<section class="home-board">
+    <div class="cover-waves" aria-hidden="true"></div>
     <div class="hero">
-      <div class="hero-chips">${['⛵', '🗡️', '🐉', '🧭'].map((c) => `<span>${c}</span>`).join('')}</div>
+      ${laurel()}
       <h1>오디세이아 : 귀환의 항해</h1>
-      <p class="muted">${ROUNDS}일간의 항해 · 한 화면 현장 진행</p>
+      <p class="cover-sub">${ROUNDS}일간의 해상 개척과 고국으로의 무사 귀환 작전</p>
       <button class="tutorial-btn" data-action="tutorial">📖 항해 설명 보기</button>
       <button class="secondary practice-home" data-action="practice">🎲 바로 연습 항해 (${PRACTICE_DAYS}일, 무작위 역경)</button>
     </div>
@@ -84,7 +85,28 @@ function homeView(): string {
       ${resume}
       <button data-action="new-game" ${picked.size ? '' : 'disabled'}>▶ 출항 (${picked.size}함대)</button>
     </div>
+    <p class="cover-sign">Design &amp; Production by 이주영 | World Concept by 정현목</p>
   </section>`;
+}
+
+/** 표지의 금빛 월계관 (라인 아트): 아래 가운데에서 양쪽으로 반원을 그리며 올라가는 두 가지 */
+function laurel(): string {
+  const cx = 60, cy = 52, r = 40;
+  const at = (deg: number) => [cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180)];
+  const parts: string[] = [];
+  for (const side of [-1, 1]) {
+    const end = 90 - side * 140;
+    const [ex, ey] = at(end);
+    parts.push(`<path d="M${cx} ${cy + r} A${r} ${r} 0 0 ${side < 0 ? 1 : 0} ${ex.toFixed(1)} ${ey.toFixed(1)}"/>`);
+    for (let k = 0; k < 7; k++) {
+      const deg = 90 - side * (22 + k * 19);
+      const [x, y] = at(deg);
+      // 가지 방향(접선)에서 바깥으로 비스듬히
+      const tilt = deg + 90 - side * 40;
+      parts.push(`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="7.5" ry="3" transform="rotate(${tilt.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`);
+    }
+  }
+  return `<svg class="laurel" viewBox="0 0 120 100" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">${parts.join('')}</svg>`;
 }
 
 /* ───────── 튜토리얼 ───────── */
@@ -244,7 +266,7 @@ function banner(): string {
         <div class="guide-main">
           <h2>📝 포스트잇에 적어 내세요</h2>
           <div class="big-timer" data-timer></div>
-          <p class="scout-now">🔮 <b>${SCOUT_NAME}</b>를 쓰려면 <b>지금</b> 진행자에게 오세요! <span>(${SCOUT_COST}해리 후퇴, 해역 1곳의 남은 생명력)</span></p>
+          <p class="scout-now">👁️ <b>${SCOUT_NAME}</b>를 쓰려면 <b>지금</b> 진행자에게 오세요! <span>(${SCOUT_COST}해리 후퇴, 해역 1곳의 남은 생명력)</span></p>
           <p class="muted">${done}/${pub.order.length}함대 입력 완료</p>
         </div>
         <div class="guide-example">
@@ -408,8 +430,8 @@ function inputRow(t: TeamId, pos: number): string {
     <div class="in-group"><span class="in-label">무기</span>${cards}</div>
     <div class="in-group"><span class="in-label">추가 카드</span>${extras}</div>
     ${extraTables || '<div></div>'}
-    <div class="in-group"><span class="in-label">💨 순풍 +${CUT_IN_COST}해리</span>${cuts}</div>
-    <div class="in-group"><span class="in-label">🔮 예지 +${SCOUT_COST}해리</span>${scouts}</div>
+    <div class="in-group"><span class="in-label">🌬️ 순풍 +${CUT_IN_COST}해리</span>${cuts}</div>
+    <div class="in-group"><span class="in-label">👁️ 예지 +${SCOUT_COST}해리</span>${scouts}</div>
   </div>`;
 }
 
@@ -417,7 +439,7 @@ function scoutModal(): string {
   if (!scoutShown) return '';
   const s = scoutShown;
   return `<div class="modal-back"><div class="modal" data-peek-box>
-    <h2>🔮 ${esc(teamName(s.team))} ${SCOUT_NAME}</h2>
+    <h2>👁️ ${esc(teamName(s.team))} ${SCOUT_NAME}</h2>
     <p>${s.table}번 해역 · ${esc(agendaTitle(s.agenda))} · 남은 생명력</p>
     <div class="scout-num"><span class="masked">?</span><strong>${s.remaining}</strong></div>
     <p class="muted">📢 함대 대표가 직접 <b>누르고 있는 동안</b>만 숫자가 보여요. 손을 떼면 다시 가려져요.</p>
@@ -691,7 +713,7 @@ function act(action: string, el: HTMLElement) {
       const { state, result } = scout(eng(), team, table);
       if (result.error) return toast(result.error);
       scoutShown = { ...result, team };
-      const entry = { round: state.pub.round, team, text: `🔮 ${SCOUT_NAME}: ${table}번 ${agendaTitle(result.agenda)} 남은 생명력 ${result.remaining}` };
+      const entry = { round: state.pub.round, team, text: `👁️ ${SCOUT_NAME}: ${table}번 ${agendaTitle(result.agenda)} 남은 생명력 ${result.remaining}` };
       return save(commit(game, { engine: state, log: [...game.log, entry] }));
     }
     case 'scout-close':

@@ -40,7 +40,7 @@ export const CARDS: Record<CardId, { name: string; icon: string; power: number; 
   blitz: { name: '아폴론의 전갈 화살', icon: '🏹', power: 6, powerText: '−6', effect: '생명력 6 감소', desc: '생명력 6 감소 · 1회용' },
   practice: {
     name: '헤르메스의 투척 창',
-    icon: '🎯',
+    icon: '⚡',
     power: 6,
     powerText: '가로채기',
     effect: '가로챌 돌파가 없으면 다음 날 시작 시 생명력 6 감소',
@@ -82,8 +82,8 @@ export interface Agenda {
 
 const list: Agenda[] = [
   { id: 1, icon: '🌸', title: '망각의 로투스 섬', topic: '검진비', demand: 2, tier: 'low' },
-  { id: 2, icon: '🌬️', title: '아이올로스의 바람 자루', topic: '난임시술', demand: 3, tier: 'low' },
-  { id: 3, icon: '🏛️', title: '외경의 거대 충전소', topic: '전기차', demand: 4, tier: 'mid' },
+  { id: 2, icon: '💨', title: '아이올로스의 바람 자루', topic: '난임시술', demand: 3, tier: 'low' },
+  { id: 3, icon: '🔌', title: '외경의 거대 충전소', topic: '전기차', demand: 4, tier: 'mid' },
   { id: 4, icon: '🐖', title: '키르케의 환락', topic: '체육대회', demand: 3, tier: 'low' },
   { id: 5, icon: '🍇', title: '디오니소스의 포도밭', topic: '휴게실 개선', demand: 2, tier: 'low' },
   { id: 6, icon: '📜', title: '헤르메스의 기상 계약', topic: '안무/안전구', demand: 3, tier: 'low' },
@@ -96,14 +96,14 @@ const list: Agenda[] = [
   { id: 13, icon: '🛡️', title: '아레스의 군신 장막', topic: '사내 복지제도', demand: 6, tier: 'mid' },
   { id: 14, icon: '🪨', title: '머리 여섯의 괴물 스킬라', topic: '사내복지기금', demand: 8, tier: 'high' },
   { id: 15, icon: '🐉', title: '히드라의 아홉 머리', topic: '통상임금 확장', demand: 9, tier: 'high' },
-  { id: 16, icon: '👁️', title: '외눈박이 거인 키클롭스', topic: '기본급', demand: 10, tier: 'high' },
+  { id: 16, icon: '🧿', title: '외눈박이 거인 키클롭스', topic: '기본급', demand: 10, tier: 'high' },
   { id: 17, icon: '🌋', title: '헤파이스토스의 거대 용암', topic: '임금피크제 폐지', demand: 10, tier: 'high' },
   { id: 18, icon: '👑', title: '이타카의 최종 결전', topic: '성과급', demand: 12, tier: 'high' },
   // v3.3 추가 (교섭 안건은 미정)
   { id: 19, icon: '🏟️', title: '파이아케스의 원반 시합', topic: '', demand: 4, tier: 'mid' },
   { id: 20, icon: '🏝️', title: '칼립소의 붙잡는 섬', topic: '', demand: 5, tier: 'mid' },
   { id: 21, icon: '👻', title: '하데스의 저승 문턱', topic: '', demand: 5, tier: 'mid' },
-  { id: 22, icon: '⚡', title: '제우스의 벼락', topic: '', demand: 6, tier: 'mid' },
+  { id: 22, icon: '🌩️', title: '제우스의 벼락', topic: '', demand: 6, tier: 'mid' },
 ];
 
 export const AGENDAS: Record<number, Agenda> = Object.fromEntries(list.map((a) => [a.id, a]));

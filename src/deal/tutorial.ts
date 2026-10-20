@@ -118,8 +118,8 @@ export const INTRO_SLIDES: Slide[] = [
     title: '🛒 특수 아이템 구매',
     html: `<p>다음 두 가지의 특수 아이템은 포스트잇 제출 기간 중 언제든지 사용할 수 있어요. 단, 아이템 사용에 따라 <b>고국에서 멀어집니다.</b></p>
       <div class="item-cards">
-        <div class="item-card"><span class="pictogram">🔮</span><b>${SCOUT_NAME}</b><span>현재 해역에 있는 역경의 생명력을 확인할 수 있다.</span><em>${SCOUT_COST}해리 후퇴</em></div>
-        <div class="item-card"><span class="pictogram">💨</span><b>${CUT_IN_NAME}</b><span>자신의 순서를 원하는 순서로 바꾼다.</span><em>${CUT_IN_COST}해리 후퇴</em></div>
+        <div class="item-card"><span class="pictogram">👁️</span><b>${SCOUT_NAME}</b><span>현재 해역에 있는 역경의 생명력을 확인할 수 있다.</span><em>${SCOUT_COST}해리 후퇴</em></div>
+        <div class="item-card"><span class="pictogram">🌬️</span><b>${CUT_IN_NAME}</b><span>자신의 순서를 원하는 순서로 바꾼다.</span><em>${CUT_IN_COST}해리 후퇴</em></div>
       </div>
       <div class="cut-example">
         <p><b>2함대 이상 같은 자리를 원하면?</b> 고국에 가까운 함대가 그 자리, 밀린 함대는 <b>바로 다음 빈자리</b>. (같으면 원래 순번이 앞인 함대) 순풍을 쓰지 않은 함대는 남은 자리를 원래 순서대로 채운다. 밀려도 ${CUT_IN_COST}해리 후퇴는 그대로!</p>

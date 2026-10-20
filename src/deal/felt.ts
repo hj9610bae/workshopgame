@@ -85,16 +85,16 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
 
 export function deck(queue: number): string {
   const rest = activeSetup().queue.slice(queue);
-  // 역경이 많으면 다음 14개까지만 이름을 보여 줌
-  const SHOW = 14;
-  const more = rest.length > SHOW ? `<li class="more">외 ${rest.length - SHOW}개</li>` : '';
+  // 다음 10개까지만 이름을 보여 줌
+  const SHOW = 10;
+  const more = rest.length > SHOW ? `<p class="deck-more">외 ${rest.length - SHOW}개</p>` : '';
   const list = rest
     .slice(0, SHOW)
     .map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)} <small>❤️${hpOf(id)}${lootOf(id) ? ` ${CARDS[lootOf(id)!].icon}` : ''}</small></li>`)
-    .join('') + more;
+    .join('');
   return `<div class="deck">
     <div class="deck-label">대기열 <span>${rest.length}</span></div>
-    ${list ? `<ol class="deck-list">${list}</ol>` : '<p class="muted small">비었어요</p>'}
+    ${list ? `<ol class="deck-list">${list}</ol>${more}` : '<p class="muted small">비었어요</p>'}
   </div>`;
 }
 
@@ -162,7 +162,7 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
     })
     .join('');
   return `<section class="sea" style="--rows:${order.length};--port:${port.toFixed(2)}%">
-    <div class="sea-land"><span>🏝️ 이타카 섬</span></div>
+    <div class="sea-land"><span>🏛️ 이타카</span></div>
     <div class="sea-port"><span>⚓ 이타카 항구 0</span></div>
     <div class="sea-troy"><span>⚔️ 트로이 전장</span></div>
     <div class="sea-ticks">${ticks.join('')}</div>

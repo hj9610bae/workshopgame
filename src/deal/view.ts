@@ -116,9 +116,9 @@ export function describeEvent(e: GameEvent): {
   if (e.stolenBy && e.agenda) {
     const thief = teamName(e.stolenBy);
     return {
-      icon: '🎯',
+      icon: '⚡',
       title: `${agenda} 돌파! 그런데… ${thief}의 투척 창이 가로챘다!`,
-      detail: `마지막 일격은 ${team}의 ${e.weapon ? weaponPhrase(e.weapon).replace(/(으)?로$/, '') : '공격'} · 🎯 헤르메스의 투척 창: 그날 그 해역의 돌파 보상을 가로챔 · 보상은 ${thief}: ${reward}`,
+      detail: `마지막 일격은 ${team}의 ${e.weapon ? weaponPhrase(e.weapon).replace(/(으)?로$/, '') : '공격'} · ⚡ 헤르메스의 투척 창: 그날 그 해역의 돌파 보상을 가로챔 · 보상은 ${thief}: ${reward}`,
       tone: 'deal',
     };
   }
@@ -127,10 +127,10 @@ export function describeEvent(e: GameEvent): {
     case 'finalOpen':
       return { icon: '👑', title: `최종 결전 개시! ${e.table}번 해역에 ${agendaTitle(FINAL_AGENDA)} 등장`, detail: `생명력 ${hpOf(FINAL_AGENDA)} · 돌파 보상 ${rewardText(FINAL_AGENDA)}`, tone: 'deal' };
     case 'practiceDeal':
-      return { icon: '🎯', title: `${team}, ${weaponPhrase('practice')} ${agenda} 돌파!`, detail: `${effectNote('practice')}${reward}`, tone: 'deal' };
+      return { icon: '⚡', title: `${team}, ${weaponPhrase('practice')} ${agenda} 돌파!`, detail: `${effectNote('practice')}${reward}`, tone: 'deal' };
     case 'start':
       return e.cutIn
-        ? { icon: '💨', title: '제피로스의 순풍! 공격 순서가 바뀌었어요', detail: e.order?.map(teamName).join(' → ') }
+        ? { icon: '🌬️', title: '제피로스의 순풍! 공격 순서가 바뀌었어요', detail: e.order?.map(teamName).join(' → ') }
         : { icon: '⚔️', title: '공격을 공개합니다' };
     case 'hold':
       return { icon: '🔱', title: `${e.table}번 해역 동결! 포세이돈의 삼지창`, detail: '오늘 이 해역에 대한 공격은 모두 무효', tone: 'bad' };
