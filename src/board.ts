@@ -4,7 +4,7 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
+import { AGENDAS, CARDS, FINAL_AGENDA, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
 import { agendaTitle, beginSubmit, createGame, finish, ranking, resolveRound, revealNext, scout, startRound, type EngineState } from './deal/engine';
 import { deck, distanceLabel, feltTable, seaMap, type TableLook } from './deal/felt';
 import {
@@ -22,7 +22,7 @@ import {
 } from './deal/local';
 import { practiceSetup, tutorialSteps } from './deal/tutorial';
 import type { GameEvent, ScoutResult, Stage, Submission } from './deal/types';
-import { STAGE_LABEL, describeEvent, formatTimer, hpOf, setTeamNames, snapshot, teamName, useSetup } from './deal/view';
+import { STAGE_LABEL, activeSetup, describeEvent, formatTimer, hpOf, setTeamNames, snapshot, teamName, useSetup } from './deal/view';
 import { esc, onAction, render, toast } from './ui';
 
 const app = document.querySelector<HTMLElement>('#app')!;
@@ -51,7 +51,7 @@ function save(next: LocalGame) {
 
 const eng = (): EngineState => game.engine!;
 /** 연습 항해: 무작위 배치(setup)로 하루만 */
-const isPractice = (): boolean => !!game.engine?.setup;
+const isPractice = (): boolean => !!game.engine?.setup?.practice;
 const stage = (): Stage => game.engine?.pub.stage ?? 'lobby';
 /** 진행자 창이 따로 열려 있으면 프로젝터 화면에는 조작 버튼을 숨김 */
 const showDock = () => isConsole || !consoleAlive();
@@ -224,18 +224,6 @@ function banner(): string {
   }
 }
 
-function eventRail(): string {
-  const { pub } = eng();
-  if (pub.stage !== 'reveal') return '';
-  const items = pub.events
-    .slice(0, pub.revealed)
-    .map((e) => describeEvent(e))
-    .reverse()
-    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}</li>`)
-    .join('');
-  return `<div class="rail-events"><h3>오늘의 항해</h3><ol>${items}</ol></div>`;
-}
-
 function seatLook() {
   const { pub } = eng();
   const status: Partial<Record<TeamId, string>> = {};
@@ -260,7 +248,7 @@ function gameView(): string {
         <div class="felt-tables" style="--cols:${shown.length}">${tables}</div>
         ${banner()}
       </section>
-      <aside class="rail">${deck(eventQueue())}${eventRail()}</aside>
+      <aside class="rail">${deck(eventQueue())}</aside>
     </div>
     ${seaMap(pub.order, snap.scores, seatLook())}
     ${showDock() ? dock() : ''}`;
@@ -270,7 +258,7 @@ function gameView(): string {
 function eventQueue(): number {
   const { pub } = eng();
   let q = pub.queue;
-  // 아직 공개되지 않은 사건 중 1~3번 해역 처치 수만큼 되돌림
+  // 아직 공개되지 않은 사건 중 1~3번 해역 돌파 수만큼 되돌림
   for (const e of pub.events.slice(pub.revealed)) if (e.agenda && e.reward && e.table && e.table <= 3) q -= 1;
   return Math.max(0, q);
 }
@@ -424,7 +412,7 @@ function rankView(): string {
   const winners = rows.filter((r) => r.rank === 1);
   const medal = ['🥇', '🥈', '🥉'];
   const list = rows
-    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">처치 ${r.deals}회</span></li>`)
+    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">돌파 ${r.deals}회</span></li>`)
     .join('');
   const best = winners[0] ? distanceOf(winners[0].score) : START_DISTANCE;
   const where = best <= 0 ? `고국 이타카에 도착해 내륙 ${-best}해리까지 들어간` : `고국까지 ${best}해리를 남긴`;
@@ -443,18 +431,19 @@ function rankView(): string {
   </section>`;
 }
 
-/** 모든 역경의 생명력·실제 교섭 안건·처치한 함대 */
+/** 모든 역경의 생명력·실제 교섭 안건·돌파한 함대 */
 function agendaReveal(): string {
   const { pub } = eng();
   const dealtBy = new Map(pub.tables.flatMap((t) => t.done ?? []).map((d) => [d.agenda, d.team]));
-  const cards = ALL_AGENDAS.map((id, i) => {
+  const { tables, queue } = activeSetup();
+  const cards = [...tables, ...queue, FINAL_AGENDA].map((id, i) => {
     const a = AGENDAS[id];
     const team = dealtBy.get(id);
     return `<li class="reveal-card tier-${a.tier}" style="--i:${i}">
       <div class="reveal-head"><span class="pictogram">${a.icon}</span><b>${esc(a.title)}</b></div>
-      <div class="reveal-topic">${TIER_LABEL[a.tier]} · ${esc(a.topic)}</div>
+      <div class="reveal-topic">${TIER_LABEL[a.tier]}${a.topic ? ` · ${esc(a.topic)}` : ''}</div>
       <div class="reveal-nums"><span><small>생명력</small><strong>${hpOf(id)}</strong></span></div>
-      <div class="reveal-result">${team ? `⚔️ ${esc(teamName(team))} 처치` : '살아남음'}</div>
+      <div class="reveal-result">${team ? `⚔️ ${esc(teamName(team))} 돌파` : '살아남음'}</div>
     </li>`;
   }).join('');
   return `<section class="agenda-reveal">
@@ -536,7 +525,8 @@ function act(action: string, el: HTMLElement) {
     case 'new-game': {
       if (game.engine && game.engine.pub.stage !== 'final' && !confirm('진행 중인 항해를 지우고 새로 출항할까요?')) return;
       const teams = TEAM_IDS.filter((t) => picked.has(t));
-      const step = startRound(createGame(teams));
+      // 출항할 때마다 구간 안에서 섞은 역경 배치
+      const step = startRound(createGame(teams, shuffledSetup()));
       mode = 'game';
       inputOpen = false;
       return save({ ...emptyGame(game.names), engine: step.state, log: logNotes(step) });

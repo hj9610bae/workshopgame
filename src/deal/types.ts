@@ -36,8 +36,10 @@ export interface GameEvent {
   table?: number;
   agenda?: number;
   reward?: number;
-  /** 처치로 받은 전리품 (역경 카드에 이름이 공개돼 있음) */
+  /** 돌파로 받은 전리품 (역경 카드에 이름이 공개돼 있음) */
   loot?: SpecialCardId;
+  /** 돌파 사건: 마지막 일격에 쓴 무기 (공격 이력은 비공개지만 마지막 일격의 무기는 공개) */
+  weapon?: CardId;
   result?: ProposalResult;
   reason?: VoidReason;
   /** 합의 사건: 실무 교섭 병행으로 보상을 가로챈 팀 */

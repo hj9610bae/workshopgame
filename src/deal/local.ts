@@ -8,8 +8,8 @@ import type { EngineState, Step } from './engine';
 import type { Submission } from './types';
 import { storage } from '../ui';
 
-/** 교섭판(v2.4, 'deal-board-v1')과 역경 번호가 달라 예전 저장 게임은 불러오지 않음 */
-const KEY = 'odyssey-board-v1';
+/** 교섭판('deal-board-v1')·오디세이아 v1(역경 18개)과 역경 구성이 달라 예전 저장 게임은 불러오지 않음 */
+const KEY = 'odyssey-board-v2';
 const CONSOLE_KEY = 'deal-board-console';
 const HISTORY_LIMIT = 40;
 

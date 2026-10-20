@@ -22,14 +22,14 @@ describe('규칙서 5장 예시 1일차', () => {
     E: basic(3),
   });
 
-  it('A가 로투스 섬, D가 바람 자루를 처치하고 B는 새로 온 키르케를 공격', () => {
+  it('A가 로투스 섬, D가 바람 자루를 돌파하고 B는 새로 온 키르케를 공격', () => {
     const tables = state.pub.tables.map((t) => t.agenda);
     expect(tables).toEqual([4, 5, 3, 0]);
     expect(state.secret.remaining).toEqual([1, 2, 2, 0]);
     expect(scores(state)).toEqual({ A: 12, B: 10, C: 10, D: 13, E: 10 });
   });
 
-  it('화면용 사건에는 처치만 드러남', () => {
+  it('화면용 사건에는 돌파만 드러남', () => {
     const proposals = state.pub.events.filter((e) => e.kind === 'proposal');
     expect(proposals.map((e) => [e.team, e.result])).toEqual([
       ['A', 'deal'],
@@ -43,22 +43,23 @@ describe('규칙서 5장 예시 1일차', () => {
 
   it('팀별 메시지', () => {
     expect(notes.B?.[0].text).toContain('키르케');
-    expect(notes.D?.[0].text).toContain('바람 자루 처치');
+    expect(notes.D?.[0].text).toContain('바람 자루 돌파');
   });
 
-  it('처치 사건에는 처치한 함대만 공개되고 공격 이력은 공개되지 않음', () => {
+  it('돌파 사건에는 돌파한 함대만 공개되고 공격 이력은 공개되지 않음', () => {
     const deals = state.pub.events.filter((e) => e.result === 'deal');
     expect(deals.map((e) => e.team)).toEqual(['A', 'D']);
+    expect(deals.map((e) => e.weapon)).toEqual(['basic', 'basic']);
     expect(state.pub.events.every((e) => !('trail' in e) && !('demand' in e))).toBe(true);
   });
 
-  it('처치되지 않은 역경의 이력은 비공개 상태로만 쌓이고, 새 역경은 이력이 비어서 시작', () => {
+  it('돌파되지 않은 역경의 이력은 비공개 상태로만 쌓이고, 새 역경은 이력이 비어서 시작', () => {
     expect(state.secret.trail[0]).toEqual([{ team: 'B', card: 'basic', amount: 2 }]);
     expect(state.secret.trail[1]).toEqual([]);
     expect(state.secret.trail[2]).toEqual([{ team: 'E', card: 'basic', amount: 2 }]);
   });
 
-  it('전리품은 앞쪽 역경에 쇠사슬 → 삼지창 순으로 붙고, 처치 사건에 무기 이름 공개', () => {
+  it('전리품은 앞쪽 역경에 쇠사슬 → 삼지창 순으로 붙고, 돌파 사건에 무기 이름 공개', () => {
     expect(state.hands.A).toMatchObject({ promo: 1, hold: 0 });
     expect(state.hands.D).toMatchObject({ hold: 1, promo: 0 });
     const deals = state.pub.events.filter((e) => e.result === 'deal');
@@ -66,7 +67,7 @@ describe('규칙서 5장 예시 1일차', () => {
     expect(notes.A?.[0].text).toContain('아테나의 쇠사슬');
   });
 
-  it('처치된 역경은 해역의 지나간 역경 목록에 쌓임 (공개 정보)', () => {
+  it('돌파된 역경은 해역의 지나간 역경 목록에 쌓임 (공개 정보)', () => {
     expect(state.pub.tables[0].done).toEqual([{ agenda: 1, team: 'A' }]);
     expect(state.pub.tables[1].done).toEqual([{ agenda: 2, team: 'D' }]);
     expect(state.pub.tables[2].done ?? []).toEqual([]);
@@ -99,9 +100,9 @@ describe('특수 무기', () => {
     expect(state.pub.events.find((e) => e.kind === 'hold')?.team).toBeUndefined();
   });
 
-  it('헤르메스의 투척 창: 오늘 그 해역의 처치를 순번과 관계없이 가로챔', () => {
+  it('헤르메스의 투척 창: 오늘 그 해역의 돌파를 순번과 관계없이 가로챔', () => {
     const s = withHand('C', 'practice');
-    // 바람 자루 3: A −2, B −2 로 B가 처치하지만 C가 가로챔
+    // 바람 자루 3: A −2, B −2 로 B가 돌파하지만 C가 가로챔
     const { state, notes } = resolveRound(s, { A: basic(2), B: basic(2), C: { table: 2, card: 'practice', cutIn: 0 } });
     expect(state.pub.teams.C!.score).toBe(13);
     expect(state.pub.teams.B!.score).toBe(10);
@@ -112,14 +113,14 @@ describe('특수 무기', () => {
     expect(state.secret.practice).toEqual([]);
   });
 
-  it('뒤 순번이 걸어도 앞 순번의 처치를 가로챔', () => {
+  it('뒤 순번이 걸어도 앞 순번의 돌파를 가로챔', () => {
     const s = withHand('E', 'practice');
     const { state } = resolveRound(s, { A: basic(1), E: { table: 1, card: 'practice', cutIn: 0 } });
     expect(state.pub.teams.E!.score).toBe(12);
     expect(state.pub.teams.A!.score).toBe(10);
   });
 
-  it('가로챌 처치가 없으면 다음 날 시작 시 −6, 처치되면 창 주인이 보상', () => {
+  it('가로챌 돌파가 없으면 다음 날 시작 시 −6, 돌파되면 창 주인이 보상', () => {
     const s = withHand('C', 'practice');
     const r1 = resolveRound(s, { C: { table: 3, card: 'practice', cutIn: 0 } }).state;
     expect(r1.secret.remaining[2]).toBe(4);
@@ -131,6 +132,7 @@ describe('특수 무기', () => {
       team: 'C',
       agenda: 3,
       loot: 'blitz',
+      weapon: 'practice',
     });
   });
 
@@ -173,20 +175,20 @@ describe('특수 무기', () => {
   it('쇠사슬은 공격 무기와 함께 추가로 걸고, 공격도 그대로 적용', () => {
     const s = withHand('B', 'promo');
     const { state } = resolveRound(s, { A: basic(2), B: { ...basic(1), extra: { card: 'promo', table: 2 } } });
-    // B: 로투스 섬 처치(+2) + 바람 자루 3 − 2(A) − 1(쇠사슬) = 0 → B 처치(+3)
+    // B: 로투스 섬 돌파(+2) + 바람 자루 3 − 2(A) − 1(쇠사슬) = 0 → B 돌파(+3)
     expect(state.pub.teams.B!.score).toBe(15);
     expect(state.hands.B!.promo).toBe(1); // 쓴 1장 − 로투스 섬 전리품(쇠사슬) 1장
     expect(state.pub.tables[1].promos).toEqual(['B']);
     expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 2 });
   });
 
-  it('쇠사슬: 매일 끝날 때 1 감소, 처치 시 건 함대가 보상', () => {
+  it('쇠사슬: 매일 끝날 때 1 감소, 돌파 시 건 함대가 보상', () => {
     const s = withHand('B', 'promo');
     const { state } = resolveRound(s, { A: basic(2), B: { table: 2, card: 'promo', cutIn: 0 } });
-    // 바람 자루 3 − 2(A) − 1(쇠사슬) = 0 → B 처치
+    // 바람 자루 3 − 2(A) − 1(쇠사슬) = 0 → B 돌파
     expect(state.pub.teams.B!.score).toBe(13);
     expect(state.pub.tables[1]).toMatchObject({ agenda: 4, promos: ['B'] });
-    expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 2, reward: 3 });
+    expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 2, reward: 3, weapon: 'promo' });
   });
 
   it('예전에 저장된 게임(이력 없음)도 이어서 진행', () => {
@@ -214,7 +216,7 @@ describe('제피로스의 순풍 (새치기)', () => {
   it('원하는 순번으로 이동하고 2해리 후퇴', () => {
     const { state } = resolveRound(round1(), { E: { ...basic(1), cutIn: 1 } });
     expect(state.pub.order).toEqual(['E', 'A', 'B', 'C', 'D']);
-    // E는 2해리 후퇴 후 로투스 섬 처치로 2해리 전진
+    // E는 2해리 후퇴 후 로투스 섬 돌파로 2해리 전진
     expect(state.pub.teams.E!.score).toBe(10);
     expect(state.pub.events[0]).toMatchObject({ kind: 'start', cutIn: true, order: ['E', 'A', 'B', 'C', 'D'] });
   });
@@ -270,7 +272,7 @@ describe('아폴론의 예지 (스카우터)', () => {
 });
 
 describe('최종 결전', () => {
-  it('8일차 시작 시 4번 해역에 이타카의 최종 결전(12) 등장, 처치되면 닫힘', () => {
+  it('8일차 시작 시 4번 해역에 이타카의 최종 결전(12) 등장, 돌파되면 닫힘', () => {
     let s = createGame(TEAM_IDS);
     for (let r = 1; r < FINAL_OPEN_ROUND; r++) {
       s = resolveRound(beginSubmit(startRound(s, keepOrder).state, 0), {}).state;
@@ -291,7 +293,7 @@ describe('최종 결전', () => {
 });
 
 describe('최종 순위', () => {
-  it('고국과의 거리 → 처치 수 순, 모두 같으면 공동 순위', () => {
+  it('고국과의 거리 → 돌파 수 순, 모두 같으면 공동 순위', () => {
     const s = finish(createGame(['A', 'B', 'C']));
     s.pub.teams = { A: { score: 12, deals: 1 }, B: { score: 12, deals: 2 }, C: { score: 12, deals: 1 } };
     expect(ranking(s.pub).map((r) => [r.team, r.rank])).toEqual([
@@ -303,7 +305,7 @@ describe('최종 순위', () => {
 });
 
 describe('고국과의 거리', () => {
-  it('15해리 출발, 처치하면 생명력만큼 가까워지고 아이템을 쓰면 멀어짐', () => {
+  it('15해리 출발, 돌파하면 생명력만큼 가까워지고 아이템을 쓰면 멀어짐', () => {
     const s = round1();
     expect(distanceOf(s.pub.teams.A!.score)).toBe(START_DISTANCE);
     const { state } = resolveRound(s, { A: { ...basic(2), cutIn: 1 } });

@@ -5,7 +5,7 @@ import type { TableState } from './types';
 import { activeSetup, hpOf, lootOf, teamName } from './view';
 
 export interface TableLook {
-  /** 방금 처치된 역경 (해역에는 이미 새 역경이 올라와 있음) */
+  /** 방금 돌파된 역경 (해역에는 이미 새 역경이 올라와 있음) */
   deal?: { team: TeamId; agenda: number; reward: number };
   /** 방금 새 역경이 들어옴 */
   fresh?: boolean;
@@ -13,7 +13,7 @@ export interface TableLook {
   promo?: boolean;
 }
 
-/** 이 해역에서 처치되어 지나간 역경이 뒤로 희미하게 쌓인 모양 (최근 3장) */
+/** 이 해역에서 돌파되어 지나간 역경이 뒤로 희미하게 쌓인 모양 (최근 3장) */
 function pile(table: TableState): { html: string; depth: number } {
   const done = table.done ?? [];
   const shown = done.slice(-3);
@@ -61,7 +61,7 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
     .filter(Boolean)
     .join(' ');
   const stamp = look.deal
-    ? `<div class="deal-stamp"><span>처치!</span><small>${esc(teamName(look.deal.team))} ${look.deal.reward}해리 전진</small></div>`
+    ? `<div class="deal-stamp"><span>돌파!</span><small>${esc(teamName(look.deal.team))} ${look.deal.reward}해리 전진</small></div>`
     : '';
   const head = `<div class="ftable-no"><span>⚑ ${no}번 해역${isFinal ? ' · 최종 결전' : ''}</span></div>`;
   const past = pile(table);
@@ -85,17 +85,15 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
 
 export function deck(queue: number): string {
   const rest = activeSetup().queue.slice(queue);
-  const stack = rest.length ? Array.from({ length: Math.min(rest.length, 5) }, (_, i) => `<i style="--i:${i}"></i>`).join('') : '';
-  // 역경이 많아 다음 8개까지만 이름을 보여 줌
-  const SHOW = 8;
+  // 역경이 많으면 다음 14개까지만 이름을 보여 줌
+  const SHOW = 14;
   const more = rest.length > SHOW ? `<li class="more">외 ${rest.length - SHOW}개</li>` : '';
   const list = rest
     .slice(0, SHOW)
     .map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)} <small>❤️${hpOf(id)}${lootOf(id) ? ` ${CARDS[lootOf(id)!].icon}` : ''}</small></li>`)
     .join('') + more;
   return `<div class="deck">
-    <div class="deck-stack">${stack}<span class="deck-count">${rest.length}</span></div>
-    <div class="deck-label">대기열</div>
+    <div class="deck-label">대기열 <span>${rest.length}</span></div>
     ${list ? `<ol class="deck-list">${list}</ol>` : '<p class="muted small">비었어요</p>'}
   </div>`;
 }

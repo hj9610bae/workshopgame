@@ -1,6 +1,6 @@
 /* 사회자 화면·대표 폰이 함께 쓰는 화면 조각 */
 import { esc } from '../ui';
-import { AGENDAS, CARDS, FINAL_AGENDA, FINAL_OPEN_ROUND, ROUNDS, SETUP, type Setup, type SpecialCardId, type TeamId } from './data';
+import { AGENDAS, CARDS, FINAL_AGENDA, FINAL_OPEN_ROUND, ROUNDS, SETUP, type CardId, type Setup, type SpecialCardId, type TeamId } from './data';
 import { agendaTitle } from './engine';
 import type { GameEvent, PublicState, Stage, TableState } from './types';
 
@@ -40,13 +40,13 @@ export function snapshot(pub: PublicState): { tables: TableState[]; scores: Part
   };
 }
 
-/** 처음 생명력 (공개) = 처치 시 전진 거리 */
+/** 처음 생명력 (공개) = 돌파 시 전진 거리 */
 export const hpOf = (agendaId: number): number => setup.demand[agendaId] ?? AGENDAS[agendaId]?.demand ?? 0;
 
-/** 처치 시 받는 전리품 (특수 무기) */
+/** 돌파 시 받는 전리품 (특수 무기) */
 export const lootOf = (agendaId: number): SpecialCardId | undefined => setup.loot[agendaId];
 
-/** 처치 보상: 전진 거리 + 전리품 무기 이름 */
+/** 돌파 보상: 전진 거리 + 전리품 무기 이름 */
 export function rewardText(agendaId: number): string {
   const loot = lootOf(agendaId);
   return `${hpOf(agendaId)}해리 전진${loot ? ` · ${CARDS[loot].icon} ${CARDS[loot].name}` : ''}`;
@@ -72,7 +72,7 @@ export function tableCard(table: TableState, index: number, round: number): stri
     <h3>${a.icon} ${esc(a.title)}</h3>
     <p class="gap">생명력 ${hpOf(a.id)}</p>
     <div class="table-stats">
-      <div><span class="label">처치 보상</span><strong>${rewardText(a.id)}</strong></div>
+      <div><span class="label">돌파 보상</span><strong>${rewardText(a.id)}</strong></div>
     </div>
     ${promos}
     ${table.frozen ? '<div class="frozen-badge">🔱 동결</div>' : ''}
@@ -85,6 +85,23 @@ export function queueStrip(pub: PublicState): string {
   return `<ol class="queue">${rest.map((id) => `<li>${AGENDAS[id].icon} ${esc(agendaTitle(id))}</li>`).join('')}</ol>`;
 }
 
+/** 받침에 맞춘 조사 '으로/로' (받침 없거나 ㄹ 받침이면 '로') */
+function ro(word: string): string {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  const jong = code >= 0 && code < 11172 ? code % 28 : 0;
+  return jong === 0 || jong === 8 ? '로' : '으로';
+}
+
+/** 마지막 일격의 무기: '🗡️ 기본 무기 단검으로' / '🏹 특수 무기 아폴론의 전갈 화살로' */
+export function weaponPhrase(card: CardId): string {
+  const c = CARDS[card];
+  return `${c.icon} ${card === 'basic' ? '기본' : '특수'} 무기 ${c.name}${ro(c.name)}`;
+}
+
+/** 특수 무기는 다른 함대가 효과를 모르니 돌파 발표에 짧은 효과 설명을 붙임 */
+const effectNote = (card: CardId | undefined): string =>
+  card && card !== 'basic' ? `${CARDS[card].icon} ${CARDS[card].name}: ${CARDS[card].effect} · ` : '';
+
 /** 공개 화면에 띄울 사건 문장 */
 export function describeEvent(e: GameEvent): {
   icon: string;
@@ -95,22 +112,22 @@ export function describeEvent(e: GameEvent): {
   const team = e.team ? teamName(e.team) : '';
   const agenda = e.agenda ? `${agendaTitle(e.agenda)}` : '';
   const reward = e.reward ? `고국으로 ${e.reward}해리 전진${e.loot ? ` · ${CARDS[e.loot].icon} ${CARDS[e.loot].name} 획득` : ''}` : '';
-  // 헤르메스의 투척 창으로 가로챈 처치: 보상은 가로챈 함대에게
+  // 헤르메스의 투척 창으로 가로챈 돌파: 보상은 가로챈 함대에게
   if (e.stolenBy && e.agenda) {
     const thief = teamName(e.stolenBy);
     return {
       icon: '🎯',
-      title: `${agenda} 처치! 그런데… ${thief}의 투척 창이 가로챘다!`,
-      detail: `마지막 일격은 ${team} · 보상은 ${thief}: ${reward}`,
+      title: `${agenda} 돌파! 그런데… ${thief}의 투척 창이 가로챘다!`,
+      detail: `마지막 일격은 ${team}의 ${e.weapon ? weaponPhrase(e.weapon).replace(/(으)?로$/, '') : '공격'} · 🎯 헤르메스의 투척 창: 그날 그 해역의 돌파 보상을 가로챔 · 보상은 ${thief}: ${reward}`,
       tone: 'deal',
     };
   }
   const firstMark = e.first ? ' (삼지창 우선권으로 먼저)' : '';
   switch (e.kind) {
     case 'finalOpen':
-      return { icon: '👑', title: `최종 결전 개시! ${e.table}번 해역에 ${agendaTitle(FINAL_AGENDA)} 등장`, detail: `생명력 ${hpOf(FINAL_AGENDA)} · 처치 보상 ${rewardText(FINAL_AGENDA)}`, tone: 'deal' };
+      return { icon: '👑', title: `최종 결전 개시! ${e.table}번 해역에 ${agendaTitle(FINAL_AGENDA)} 등장`, detail: `생명력 ${hpOf(FINAL_AGENDA)} · 돌파 보상 ${rewardText(FINAL_AGENDA)}`, tone: 'deal' };
     case 'practiceDeal':
-      return { icon: '🎯', title: `헤르메스의 투척 창 명중! ${team}, ${agenda} 처치`, detail: reward, tone: 'deal' };
+      return { icon: '🎯', title: `${team}, ${weaponPhrase('practice')} ${agenda} 돌파!`, detail: `${effectNote('practice')}${reward}`, tone: 'deal' };
     case 'start':
       return e.cutIn
         ? { icon: '💨', title: '제피로스의 순풍! 공격 순서가 바뀌었어요', detail: e.order?.map(teamName).join(' → ') }
@@ -118,13 +135,13 @@ export function describeEvent(e: GameEvent): {
     case 'hold':
       return { icon: '🔱', title: `${e.table}번 해역 동결! 포세이돈의 삼지창`, detail: '오늘 이 해역에 대한 공격은 모두 무효', tone: 'bad' };
     case 'promoDeal':
-      return { icon: '⛓️', title: `아테나의 쇠사슬! ${team}, ${agenda} 처치`, detail: reward, tone: 'deal' };
+      return { icon: '⛓️', title: `${team}, ${weaponPhrase('promo')} ${agenda} 돌파!`, detail: `${effectNote('promo')}${reward}`, tone: 'deal' };
     case 'end':
       return { icon: '🌙', title: '오늘의 항해 끝' };
     case 'proposal':
       switch (e.result) {
         case 'deal':
-          return { icon: '🎉', title: `${team}, ${agenda} 처치!${firstMark}`, detail: reward, tone: 'deal' };
+          return { icon: '🎉', title: `${team}, ${e.weapon ? `${weaponPhrase(e.weapon)} ` : ''}${agenda} 돌파!${firstMark}`, detail: `${effectNote(e.weapon)}${reward}`, tone: 'deal' };
         case 'promo':
           return { icon: '⛓️', title: `${team}, ${e.table}번 해역에 아테나의 쇠사슬`, detail: '매일 끝날 때 생명력 1 감소' };
         case 'void':

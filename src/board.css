@@ -687,41 +687,19 @@ body.live button.small {
   background: var(--surface);
 }
 
-.deck-stack {
-  position: relative;
-  height: 5.2em;
-  width: 4em;
-  margin: 0 auto;
-}
-
-.deck-stack i {
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  border: 2px solid #fff;
-  background: repeating-linear-gradient(45deg, #b8323d 0 6px, #8e1f2a 6px 12px);
-  transform: translate(calc(var(--i) * 3px), calc(var(--i) * -3px));
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-.deck-count {
-  position: absolute;
-  right: -14px;
-  bottom: -8px;
-  z-index: 1;
-  min-width: 1.8em;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-text);
-  text-align: center;
-  font-weight: 900;
-}
-
 .deck-label {
-  margin-top: 10px;
   text-align: center;
   font-weight: 800;
+  font-size: 1.15rem;
+}
+
+.deck-label span {
+  display: inline-block;
+  min-width: 1.8em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #1a1a1a;
 }
 
 .deck-list {
@@ -737,46 +715,6 @@ body.live button.small {
 
 .deck-list small {
   opacity: 0.8;
-}
-
-.rail-events {
-  padding: 14px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  overflow: auto;
-  max-height: 40vh;
-}
-
-.rail-events h3 {
-  margin: 0 0 8px;
-}
-
-.rail-events ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-  font-size: 0.85rem;
-}
-
-.rail-events li:first-child {
-  font-weight: 800;
-  color: var(--text);
-}
-
-.rail-events li {
-  color: var(--muted);
-}
-
-.rail-events li small {
-  display: block;
-  font-size: 0.75rem;
-  opacity: 0.85;
-}
-
-.rail-events li.deal {
-  color: #ffb3bf;
 }
 
 /* 바다 지도: 왼쪽 이타카 섬 ← 바다 → 오른쪽 트로이 전장 */

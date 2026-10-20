@@ -39,6 +39,7 @@ export function practiceSetup(rng: Rng = Math.random): Setup {
     queue: ids.slice(3),
     demand: Object.fromEntries(ids.map((id) => [id, AGENDAS[id].demand])),
     loot: Object.fromEntries(lootAt.map((id, i) => [id, LOOT_ORDER[i]])),
+    practice: true,
   };
 }
 

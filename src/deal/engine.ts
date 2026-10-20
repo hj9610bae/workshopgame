@@ -1,5 +1,5 @@
 /*
- * 오디세이아 규칙 엔진 (docs/rules.md 구현). 코드의 '안건·테이블·합의'는 규칙서의 '역경·해역·처치'.
+ * 오디세이아 규칙 엔진 (docs/rules.md 구현). 코드의 '안건·테이블·합의'는 규칙서의 '역경·해역·돌파'.
  * score 는 전진한 거리(높을수록 좋음)이고, 화면에는 distanceOf()로 '고국과의 거리'를 보여 줘요.
  * Firebase·화면과 무관한 순수 함수라서 테스트로 규칙을 검증할 수 있어요.
  * 모든 함수는 입력 상태를 바꾸지 않고 새 상태를 돌려줍니다.
@@ -27,7 +27,7 @@ export interface EngineState {
   pub: PublicState;
   secret: SecretState;
   hands: Partial<Record<TeamId, Hand>>;
-  /** 튜토리얼 예시처럼 다른 안건 배치를 쓸 때만. 없으면 실제 게임 배치(SETUP) */
+  /** 역경 배치 (실제 게임은 출항 때 shuffledSetup(), 연습은 practiceSetup()). 없으면 기준 배치(SETUP) */
   setup?: Setup;
 }
 
@@ -49,6 +49,8 @@ interface Deal {
   agenda: number;
   reward: number;
   card?: SpecialCardId;
+  /** 마지막 일격에 쓴 무기 (공개) */
+  weapon: CardId;
 }
 
 export const emptyHand = (): Hand => ({ blitz: 0, practice: 0, promo: 0, hold: 0 });
@@ -142,7 +144,7 @@ class Turn {
     // 실무 교섭 병행: 이번 라운드 이 테이블의 합의는 먼저 건 팀이 가로챔
     const thief = this.steals.get(i)?.shift();
     const winner = thief ?? team;
-    // 처치 보상(전진 거리) = 처음 생명력
+    // 돌파 보상(전진 거리) = 처음 생명력
     const reward = this.setup.demand[agenda.id];
     this.team(winner).score += reward;
     this.team(winner).deals += 1;
@@ -155,6 +157,7 @@ class Turn {
       agenda: agenda.id,
       reward,
       card: loot,
+      weapon: card,
     };
   }
 
@@ -178,11 +181,11 @@ class Turn {
   }
 }
 
-/** 공개 화면용 처치 사건: 처치한 함대·전리품 이름은 공개, 공격 이력(secret.trail)은 비공개 */
+/** 공개 화면용 돌파 사건: 돌파한 함대·전리품 이름은 공개, 공격 이력(secret.trail)은 비공개 */
 const shown = ({ card, winner, stolen, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: card } : {}), ...(stolen ? { stolenBy: winner } : {}) });
 
 const dealText = (deal: Deal) =>
-  `${agendaTitle(deal.agenda)} 처치! ${deal.reward}해리 전진${deal.card ? ` · 특수 무기 [${CARDS[deal.card].name}] 획득 (${CARDS[deal.card].desc})` : ''}`;
+  `${agendaTitle(deal.agenda)} 돌파! ${deal.reward}해리 전진${deal.card ? ` · 특수 무기 [${CARDS[deal.card].name}] 획득 (${CARDS[deal.card].desc})` : ''}`;
 
 function shuffle<T>(items: T[], rng: Rng): T[] {
   for (let i = items.length - 1; i > 0; i--) {
@@ -321,7 +324,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     }
   }
 
-  // ② 헤르메스의 투척 창: 오늘 그 해역의 처치를 가로챔 (순번과 관계없이 미리 걸어 둠)
+  // ② 헤르메스의 투척 창: 오늘 그 해역의 돌파를 가로챔 (순번과 관계없이 미리 걸어 둠)
   for (const t of order) {
     const sub = mainOf(t);
     if (sub?.card !== 'practice' || !turn.has(t, 'practice') || !turn.isOpen(sub.table)) continue;
@@ -429,9 +432,9 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     for (const t of teams) {
       if (pub.round < ROUNDS) {
         secret.practice.push({ team: t, table: i + 1 });
-        turn.note(t, `🎯 ${i + 1}번 해역에서 가로챌 처치가 없었어요 — 내일 시작 시 −${CARDS.practice.power}`, -1);
+        turn.note(t, `🎯 ${i + 1}번 해역에서 가로챌 돌파가 없었어요 — 내일 시작 시 −${CARDS.practice.power}`, -1);
       } else {
-        turn.note(t, `🎯 ${i + 1}번 해역에서 가로챌 처치가 없었어요`, -1);
+        turn.note(t, `🎯 ${i + 1}번 해역에서 가로챌 돌파가 없었어요`, -1);
       }
     }
   }
@@ -456,7 +459,7 @@ export function finish(state: EngineState): EngineState {
   return next;
 }
 
-/** 최종 순위: 고국에 가까운 순(전진 거리 큰 순) → 처치 수. 둘 다 같으면 공동 순위 */
+/** 최종 순위: 고국에 가까운 순(전진 거리 큰 순) → 돌파 수. 둘 다 같으면 공동 순위 */
 export function ranking(pub: PublicState): { team: TeamId; score: number; deals: number; rank: number }[] {
   const rows = pub.teamIds
     .map((team) => ({ team, score: pub.teams[team]?.score ?? 0, deals: pub.teams[team]?.deals ?? 0, rank: 0 }))
