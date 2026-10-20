@@ -3,7 +3,7 @@
  * 설명이 끝나면 실제 진행 화면으로 PRACTICE_DAYS 일 연습 항해를 해요. 실제 첫 해역·전리품 위치가 드러나지 않게
  * 연습 게임은 역경 순서·전리품을 무작위로 정해요. (생명력은 처음부터 공개라 실제 값을 그대로 씀)
  */
-import { AGENDAS, CARDS, PRACTICE_DAYS, CUT_IN_COST, CUT_IN_NAME, FINAL_AGENDA, INITIAL_TABLES, LOOT, LOOT_ORDER, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, SUBMIT_SECONDS, type CardId, type Setup } from './data';
+import { AGENDAS, CARDS, PRACTICE_DAYS, CUT_IN_COST, CUT_IN_NAME, FINAL_AGENDA, INITIAL_TABLES, LOOT, LOOT_ORDER, QUEUE, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, SUBMIT_SECONDS, type CardId, type Setup } from './data';
 import { adversaryCard, weaponCard } from './felt';
 import type { Rng } from './engine';
 
@@ -12,8 +12,8 @@ export interface Slide {
   title: string;
   /** 직접 작성한 본문 HTML */
   html: string;
-  /** 본문 아래에 예시 바다 지도를 그림 (board.ts) */
-  sea?: boolean;
+  /** 본문 아래에 예시 바다 지도를 그림 (board.ts): start = 모두 출발점, order = 거리가 제각각인 순서 예시 */
+  sea?: 'start' | 'order';
 }
 
 function shuffled<T>(items: T[], rng: Rng): T[] {
@@ -49,7 +49,36 @@ const exampleWaters = (): string =>
     (id, i) => `<div class="ftable"><div class="ftable-no"><span>⚑ ${i + 1}번 해역</span></div>${adversaryCard(id, AGENDAS[id].demand, LOOT[id])}</div>`,
   ).join('')}</div>`;
 
-const weapons = (ids: CardId[]): string => `<div class="weapon-cards">${ids.map(weaponCard).join('')}</div>`;
+const weapons = (ids: CardId[], secret = false): string =>
+  `<div class="weapon-cards">${ids.map((id) => weaponCard(id, secret && id !== 'basic')).join('')}</div>`;
+
+/* 공격 적용 예시 장면: 실제 게임과 같은 카드로 순서대로 보여 줌 */
+const step = (label: string) => `<div class="scene-step"><span>➜</span><small>${label}</small></div>`;
+const panel = (inner: string, caption: string, cls = '') => `<figure class="scene-panel ${cls}">${inner}<figcaption>${caption}</figcaption></figure>`;
+const [lotus, wind] = INITIAL_TABLES;
+const nextInQueue = QUEUE[0];
+
+/** ①: 바람 자루(3)를 C −2(남은 생명력 비공개) → D −2로 돌파, 넘친 1은 소멸 */
+const sceneOverkill = (): string =>
+  `<div class="scene">
+    ${panel(adversaryCard(wind, AGENDAS[wind].demand, LOOT[wind]), '2번 해역')}
+    ${step('1번째 · C함대<br>🗡️ 단검 −2')}
+    ${panel(adversaryCard(wind, AGENDAS[wind].demand, LOOT[wind], '?'), '남은 생명력은 <b>비공개</b>', 'mystery')}
+    ${step('2번째 · D함대<br>🗡️ 단검 −2')}
+    ${panel(`<div class="scene-burst"><b>돌파!</b><span>D함대 ${AGENDAS[wind].demand}해리 전진</span><span>${CARDS[LOOT[wind]!].icon} ${CARDS[LOOT[wind]!].name} 획득</span></div>`, '넘친 공격력 1은 <b>소멸</b>')}
+  </div>`;
+
+/** ②: A가 1번 해역 로투스를 돌파 → 마지막 공격 함대 공개 → 대기열 맨 위가 1번 해역으로 → 뒤 순서 B는 새 역경을 공격 */
+const sceneRefill = (): string =>
+  `<div class="scene">
+    ${panel(adversaryCard(lotus, AGENDAS[lotus].demand, LOOT[lotus]), '1번 해역')}
+    ${step('1번째 · A함대<br>🗡️ 단검 −2')}
+    ${panel(`<div class="scene-burst"><b>돌파!</b><span>A함대 공개</span><span>${AGENDAS[lotus].demand}해리 전진 · ${CARDS[LOOT[lotus]!].icon} 획득</span></div>`, '마지막 공격 함대가 보상')}
+    ${step('대기열 맨 위가<br>빈자리로')}
+    ${panel(adversaryCard(nextInQueue, AGENDAS[nextInQueue].demand, LOOT[nextInQueue]), '새로 온 역경 (1번 해역)')}
+    ${step('2번째 · B함대<br>1번 해역 선택')}
+    ${panel(`<div class="scene-burst calm"><b>−2</b><span>B함대는 새 역경을 공격</span></div>`, '같은 해역 번호 그대로')}
+  </div>`;
 
 export const INTRO_SLIDES: Slide[] = [
   {
@@ -61,9 +90,8 @@ export const INTRO_SLIDES: Slide[] = [
   {
     kind: 'slide',
     title: '🧭 고국과의 거리',
-    sea: true,
+    sea: 'start',
     html: `<div class="slide-row">
-        ${weapons(['basic'])}
         <ul class="slide-list">
           <li>모든 함대는 고국에서부터 <b>${START_DISTANCE}해리</b> 떨어진 <b>트로이 전장</b>에서 출발해요.</li>
           <li>모든 함대는 <b>${CARDS.basic.name}</b>만 가지고 출발해요.</li>
@@ -73,11 +101,13 @@ export const INTRO_SLIDES: Slide[] = [
   {
     kind: 'slide',
     title: '📣 공격 순서 발표',
+    sea: 'order',
     html: `<ul class="slide-list">
         <li><b>고국에 가까운 함대부터</b> 공격해요.</li>
         <li>첫날은 <b>랜덤</b>으로 순서가 정해져요.</li>
         <li>단, 둘째 날부터 고국과의 거리가 <b>같은</b> 경우 전날에 공격 순서가 <b>빨랐던 함대를 뒤 순서</b>로 배치해요.</li>
-      </ul>`,
+      </ul>
+      <p class="muted">예) B·C함대가 모두 9해리, 전날 C함대가 먼저 공격했다면 → 오늘은 <b>B → C</b></p>`,
   },
   {
     kind: 'slide',
@@ -92,26 +122,34 @@ export const INTRO_SLIDES: Slide[] = [
   {
     kind: 'slide',
     title: `⚔️ 해역 및 무기 선택 (${SUBMIT_SECONDS / 60}분)`,
-    html: `${weapons(['basic', 'blitz', 'practice', 'promo', 'hold'])}
+    html: `${weapons(['basic', 'blitz', 'practice', 'promo', 'hold'], true)}
       <ul class="slide-list">
         <li>각 함대는 ${SUBMIT_SECONDS / 60}분 안에 <b>공격할 해역의 번호</b>를 선택하고, 공격에 사용할 <b>무기 카드 1장</b>을 제시하여 <b>포스트잇</b>에 작성해요.</li>
         <li>기본 무기 카드(${CARDS.basic.name})는 제시 후 돌려받지만, <b>특수 무기 카드는 사용 즉시 버려져</b> 돌려받지 못해요.</li>
         <li>공격 시 제출한 무기의 <b>공격력만큼</b> 해당 해역에 있는 역경의 생명력이 감소하며, 생명력이 <b>0</b>이 되면 돌파돼요.</li>
+        <li>특수 무기의 <b>이름</b>은 게임 중에 공개되지만, <b>실제 효과</b>는 그 무기를 획득한 함대만 알 수 있어요.</li>
       </ul>`,
   },
   {
     kind: 'slide',
-    title: '💥 공격 적용',
-    html: `<ul class="slide-list dense">
+    title: '💥 공격 적용 ① 순서대로 자동 공격',
+    html: `<ul class="slide-list">
         <li>함대들이 해역 및 무기 선택을 마치면, 정해진 공격 순서에 따라 <b>자동으로 공격</b>이 진행돼요.</li>
         <li>공격 적용 시 역경의 <b>잔여 생명력</b>, 함대의 <b>해역 및 무기 선택 결과</b>는 공개되지 않아요.</li>
         <li>역경의 잔여 생명력보다 더 큰 공격력의 무기가 사용됐다면, 역경은 돌파되고 <b>남은 공격력은 소멸</b>돼요.</li>
+      </ul>
+      ${sceneOverkill()}`,
+  },
+  {
+    kind: 'slide',
+    title: '💥 공격 적용 ② 돌파와 빈자리 채우기',
+    html: `<ul class="slide-list">
         <li>역경 돌파 시, 해당 역경을 <b>마지막으로 공격한 함대</b>가 공개되며 그 함대가 고국으로 전진하고 전리품을 획득해요.</li>
         <li>돌파한 역경은 즉시 해역에서 제거되고, <b>대기열 가장 위쪽</b>에 있는 역경이 해당 해역의 빈자리를 채워요.</li>
-        <li>이때, 뒤 순서 함대 중 역경이 돌파된 해역을 선택한 함대들은 <b>새로 빈자리를 채운 역경</b>을 공격하게 돼요.<br>
-          <span class="muted">예시: 해역 1번 공격 시, 자신의 앞 순서에 의해 해역 1번의 역경이 돌파됐다면, 해역 1번에 재배치된 역경에 공격이 가해짐.</span></li>
+        <li>이때, 뒤 순서 함대 중 역경이 돌파된 해역을 선택한 함대들은 <b>새로 빈자리를 채운 역경</b>을 공격하게 돼요.</li>
         <li>모든 함대가 공격을 마치면, 라운드가 종료돼요.</li>
-      </ul>`,
+      </ul>
+      ${sceneRefill()}`,
   },
   {
     kind: 'slide',

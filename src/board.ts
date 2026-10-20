@@ -113,7 +113,7 @@ function laurel(): string {
 
 function tutorialView(): string {
   const step = steps[tutorialIndex];
-  const body = `<section class="slide"><h1>${esc(step.title)}</h1>${step.html}${step.sea ? exampleSea() : ''}</section>`;
+  const body = `<section class="slide"><h1>${esc(step.title)}</h1>${step.html}${step.sea ? exampleSea(step.sea) : ''}</section>`;
   const dots = steps
     .map((_, i) => `<button class="dot-btn${i === tutorialIndex ? ' on' : ''}" data-action="tut-go" data-index="${i}" aria-label="${i + 1}번째 장면"></button>`)
     .join('');
@@ -136,10 +136,16 @@ function tutorialView(): string {
   </div>`;
 }
 
-/** 설명용 바다 지도: 모든 함대가 트로이 전장(출발 거리)에서 출발 */
-function exampleSea(): string {
-  const scores = Object.fromEntries(TEAM_IDS.map((t) => [t, START_SCORE]));
-  return `<div class="slide-sea">${seaMap([...TEAM_IDS], scores, { key: 'tutorial' })}</div>`;
+/** 설명용 바다 지도. start: 모두 트로이 전장(출발 거리)에서 출발 / order: 거리가 제각각인 공격 순서 예시 */
+function exampleSea(kind: 'start' | 'order'): string {
+  if (kind === 'start') {
+    const scores = Object.fromEntries(TEAM_IDS.map((t) => [t, START_SCORE]));
+    return `<div class="slide-sea">${seaMap([...TEAM_IDS], scores, { key: 'tutorial-start' })}</div>`;
+  }
+  // 고국에 가까운 순. B·C는 9해리 동점 → 전날 앞 순번이던 C가 뒤로
+  const dist: Record<TeamId, number> = { A: 4, B: 9, C: 9, D: 12, E: 15 };
+  const scores = Object.fromEntries(TEAM_IDS.map((t) => [t, START_DISTANCE + START_SCORE - dist[t]]));
+  return `<div class="slide-sea">${seaMap([...TEAM_IDS], scores, { key: 'tutorial-order' })}</div>`;
 }
 
 function stopAutoplay() {
@@ -261,25 +267,36 @@ function banner(): string {
       return `<div class="banner calm"><h2>${pub.round}일차 순서 발표</h2><p>${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p>
         ${news.length ? `<ul class="news">${news.join('')}</ul>` : ''}<p class="muted small">${tie}</p></div>`;
     }
-    case 'submit':
+    case 'submit': {
+      // 양피지 명령서 예시: 필수(함대·해역·무기)와 선택(순풍·추가 무기)을 나눠 보여 줌
+      const row = (label: string, value: string, need: boolean) =>
+        `<tr class="${need ? 'need' : 'opt'}"><th>${label}</th><td>${value}</td><td><em>${need ? '필수' : '선택'}</em></td></tr>`;
       return `<div class="banner calm submit-guide">
         <div class="guide-main">
-          <h2>📝 포스트잇에 적어 내세요</h2>
+          <h2 class="guide-title"><span class="when-open">📜 항해 명령서 작성 가이드</span><span class="when-over">⏰ 제출 시간 종료! 밀서를 제출하세요</span></h2>
           <div class="big-timer" data-timer></div>
-          <p class="scout-now">👁️ <b>${SCOUT_NAME}</b>를 쓰려면 <b>지금</b> 진행자에게 오세요! <span>(${SCOUT_COST}해리 후퇴, 해역 1곳의 남은 생명력)</span></p>
+          <div class="oracle">
+            <span class="oracle-eye" aria-hidden="true">👁️</span>
+            <div><b>${SCOUT_NAME}</b>를 쓰려면 <b>지금</b> 진행자에게 오세요!<small>해역 1곳의 남은 생명력을 우리 함대만 확인</small></div>
+            <span class="oracle-cost">${SCOUT_COST}해리 후퇴</span>
+          </div>
           <p class="muted">${done}/${pub.order.length}함대 입력 완료</p>
         </div>
         <div class="guide-example">
-          <div class="postit">
-            <div class="postit-team">A함대</div>
-            <div class="postit-line"><span>해역</span><b>2번</b></div>
-            <div class="postit-line"><span>무기</span><b>${CARDS.basic.name}</b></div>
-            <div class="postit-line opt"><span>순풍</span><b>1번째</b><em>(쓸 때만)</em></div>
-            <div class="postit-line opt"><span>추가</span><b>무기명 3번</b><em>(가진 함대만)</em></div>
+          <div class="scroll">
+            <div class="scroll-head">항해 명령서</div>
+            <table class="scroll-form">
+              ${row('함대명', 'A 함대', true)}
+              ${row('선택 해역', '2번 해역', true)}
+              ${row('제출 무기', `${CARDS.basic.name} (기본)`, true)}
+              ${row('순풍 아이템', '1번째', false)}
+              ${row('추가 무기', '특수 무기명 · 3번 해역', false)}
+            </table>
           </div>
-          <p class="muted small">이렇게 적어 주세요</p>
+          <p class="muted small">순풍·추가 무기는 쓸 때만 적어요</p>
         </div>
       </div>`;
+    }
     case 'reveal': {
       if (pub.rescue) return rescueBanner();
       const e = latestEvent();
@@ -579,6 +596,7 @@ function tickTimer() {
     const left = pub.deadline - Date.now();
     el.textContent = left > 0 ? `⏱ ${formatTimer(left)}` : '⏱ 시간 종료';
     el.classList.toggle('over', left <= 0);
+    el.closest('.submit-guide')?.classList.toggle('over', left <= 0);
   }
 }
 

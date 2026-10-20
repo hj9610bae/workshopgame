@@ -453,6 +453,7 @@ body.live:has(.home-board) {
 .weapon-cards .agenda-card {
   flex: 0 1 12.5em;
   min-width: 0;
+  overflow: hidden;
   border-top: 8px solid var(--gold-deep);
   animation: deal-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
@@ -1369,7 +1370,7 @@ button.dot-btn.on {
   }
 }
 
-/* 제출 시간: 포스트잇 작성 예시 + 스카우터 안내 */
+/* 제출 시간: 양피지 항해 명령서 예시 + 아폴론의 예지 안내 */
 .banner.submit-guide {
   display: flex;
   align-items: center;
@@ -1381,58 +1382,214 @@ button.dot-btn.on {
   flex: 1;
 }
 
-.scout-now {
-  padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(255, 207, 63, 0.16);
-  border: 2px solid var(--gold);
+.guide-title {
+  font-family: var(--font-title);
+  font-size: 1.55rem;
+  color: var(--gold);
+  word-break: keep-all;
 }
 
-.scout-now span {
+.guide-title .when-over,
+.submit-guide.over .guide-title .when-open {
+  display: none;
+}
+
+.submit-guide.over .guide-title .when-over {
+  display: inline;
+  color: #ff8a93;
+  text-shadow:
+    0 0 8px rgba(230, 57, 70, 0.9),
+    0 0 22px rgba(230, 57, 70, 0.6);
+}
+
+.submit-guide.over {
+  border-color: var(--red);
+  box-shadow: 0 0 28px rgba(230, 57, 70, 0.45);
+}
+
+/* 시간 종료: 붉은 네온 + 금빛 테두리 */
+.big-timer.over {
+  display: inline-block;
+  padding: 0 18px;
+  border: 2px solid var(--gold-deep);
+  border-radius: 14px;
+  color: #ff8a93;
+  text-shadow:
+    0 0 10px rgba(230, 57, 70, 0.95),
+    0 0 26px rgba(230, 57, 70, 0.6);
+  animation: neon 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes neon {
+  to {
+    text-shadow:
+      0 0 4px rgba(230, 57, 70, 0.6),
+      0 0 12px rgba(230, 57, 70, 0.3);
+  }
+}
+
+/* 아폴론의 예지 안내: 보라·신록 글래스모피즘 + 빛나는 신안 */
+.oracle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 0;
+  padding: 10px 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(123, 79, 214, 0.35), rgba(46, 196, 160, 0.22));
+  border: 1px solid rgba(190, 170, 255, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 0 24px rgba(160, 130, 255, 0.18);
+}
+
+.oracle div {
+  word-break: keep-all;
+}
+
+.oracle small {
   display: block;
-  font-size: 0.85rem;
-  opacity: 0.8;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+.oracle-eye {
+  display: grid;
+  place-items: center;
+  width: 2.2em;
+  height: 2.2em;
+  flex: none;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  background: radial-gradient(circle, rgba(196, 160, 255, 0.55), rgba(72, 202, 228, 0.15) 60%, transparent 72%);
+  animation: aura 2.4s ease-in-out infinite;
+}
+
+@keyframes aura {
+  50% {
+    box-shadow: 0 0 22px 4px rgba(170, 140, 255, 0.55);
+  }
+}
+
+.oracle-cost {
+  margin-left: auto;
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--red);
 }
 
 .guide-example {
   text-align: center;
 }
 
-.postit {
-  width: 12.5em;
-  padding: 14px 16px 18px;
-  background: linear-gradient(180deg, #fff59a, #ffe75c);
-  color: var(--ink);
-  font-family: 'Nanum Pen Script', 'Gaegu', cursive, system-ui;
-  font-size: 1.15rem;
+.guide-example > p {
+  margin-top: 16px;
+}
+
+/* 양피지 두루마리: 빛바랜 종이 + 위아래 말린 끝 */
+.scroll {
+  position: relative;
+  width: 17em;
+  padding: 18px 18px 16px;
+  color: #3b2a14;
+  font-family: 'Noto Serif KR', serif;
   text-align: left;
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.4);
-  transform: rotate(-3deg);
-  clip-path: polygon(0 0, 100% 0, 100% 88%, 90% 100%, 0 100%);
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(255, 255, 255, 0.35), transparent 45%),
+    radial-gradient(ellipse at 85% 90%, rgba(120, 80, 30, 0.25), transparent 50%),
+    linear-gradient(180deg, #f3e2b8, #e6cf98 60%, #d8bb7c);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 30px rgba(120, 80, 30, 0.35),
+    0 12px 22px rgba(0, 0, 0, 0.45);
+  transform: rotate(-1.5deg);
 }
 
-.postit-team {
-  font-size: 1.4rem;
+.scroll::before,
+.scroll::after {
+  content: '';
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #c9a565, #8c6a32 55%, #b8925a);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.scroll::before {
+  top: -8px;
+}
+
+.scroll::after {
+  bottom: -8px;
+}
+
+.scroll-head {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px double #8c6a32;
+  font-family: var(--font-title);
+  font-size: 1.2rem;
   font-weight: 900;
-  border-bottom: 2px solid #d4a017;
-  margin-bottom: 6px;
+  letter-spacing: 0.2em;
+  text-align: center;
+  color: #6b3f12;
 }
 
-.postit-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.scroll-form {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
 }
 
-.postit-line span {
-  min-width: 3.2em;
-  color: #7a6a2a;
+.scroll-form th,
+.scroll-form td {
+  padding: 5px 4px;
+  border-bottom: 1px solid rgba(107, 63, 18, 0.3);
+  text-align: left;
 }
 
-.postit-line.opt em {
+.scroll-form th {
+  width: 5.2em;
+  font-weight: 600;
+  color: #6b4a22;
+  white-space: nowrap;
+}
+
+.scroll-form td {
+  font-weight: 900;
+}
+
+.scroll-form td:last-child {
+  width: 2.8em;
+  text-align: right;
+}
+
+/* 필수는 붉은 인장, 선택은 옅은 글씨 */
+.scroll-form em {
   font-style: normal;
-  font-size: 0.85rem;
-  color: #9a8a4a;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.scroll-form .need em {
+  padding: 1px 5px;
+  border: 1.5px solid #a3202c;
+  border-radius: 4px;
+  color: #a3202c;
+  transform: rotate(-4deg);
+  display: inline-block;
+}
+
+.scroll-form .opt th,
+.scroll-form .opt td {
+  color: rgba(59, 42, 20, 0.6);
+}
+
+.scroll-form .opt td:nth-child(2) {
+  font-weight: 600;
 }
 
 @media (max-width: 900px) {
@@ -1722,4 +1879,98 @@ button.dot-btn.on {
 .rescue-ctl .in-label {
   width: auto;
   margin-right: 6px;
+}
+
+/* ───── 항해 설명: 공격 적용 예시 장면 ───── */
+.scene {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 1600px;
+  font-size: 0.95rem;
+}
+
+.scene-panel {
+  flex: 0 1 13em;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scene-panel .agenda-card {
+  padding: 10px 8px 8px;
+}
+
+.scene-panel .agenda-card h3 {
+  font-size: 1.05rem;
+}
+
+.scene-panel .pictogram {
+  font-size: 2rem;
+}
+
+.scene-panel figcaption {
+  font-size: 0.95rem;
+  color: var(--ink-muted);
+}
+
+.scene-panel.mystery .hp b {
+  color: var(--gold);
+}
+
+.scene-step {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--gold);
+  line-height: 1.25;
+}
+
+.scene-step span {
+  font-size: 1.8rem;
+}
+
+.scene-step small {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.scene-burst {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 9.5em;
+  padding: 10px;
+  border-radius: 14px;
+  border: 2px solid var(--mint);
+  background: radial-gradient(circle, rgba(72, 202, 228, 0.25), rgba(28, 37, 65, 0.9) 70%);
+}
+
+.scene-burst b {
+  font-family: var(--font-title);
+  font-size: 1.8rem;
+  color: var(--mint);
+}
+
+.scene-burst span {
+  font-size: 0.95rem;
+}
+
+.scene-burst.calm {
+  border-color: var(--gold-deep);
+  background: rgba(28, 37, 65, 0.9);
+}
+
+.scene-burst.calm b {
+  color: var(--red);
+}
+
+.agenda-card.weapon.secret .hp b {
+  color: var(--gold);
 }

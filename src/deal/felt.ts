@@ -32,24 +32,25 @@ function pile(table: TableState): { html: string; depth: number } {
  * 역경 카드: 픽토그램 + 역경 이름 + 생명력 + 전리품(전진 거리, 특수 무기 이름).
  * 실제 게임·연습 항해·항해 설명이 모두 이 양식을 씀
  */
-export function adversaryCard(id: number, hp: number, loot?: SpecialCardId): string {
+export function adversaryCard(id: number, hp: number, loot?: SpecialCardId, shownHp: string = String(hp)): string {
   const a = AGENDAS[id];
   return `<div class="agenda-card">
       <div class="pictogram" aria-hidden="true">${a.icon}</div>
       <h3>${esc(a.title)}</h3>
-      <p class="hp">❤️ 생명력 <b>${hp}</b></p>
+      <p class="hp">❤️ 생명력 <b>${shownHp}</b></p>
       <div class="reward"><span>⛵ ${hp}해리 전진</span>${loot ? `<span class="loot">${CARDS[loot].icon} ${CARDS[loot].name}</span>` : ''}</div>
     </div>`;
 }
 
-/** 무기 카드: 역경 카드와 같은 양식 (픽토그램 + 무기 이름 + 공격력) */
-export function weaponCard(id: CardId): string {
+/** 무기 카드: 역경 카드와 같은 양식 (픽토그램 + 무기 이름 + 공격력). secret 이면 공격력·효과를 ? 로 */
+export function weaponCard(id: CardId, secret = false): string {
   const c = CARDS[id];
-  return `<div class="agenda-card weapon ${id}">
+  const foot = id === 'basic' ? '기본 무기 · 계속 사용' : secret ? '효과는 획득한 함대만' : '특수 무기 · 1회용';
+  return `<div class="agenda-card weapon ${id}${secret ? ' secret' : ''}">
       <div class="pictogram" aria-hidden="true">${c.icon}</div>
       <h3>${c.name}</h3>
-      <p class="hp">⚔️ 공격력 <b>${c.powerText}</b></p>
-      <div class="reward"><span>${id === 'basic' ? '기본 무기 · 계속 사용' : '특수 무기 · 1회용'}</span></div>
+      <p class="hp">⚔️ 공격력 <b>${secret ? '?' : c.powerText}</b></p>
+      <div class="reward"><span>${foot}</span></div>
     </div>`;
 }
 
