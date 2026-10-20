@@ -1,6 +1,6 @@
 /* 사회자 화면·대표 폰이 함께 쓰는 화면 조각 */
 import { esc } from '../ui';
-import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, ROUNDS, SETUP, type CardId, type Setup, type TeamId } from './data';
+import { AGENDAS, CARDS, FINAL_AGENDA, FINAL_OPEN_ROUND, ROUNDS, SETUP, type Setup, type SpecialCardId, type TeamId } from './data';
 import { agendaTitle } from './engine';
 import type { GameEvent, PublicState, Stage, TableState } from './types';
 
@@ -43,9 +43,13 @@ export function snapshot(pub: PublicState): { tables: TableState[]; scores: Part
 /** 처음 생명력 (공개) = 처치 시 전진 거리 */
 export const hpOf = (agendaId: number): number => setup.demand[agendaId] ?? AGENDAS[agendaId]?.demand ?? 0;
 
-/** 처치 보상. 전리품은 어떤 무기인지 밝히지 않고 '특수 무기'로만 */
+/** 처치 시 받는 전리품 (특수 무기) */
+export const lootOf = (agendaId: number): SpecialCardId | undefined => setup.loot[agendaId];
+
+/** 처치 보상: 전진 거리 + 전리품 무기 이름 */
 export function rewardText(agendaId: number): string {
-  return `${hpOf(agendaId)}해리 전진${setup.loot[agendaId] ? ' · 특수 무기' : ''}`;
+  const loot = lootOf(agendaId);
+  return `${hpOf(agendaId)}해리 전진${loot ? ` · ${CARDS[loot].icon} ${CARDS[loot].name}` : ''}`;
 }
 
 export function tableCard(table: TableState, index: number, round: number): string {
@@ -81,34 +85,16 @@ export function queueStrip(pub: PublicState): string {
   return `<ol class="queue">${rest.map((id) => `<li>${AGENDAS[id].icon} ${esc(agendaTitle(id))}</li>`).join('')}</ol>`;
 }
 
-const HIT_ICON: Record<CardId, string> = { basic: '', blitz: '🏹', practice: '🎯', promo: '⛓️', hold: '' };
-
-/** 처치된 역경이 깎여 온 과정. 각 단계 뒤의 남은 생명력 포함 */
-export function trailSteps(e: GameEvent): { label: string; amount: number; after: number }[] {
-  let left = e.demand ?? 0;
-  return (e.trail ?? []).map((h) => {
-    left -= h.amount;
-    return { label: `${teamName(h.team)} ${HIT_ICON[h.card]}`.trim(), amount: h.amount, after: left };
-  });
-}
-
-/** 예: "생명력 3 ➔ C함대 −2 (1) ➔ D함대 −2 (-1)" */
-export function trailText(e: GameEvent): string | undefined {
-  if (!e.demand) return undefined;
-  return [`생명력 ${e.demand}`, ...trailSteps(e).map((s) => `${s.label} −${s.amount} (${s.after})`)].join(' ➔ ');
-}
-
 /** 공개 화면에 띄울 사건 문장 */
 export function describeEvent(e: GameEvent): {
   icon: string;
   title: string;
   detail?: string;
-  trail?: string;
   tone?: 'deal' | 'bad';
 } {
   const team = e.team ? teamName(e.team) : '';
   const agenda = e.agenda ? `${agendaTitle(e.agenda)}` : '';
-  const reward = e.reward ? `고국으로 ${e.reward}해리 전진${e.loot ? ' · 특수 무기 1개 획득' : ''}` : '';
+  const reward = e.reward ? `고국으로 ${e.reward}해리 전진${e.loot ? ` · ${CARDS[e.loot].icon} ${CARDS[e.loot].name} 획득` : ''}` : '';
   // 헤르메스의 투척 창으로 가로챈 처치: 보상은 가로챈 함대에게
   if (e.stolenBy && e.agenda) {
     const thief = teamName(e.stolenBy);
@@ -116,7 +102,6 @@ export function describeEvent(e: GameEvent): {
       icon: '🎯',
       title: `${agenda} 처치! 그런데… ${thief}의 투척 창이 가로챘다!`,
       detail: `마지막 일격은 ${team} · 보상은 ${thief}: ${reward}`,
-      trail: trailText(e),
       tone: 'deal',
     };
   }
@@ -125,7 +110,7 @@ export function describeEvent(e: GameEvent): {
     case 'finalOpen':
       return { icon: '👑', title: `최종 결전 개시! ${e.table}번 해역에 ${agendaTitle(FINAL_AGENDA)} 등장`, detail: `생명력 ${hpOf(FINAL_AGENDA)} · 처치 보상 ${rewardText(FINAL_AGENDA)}`, tone: 'deal' };
     case 'practiceDeal':
-      return { icon: '🎯', title: `헤르메스의 투척 창 명중! ${team}, ${agenda} 처치`, detail: reward, trail: trailText(e), tone: 'deal' };
+      return { icon: '🎯', title: `헤르메스의 투척 창 명중! ${team}, ${agenda} 처치`, detail: reward, tone: 'deal' };
     case 'start':
       return e.cutIn
         ? { icon: '💨', title: '제피로스의 순풍! 공격 순서가 바뀌었어요', detail: e.order?.map(teamName).join(' → ') }
@@ -133,13 +118,13 @@ export function describeEvent(e: GameEvent): {
     case 'hold':
       return { icon: '🔱', title: `${e.table}번 해역 동결! 포세이돈의 삼지창`, detail: '오늘 이 해역에 대한 공격은 모두 무효', tone: 'bad' };
     case 'promoDeal':
-      return { icon: '⛓️', title: `아테나의 쇠사슬! ${team}, ${agenda} 처치`, detail: reward, trail: trailText(e), tone: 'deal' };
+      return { icon: '⛓️', title: `아테나의 쇠사슬! ${team}, ${agenda} 처치`, detail: reward, tone: 'deal' };
     case 'end':
       return { icon: '🌙', title: '오늘의 항해 끝' };
     case 'proposal':
       switch (e.result) {
         case 'deal':
-          return { icon: '🎉', title: `${team}, ${agenda} 처치!${firstMark}`, detail: reward, trail: trailText(e), tone: 'deal' };
+          return { icon: '🎉', title: `${team}, ${agenda} 처치!${firstMark}`, detail: reward, tone: 'deal' };
         case 'promo':
           return { icon: '⛓️', title: `${team}, ${e.table}번 해역에 아테나의 쇠사슬`, detail: '매일 끝날 때 생명력 1 감소' };
         case 'void':
@@ -160,11 +145,11 @@ export function describeEvent(e: GameEvent): {
 export function eventItem(e: GameEvent, big = false): string {
   const d = describeEvent(e);
   return `<li class="event${d.tone ? ` ${d.tone}` : ''}${big ? ' big' : ''}"><span class="icon">${d.icon}</span>
-    <div><strong>${esc(d.title)}</strong>${d.detail ? `<span class="muted">${esc(d.detail)}</span>` : ''}${d.trail ? `<span class="muted small">${esc(d.trail)}</span>` : ''}</div></li>`;
+    <div><strong>${esc(d.title)}</strong>${d.detail ? `<span class="muted">${esc(d.detail)}</span>` : ''}</div></li>`;
 }
 
 export const roundLabel = (pub: PublicState): string =>
-  pub.stage === 'lobby' ? '출항 대기' : pub.stage === 'final' ? '최종 결과' : `${pub.round}일차/${ROUNDS} · ${STAGE_LABEL[pub.stage]}`;
+  pub.stage === 'lobby' ? '출항 대기' : pub.stage === 'final' ? '최종 결과' : `${pub.round}일차/${ROUNDS}일차 · ${STAGE_LABEL[pub.stage]}`;
 
 export function formatTimer(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));

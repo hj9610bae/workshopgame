@@ -1,6 +1,6 @@
 import type { CardId, ExtraCardId, SpecialCardId, TeamId } from './data';
 
-/** 안건의 요구 수치를 깎은 기록 (합의되기 전까지 비공개) */
+/** 역경의 생명력을 깎은 기록 (비공개, 진행자 창에만) */
 export interface Hit {
   team: TeamId;
   card: CardId;
@@ -29,15 +29,15 @@ export type EventKind = 'finalOpen' | 'practiceDeal' | 'start' | 'hold' | 'propo
 export type ProposalResult = 'done' | 'deal' | 'promo' | 'void' | 'pass';
 export type VoidReason = 'hold' | 'empty' | 'invalid';
 
-/** 사회자 화면에 공개되는 사건. 남은 수치나 낸 카드 같은 비공개 정보는 담지 않음 (합의된 안건의 이력만 예외) */
+/** 공개 화면에 보이는 사건. 남은 생명력·낸 무기·공격 이력 같은 비공개 정보는 담지 않음 */
 export interface GameEvent {
   kind: EventKind;
   team?: TeamId;
   table?: number;
   agenda?: number;
   reward?: number;
-  /** 합의로 특수 카드를 받았는지 (어떤 카드인지는 비공개) */
-  loot?: boolean;
+  /** 처치로 받은 전리품 (역경 카드에 이름이 공개돼 있음) */
+  loot?: SpecialCardId;
   result?: ProposalResult;
   reason?: VoidReason;
   /** 합의 사건: 실무 교섭 병행으로 보상을 가로챈 팀 */
@@ -47,9 +47,6 @@ export interface GameEvent {
   /** start: 새치기로 순서가 바뀌었는지, 바뀐 순서 */
   cutIn?: boolean;
   order?: TeamId[];
-  /** 합의 사건: 블라인드였던 처음 요구 수치와 깎인 이력 (합의 순간에 공개) */
-  demand?: number;
-  trail?: Hit[];
   /** 이 사건 직후의 테이블·점수 (공개 연출용) */
   tables: TableState[];
   scores: Partial<Record<TeamId, number>>;

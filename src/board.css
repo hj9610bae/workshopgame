@@ -171,15 +171,25 @@ body.live button.small {
   }
 }
 
+/* 해역 공간: 바다 위에 펼친 항해 지도 (경위선 격자 · 물결 · 나침반 · 점선 항로) */
 .felt {
   position: relative;
-  padding: 22px;
-  border-radius: 28px;
-  background: radial-gradient(ellipse at center, #2a80b4 0%, var(--felt) 45%, var(--felt-dark) 100%);
-  border: 10px solid var(--wood);
+  isolation: isolate;
+  overflow: hidden;
+  padding: 26px 26px 22px;
+  border-radius: 18px;
+  background:
+    /* 물결 */
+    radial-gradient(ellipse 18px 6px at 50% 100%, transparent 70%, rgba(255, 255, 255, 0.07) 72%, transparent 80%) 0 0 / 46px 22px,
+    /* 경위선 */
+    repeating-linear-gradient(0deg, transparent 0 63px, rgba(210, 236, 255, 0.13) 63px 64px),
+    repeating-linear-gradient(90deg, transparent 0 63px, rgba(210, 236, 255, 0.13) 63px 64px),
+    radial-gradient(ellipse at 40% 35%, #2f8fc4 0%, var(--felt) 45%, var(--felt-dark) 100%);
+  border: 3px solid #d9b56a;
   box-shadow:
-    inset 0 0 0 3px var(--wood-light),
-    inset 0 0 50px rgba(0, 0, 0, 0.45),
+    0 0 0 6px #10324f,
+    0 0 0 9px #d9b56a,
+    inset 0 0 60px rgba(0, 0, 0, 0.45),
     0 12px 30px rgba(0, 0, 0, 0.5);
   min-height: 40vh;
   display: flex;
@@ -187,10 +197,38 @@ body.live button.small {
   gap: 16px;
 }
 
+/* 나침반 (오른쪽 아래) */
+.felt::before {
+  content: '';
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  width: 120px;
+  height: 120px;
+  z-index: -1;
+  opacity: 0.35;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23f3e1b0' stroke-width='1.2'%3E%3Ccircle cx='50' cy='50' r='46'/%3E%3Ccircle cx='50' cy='50' r='38' stroke-dasharray='2 3'/%3E%3C/g%3E%3Cg fill='%23f3e1b0'%3E%3Cpath d='M50 4 56 50 50 96 44 50z'/%3E%3Cpath d='M4 50 50 44 96 50 50 56z' opacity='.7'/%3E%3Cpath d='M18 18 52 48 82 82 48 52z' opacity='.35'/%3E%3Cpath d='M82 18 52 52 18 82 48 48z' opacity='.35'/%3E%3C/g%3E%3Ctext x='50' y='3' font-size='9' text-anchor='middle' fill='%23f3e1b0' font-family='serif' font-weight='bold' dy='7'%3EN%3C/text%3E%3C/svg%3E")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+
+/* 해역 사이를 잇는 점선 항로 */
+.felt::after {
+  content: '';
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 32%;
+  z-index: -1;
+  border-top: 3px dashed rgba(255, 236, 190, 0.45);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
 .felt-tables {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+  gap: 22px;
   align-items: stretch;
 }
 
@@ -207,15 +245,25 @@ body.live button.small {
   gap: 6px;
 }
 
+/* 해역 번호: 지도 위 깃발 표지 */
 .ftable-no {
   text-align: center;
-  font-weight: 800;
-  color: #d8f5e4;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-.ftable.final .ftable-no {
+.ftable-no span {
+  display: inline-block;
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: rgba(8, 30, 52, 0.75);
+  border: 2px solid #d9b56a;
+  color: #f3e1b0;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.ftable.final .ftable-no span {
   color: var(--gold);
+  border-color: var(--gold);
 }
 
 .agenda-card {
@@ -288,23 +336,148 @@ body.live button.small {
   word-break: keep-all;
 }
 
-.agenda-card .gap {
+.agenda-card .hp {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   color: #6c5f49;
-  line-height: 1.35;
 }
 
-.agenda-card .gap span {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #a08f70;
+.agenda-card .hp b {
+  font-size: 1.5rem;
+  color: #d63a3a;
 }
 
+/* 전리품: 전진 거리 + 특수 무기 이름 */
 .reward {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 8px;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 2px dashed #e2d5b8;
   font-weight: 800;
   color: #a1531b;
+}
+
+.reward .loot {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #3a3048;
+  color: var(--gold);
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+/* 무기 카드 (설명 화면): 역경 카드와 같은 양식 */
+.weapon-cards {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  max-width: 1300px;
+}
+
+.weapon-cards .agenda-card {
+  flex: 0 1 10.5em;
+  min-width: 0;
+  border-top: 8px solid #8a4de0;
+  animation: deal-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.weapon-cards .agenda-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.weapon-cards .agenda-card:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.weapon-cards .agenda-card:nth-child(4) {
+  animation-delay: 0.3s;
+}
+.weapon-cards .agenda-card:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+.agenda-card.weapon.basic {
+  border-top-color: #4b8de0;
+}
+
+.agenda-card.weapon .hp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.agenda-card.weapon .hp b {
+  white-space: nowrap;
+}
+
+.agenda-card.weapon h3 {
+  font-size: 1.15rem;
+}
+
+.agenda-card.weapon .reward {
+  font-size: 0.8rem;
+  color: #6c5f49;
+}
+
+/* 설명 화면의 예시 해역 (게임 화면과 같은 지도 바탕) */
+.chart-mini {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 16em));
+  gap: 22px;
+  padding: 18px 22px;
+  border-radius: 16px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 47px, rgba(210, 236, 255, 0.13) 47px 48px),
+    repeating-linear-gradient(90deg, transparent 0 47px, rgba(210, 236, 255, 0.13) 47px 48px),
+    radial-gradient(ellipse at center, #2f8fc4 0%, var(--felt) 50%, var(--felt-dark) 100%);
+  border: 3px solid #d9b56a;
+  font-size: 0.85rem;
+}
+
+.chart-mini .agenda-card {
+  font-size: 1rem;
+}
+
+.slide-list.dense {
+  max-width: 1150px;
+}
+
+.slide-list.dense li {
+  margin: 6px 0;
+  font-size: 1.25rem;
+}
+
+.item-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
+}
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 17em;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.35;
+  box-shadow: 0 6px 0 #d9cdb3, 0 10px 18px rgba(0, 0, 0, 0.4);
+}
+
+.item-card span:not(.pictogram) {
+  font-size: 1.05rem;
+  color: #6c5f49;
+}
+
+.item-card em {
+  font-style: normal;
+  font-weight: 800;
+  color: #c0392b;
 }
 
 .stickers {
@@ -352,11 +525,6 @@ body.live button.small {
 }
 
 .ftable-wait {
-  font-weight: 800;
-}
-
-.ftable-teaser {
-  color: var(--gold);
   font-weight: 800;
 }
 
@@ -503,75 +671,6 @@ body.live button.small {
 
 [data-timer].over {
   color: var(--danger);
-}
-
-/* 처치 시 공격 이력 */
-.trail {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.trail-start,
-.trail-hit {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 4.2em;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--ink);
-  line-height: 1.15;
-}
-
-.trail-start {
-  background: #2a2118;
-  color: #fff;
-}
-
-.trail small {
-  font-size: 0.7rem;
-  opacity: 0.8;
-}
-
-.trail b {
-  font-size: 1.4rem;
-}
-
-.trail-hit b {
-  color: #d63a3a;
-}
-
-.trail-hit em {
-  font-style: normal;
-  font-size: 0.8rem;
-  color: #6c5f49;
-}
-
-.trail-hit em::before {
-  content: '남음 ';
-}
-
-.trail-hit.last {
-  outline: 3px solid var(--gold);
-}
-
-.trail-arrow {
-  font-weight: 900;
-}
-
-.trail-hit,
-.trail-arrow {
-  animation: pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) both;
-  animation-delay: calc(0.4s + var(--d) * 0.45s);
-}
-
-.trail-start {
-  animation: pop 0.4s both 0.3s;
 }
 
 /* 오른쪽: 대기열 덱 + 사건 기록 */
@@ -1187,37 +1286,6 @@ body.console #app {
   margin: 6px 0;
 }
 
-.mini-table {
-  width: 13em;
-  padding: 20px;
-  border-radius: 20px;
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 0 0 10px var(--felt), 0 0 0 16px var(--wood), 0 14px 30px rgba(0, 0, 0, 0.5);
-}
-
-.mini-title {
-  font-weight: 800;
-}
-
-.mini-gap {
-  margin-top: 6px;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  color: #6c5f49;
-}
-
-.mini-icon {
-  font-size: 3rem;
-  line-height: 1.2;
-}
-
-.mini-reward {
-  margin-top: 10px;
-  color: #a1531b;
-  font-weight: 800;
-}
-
 .slide-list {
   text-align: left;
   max-width: 900px;
@@ -1225,65 +1293,6 @@ body.console #app {
 
 .slide-list li {
   margin: 8px 0;
-}
-
-.rule-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 16px;
-  width: 100%;
-  max-width: 1200px;
-}
-
-.rule-cards.two {
-  max-width: 760px;
-}
-
-.rule-card {
-  padding: 18px 14px;
-  border-radius: 16px;
-  background: var(--paper);
-  color: var(--ink);
-  font-size: 1rem;
-  line-height: 1.4;
-  box-shadow: 0 6px 0 #d9cdb3, 0 10px 18px rgba(0, 0, 0, 0.4);
-  border-top: 10px solid #4b8de0;
-  animation: deal-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
-}
-
-.rule-card:nth-child(2) {
-  animation-delay: 0.1s;
-  border-top-color: #e0484b;
-}
-.rule-card:nth-child(3) {
-  animation-delay: 0.2s;
-  border-top-color: #8a4de0;
-}
-.rule-card:nth-child(4) {
-  animation-delay: 0.3s;
-  border-top-color: #f0b429;
-}
-.rule-card:nth-child(5) {
-  animation-delay: 0.4s;
-  border-top-color: #555;
-}
-
-.rule-cards:has(.secret) {
-  max-width: 520px;
-}
-
-.rule-card.secret {
-  border-top-color: #555;
-  background: repeating-linear-gradient(45deg, #3a3048, #3a3048 10px, #43384f 10px, #43384f 20px);
-  color: #fff;
-}
-
-.rule-card.secret p {
-  color: #d8cfe6;
-}
-
-.rule-card.secret .rule-card-power {
-  color: var(--gold);
 }
 
 .cut-example {
@@ -1296,68 +1305,6 @@ body.console #app {
 
 .cut-example p {
   margin: 6px 0;
-}
-
-.rule-card.item {
-  border-top-color: var(--success);
-}
-
-.rule-card-name {
-  font-weight: 900;
-  font-size: 1.15rem;
-}
-
-.rule-card-power {
-  margin: 8px 0;
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: #c0392b;
-}
-
-.rule-card p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #6c5f49;
-}
-
-.flow {
-  counter-reset: step;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
-  width: 100%;
-  max-width: 1200px;
-}
-
-.flow li {
-  counter-increment: step;
-  padding: 16px;
-  border-radius: 16px;
-  background: var(--surface);
-  font-size: 1.05rem;
-  animation: pop 0.5s both;
-}
-
-.flow li::before {
-  content: counter(step);
-  display: grid;
-  place-items: center;
-  width: 1.8em;
-  height: 1.8em;
-  margin: 0 auto 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-weight: 900;
-}
-
-.flow li span {
-  display: block;
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 .tut-nav {

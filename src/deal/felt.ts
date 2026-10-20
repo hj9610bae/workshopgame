@@ -1,8 +1,8 @@
 /* 현장 진행 화면(board.html)이 쓰는 '탐험 해역'·함대 자리 그림 조각 */
 import { esc } from '../ui';
-import { AGENDAS, FINAL_AGENDA, FINAL_OPEN_ROUND, TIER_LABEL, distanceOf, type TeamId } from './data';
-import type { GameEvent, TableState } from './types';
-import { activeSetup, hpOf, rewardText, teamName, trailSteps } from './view';
+import { AGENDAS, CARDS, distanceOf, type CardId, type SpecialCardId, type TeamId } from './data';
+import type { TableState } from './types';
+import { activeSetup, hpOf, lootOf, teamName } from './view';
 
 export interface TableLook {
   /** 방금 처치된 역경 (해역에는 이미 새 역경이 올라와 있음) */
@@ -28,7 +28,32 @@ function pile(table: TableState): { html: string; depth: number } {
   return { html, depth: shown.length };
 }
 
-export function feltTable(table: TableState, index: number, round: number, look: TableLook = {}): string {
+/**
+ * 역경 카드: 픽토그램 + 역경 이름 + 생명력 + 전리품(전진 거리, 특수 무기 이름).
+ * 실제 게임·연습 항해·항해 설명이 모두 이 양식을 씀
+ */
+export function adversaryCard(id: number, hp: number, loot?: SpecialCardId): string {
+  const a = AGENDAS[id];
+  return `<div class="agenda-card">
+      <div class="pictogram" aria-hidden="true">${a.icon}</div>
+      <h3>${esc(a.title)}</h3>
+      <p class="hp">❤️ 생명력 <b>${hp}</b></p>
+      <div class="reward"><span>⛵ ${hp}해리 전진</span>${loot ? `<span class="loot">${CARDS[loot].icon} ${CARDS[loot].name}</span>` : ''}</div>
+    </div>`;
+}
+
+/** 무기 카드: 역경 카드와 같은 양식 (픽토그램 + 무기 이름 + 공격력) */
+export function weaponCard(id: CardId): string {
+  const c = CARDS[id];
+  return `<div class="agenda-card weapon ${id}">
+      <div class="pictogram" aria-hidden="true">${c.icon}</div>
+      <h3>${c.name}</h3>
+      <p class="hp">⚔️ 공격력 <b>${c.powerText}</b></p>
+      <div class="reward"><span>${id === 'basic' ? '기본 무기 · 계속 사용' : '특수 무기 · 1회용'}</span></div>
+    </div>`;
+}
+
+export function feltTable(table: TableState, index: number, look: TableLook = {}): string {
   const no = index + 1;
   const isFinal = index === 3;
   const a = AGENDAS[table.agenda];
@@ -38,31 +63,20 @@ export function feltTable(table: TableState, index: number, round: number, look:
   const stamp = look.deal
     ? `<div class="deal-stamp"><span>처치!</span><small>${esc(teamName(look.deal.team))} ${look.deal.reward}해리 전진</small></div>`
     : '';
-  const head = `<div class="ftable-no">${no}번 해역${isFinal ? ' · 최종 결전' : ''}</div>`;
+  const head = `<div class="ftable-no"><span>⚑ ${no}번 해역${isFinal ? ' · 최종 결전' : ''}</span></div>`;
+  const past = pile(table);
   if (!a) {
-    const label = isFinal
-      ? round < FINAL_OPEN_ROUND
-        ? `<div class="ftable-wait">👑 ${FINAL_OPEN_ROUND}일차 개시</div><div class="ftable-teaser">${esc(AGENDAS[FINAL_AGENDA].title)} · 생명력 ${hpOf(FINAL_AGENDA)}</div>`
-        : '<div class="ftable-wait">최종 결전 종료</div>'
-      : '<div class="ftable-wait">대기열 소진</div>';
-    const past = pile(table);
-    return `<article class="${cls} empty">${head}<div class="stack" style="--n:${past.depth}">${past.html}<div class="ftable-slot">${label}</div></div>${stamp}</article>`;
+    // 4번 해역은 FINAL_OPEN_ROUND 전에는 아예 그리지 않음 (board.ts)
+    const label = isFinal ? '최종 결전 종료' : '대기열 소진';
+    return `<article class="${cls} empty">${head}<div class="stack" style="--n:${past.depth}">${past.html}<div class="ftable-slot"><div class="ftable-wait">${label}</div></div></div>${stamp}</article>`;
   }
   // 처음 생명력은 공개, 남은 생명력은 비공개 (아폴론의 예지로만 확인)
   const promos = table.promos
     .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">⛓️ ${esc(teamName(t))}</span>`)
     .join('');
-  const past = pile(table);
   return `<article class="${cls}">
     ${head}
-    <div class="stack" style="--n:${past.depth}">${past.html}
-    <div class="agenda-card">
-      <div class="pictogram" aria-hidden="true">${a.icon}</div>
-      <h3>${esc(a.title)}</h3>
-      <p class="gap"><span>${TIER_LABEL[a.tier]} · ${esc(a.topic)}</span>❤️ 생명력 <b>${hpOf(a.id)}</b></p>
-      <div class="reward">⛵ ${rewardText(a.id)}</div>
-    </div>
-    </div>
+    <div class="stack" style="--n:${past.depth}">${past.html}${adversaryCard(a.id, hpOf(a.id), lootOf(a.id))}</div>
     ${promos ? `<div class="stickers">${promos}</div>` : ''}
     ${table.frozen ? '<div class="frozen-cover">🔱 동결</div>' : ''}
     ${stamp}
@@ -77,7 +91,7 @@ export function deck(queue: number): string {
   const more = rest.length > SHOW ? `<li class="more">외 ${rest.length - SHOW}개</li>` : '';
   const list = rest
     .slice(0, SHOW)
-    .map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)} <small>❤️${hpOf(id)}</small></li>`)
+    .map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)} <small>❤️${hpOf(id)}${lootOf(id) ? ` ${CARDS[lootOf(id)!].icon}` : ''}</small></li>`)
     .join('') + more;
   return `<div class="deck">
     <div class="deck-stack">${stack}<span class="deck-count">${rest.length}</span></div>
@@ -154,18 +168,4 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
     <div class="sea-ticks">${ticks.join('')}</div>
     <ol class="sea-ships">${ships}</ol>
   </section>`;
-}
-
-/** 처치된 역경의 공격 이력: 처음 생명력부터 한 단계씩 깎여 온 과정 */
-export function trailStrip(e: Pick<GameEvent, 'agenda' | 'demand' | 'trail'>): string {
-  if (!e.demand) return '';
-  const steps = trailSteps(e as GameEvent)
-    .map(
-      (s, i) => `<span class="trail-arrow" style="--d:${i + 1}">➔</span>
-        <span class="trail-hit${s.after <= 0 ? ' last' : ''}" style="--d:${i + 1}"><small>${esc(s.label)}</small><b>−${s.amount}</b><em>${s.after}</em></span>`,
-    )
-    .join('');
-  return `<div class="trail">
-    <span class="trail-start"><small>처음 생명력</small><b>${e.demand}</b></span>${steps}
-  </div>`;
 }

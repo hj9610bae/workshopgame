@@ -50,7 +50,6 @@ const normEvent = (e: GameEvent): GameEvent => ({
   ...e,
   tables: (e.tables ?? []).map(normTable),
   scores: e.scores ?? {},
-  ...(e.demand ? { trail: e.trail ?? [] } : {}),
 });
 
 export function normPub(raw: Partial<PublicState> | null): PublicState {

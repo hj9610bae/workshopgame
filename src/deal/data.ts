@@ -15,7 +15,7 @@ export const START_DISTANCE = 15;
 /** 고국과의 거리: 작을수록(음수면 내륙까지) 좋음 */
 export const distanceOf = (score: number): number => START_DISTANCE + START_SCORE - score;
 export const SUBMIT_SECONDS = 180;
-/** 이 일차 시작 시 4번 해역(최종 결전)이 열림 */
+/** 이 일차 순서 발표 때 4번 해역(최종 결전)이 생김. 그 전에는 화면에 4번 해역이 없음 */
 export const FINAL_OPEN_ROUND = 8;
 export const TABLE_COUNT = 4;
 export const SCOUT_COST = 1;
@@ -27,18 +27,23 @@ export const CUT_IN_NAME = '제피로스의 순풍';
 export type CardId = 'basic' | 'blitz' | 'practice' | 'promo' | 'hold';
 export type SpecialCardId = Exclude<CardId, 'basic'>;
 
-export const CARDS: Record<CardId, { name: string; power: number; desc: string }> = {
-  basic: { name: '단검', power: 2, desc: '생명력 2 감소 · 매일 사용' },
-  blitz: { name: '아폴론의 전갈 화살', power: 6, desc: '생명력 6 감소 · 1회용' },
+/** icon·power 는 화면에 쓰는 픽토그램과 공격력 표기 (역경 카드와 같은 양식의 무기 카드) */
+export const CARDS: Record<CardId, { name: string; icon: string; power: number; powerText: string; desc: string }> = {
+  basic: { name: '단검', icon: '🗡️', power: 2, powerText: '−2', desc: '생명력 2 감소 · 매일 사용' },
+  blitz: { name: '아폴론의 전갈 화살', icon: '🏹', power: 6, powerText: '−6', desc: '생명력 6 감소 · 1회용' },
   practice: {
     name: '헤르메스의 투척 창',
+    icon: '🎯',
     power: 6,
+    powerText: '가로채기',
     desc: '오늘 그 해역에서 역경이 쓰러지면 전진 보상을 가로챔. 못 가로채면 다음 날 시작 시 6 감소 · 비공개',
   },
-  promo: { name: '아테나의 쇠사슬', power: 1, desc: '공격 무기와 함께 추가로 냄. 해역에 걸어 두면 매일 끝날 때 1 감소' },
+  promo: { name: '아테나의 쇠사슬', icon: '⛓️', power: 1, powerText: '매일 −1', desc: '공격 무기와 함께 추가로 냄. 해역에 걸어 두면 매일 끝날 때 1 감소' },
   hold: {
     name: '포세이돈의 삼지창',
+    icon: '🔱',
     power: 0,
+    powerText: '동결',
     desc: '공격 무기와 함께 추가로 냄. 오늘 그 해역을 동결해 모든 공격 무효 + 다음 날 그 해역에 낸 우리 공격을 가장 먼저 적용',
   },
 };
@@ -96,7 +101,7 @@ export const QUEUE = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 /** FINAL_OPEN_ROUND 일차에 4번 해역으로 열리는 최종 결전 */
 export const FINAL_AGENDA = 18;
 
-/** 전리품(특수 무기)은 역경과 따로 정하고, 해역에 오르는 순서대로 앞쪽 역경에 하나씩 붙임. 화면에는 '특수 무기'로만 표시 */
+/** 전리품(특수 무기)은 역경과 따로 정하고, 해역에 오르는 순서대로 앞쪽 역경에 하나씩 붙임. 역경 카드에 무기 이름까지 공개 */
 export const LOOT_ORDER: SpecialCardId[] = ['promo', 'hold', 'blitz', 'blitz', 'practice'];
 export const LOOT: Partial<Record<number, SpecialCardId>> = Object.fromEntries(
   [...INITIAL_TABLES, ...QUEUE].slice(0, LOOT_ORDER.length).map((id, i) => [id, LOOT_ORDER[i]]),

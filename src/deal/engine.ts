@@ -21,7 +21,7 @@ import {
   type SpecialCardId,
   type TeamId,
 } from './data';
-import type { GameEvent, Hand, Hit, Note, PublicState, ScoutResult, SecretState, Submission } from './types';
+import type { GameEvent, Hand, Note, PublicState, ScoutResult, SecretState, Submission } from './types';
 
 export interface EngineState {
   pub: PublicState;
@@ -49,8 +49,6 @@ interface Deal {
   agenda: number;
   reward: number;
   card?: SpecialCardId;
-  demand: number;
-  trail: Hit[];
 }
 
 export const emptyHand = (): Hand => ({ blitz: 0, practice: 0, promo: 0, hold: 0 });
@@ -140,7 +138,6 @@ class Turn {
     secret.remaining[i] -= amount;
     (secret.trail[i] ??= []).push({ team, card, amount });
     if (secret.remaining[i] > 0) return null;
-    const trail = secret.trail[i];
     const loot = this.setup.loot[agenda.id];
     // 실무 교섭 병행: 이번 라운드 이 테이블의 합의는 먼저 건 팀이 가로챔
     const thief = this.steals.get(i)?.shift();
@@ -158,8 +155,6 @@ class Turn {
       agenda: agenda.id,
       reward,
       card: loot,
-      demand: this.setup.demand[agenda.id],
-      trail,
     };
   }
 
@@ -183,8 +178,8 @@ class Turn {
   }
 }
 
-/** 사회자 화면용 처치 사건: 어떤 특수 무기를 받았는지는 숨기고 받았다는 것만 */
-const shown = ({ card, winner, stolen, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: true } : {}), ...(stolen ? { stolenBy: winner } : {}) });
+/** 공개 화면용 처치 사건: 처치한 함대·전리품 이름은 공개, 공격 이력(secret.trail)은 비공개 */
+const shown = ({ card, winner, stolen, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: card } : {}), ...(stolen ? { stolenBy: winner } : {}) });
 
 const dealText = (deal: Deal) =>
   `${agendaTitle(deal.agenda)} 처치! ${deal.reward}해리 전진${deal.card ? ` · 특수 무기 [${CARDS[deal.card].name}] 획득 (${CARDS[deal.card].desc})` : ''}`;

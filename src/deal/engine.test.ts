@@ -46,19 +46,10 @@ describe('규칙서 5장 예시 1일차', () => {
     expect(notes.D?.[0].text).toContain('바람 자루 처치');
   });
 
-  it('처치 사건에만 깎인 이력이 공개됨', () => {
+  it('처치 사건에는 처치한 함대만 공개되고 공격 이력은 공개되지 않음', () => {
     const deals = state.pub.events.filter((e) => e.result === 'deal');
-    expect(deals[0]).toMatchObject({ team: 'A', demand: 2, trail: [{ team: 'A', card: 'basic', amount: 2 }] });
-    expect(deals[1]).toMatchObject({
-      team: 'D',
-      demand: 3,
-      trail: [
-        { team: 'C', card: 'basic', amount: 2 },
-        { team: 'D', card: 'basic', amount: 2 },
-      ],
-    });
-    const done = state.pub.events.filter((e) => e.result === 'done');
-    expect(done.every((e) => e.trail === undefined && e.demand === undefined)).toBe(true);
+    expect(deals.map((e) => e.team)).toEqual(['A', 'D']);
+    expect(state.pub.events.every((e) => !('trail' in e) && !('demand' in e))).toBe(true);
   });
 
   it('처치되지 않은 역경의 이력은 비공개 상태로만 쌓이고, 새 역경은 이력이 비어서 시작', () => {
@@ -67,11 +58,11 @@ describe('규칙서 5장 예시 1일차', () => {
     expect(state.secret.trail[2]).toEqual([{ team: 'E', card: 'basic', amount: 2 }]);
   });
 
-  it('전리품은 앞쪽 역경에 쇠사슬 → 삼지창 순으로 붙고, 화면에는 받았다는 것만', () => {
+  it('전리품은 앞쪽 역경에 쇠사슬 → 삼지창 순으로 붙고, 처치 사건에 무기 이름 공개', () => {
     expect(state.hands.A).toMatchObject({ promo: 1, hold: 0 });
     expect(state.hands.D).toMatchObject({ hold: 1, promo: 0 });
     const deals = state.pub.events.filter((e) => e.result === 'deal');
-    expect(deals.every((e) => e.loot === true && !('card' in e))).toBe(true);
+    expect(deals.map((e) => e.loot)).toEqual(['promo', 'hold']);
     expect(notes.A?.[0].text).toContain('아테나의 쇠사슬');
   });
 
@@ -139,8 +130,7 @@ describe('특수 무기', () => {
       kind: 'practiceDeal',
       team: 'C',
       agenda: 3,
-      demand: 4,
-      trail: [{ team: 'C', card: 'practice', amount: 6 }],
+      loot: 'blitz',
     });
   });
 
@@ -196,21 +186,15 @@ describe('특수 무기', () => {
     // 바람 자루 3 − 2(A) − 1(쇠사슬) = 0 → B 처치
     expect(state.pub.teams.B!.score).toBe(13);
     expect(state.pub.tables[1]).toMatchObject({ agenda: 4, promos: ['B'] });
-    expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({
-      team: 'B',
-      demand: 3,
-      trail: [
-        { team: 'A', card: 'basic', amount: 2 },
-        { team: 'B', card: 'promo', amount: 1 },
-      ],
-    });
+    expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 2, reward: 3 });
   });
 
   it('예전에 저장된 게임(이력 없음)도 이어서 진행', () => {
     const s = round1();
     delete (s.secret as Partial<typeof s.secret>).trail;
     const { state } = resolveRound(s, { A: basic(1) });
-    expect(state.pub.events.find((e) => e.result === 'deal')?.trail).toEqual([{ team: 'A', card: 'basic', amount: 2 }]);
+    expect(state.pub.events.find((e) => e.result === 'deal')).toMatchObject({ team: 'A', agenda: 1 });
+    expect(state.secret.trail[0]).toEqual([]);
   });
 
   it('아폴론의 전갈 화살: 6 감소, 넘친 수치는 사라짐', () => {

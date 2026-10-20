@@ -4,9 +4,9 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
+import { AGENDAS, ALL_AGENDAS, CARDS, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, TIER_LABEL, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
 import { agendaTitle, beginSubmit, createGame, finish, ranking, resolveRound, revealNext, scout, startRound, type EngineState } from './deal/engine';
-import { deck, distanceLabel, feltTable, seaMap, trailStrip, type TableLook } from './deal/felt';
+import { deck, distanceLabel, feltTable, seaMap, type TableLook } from './deal/felt';
 import {
   beatConsole,
   closeConsole,
@@ -114,10 +114,9 @@ function tutorialView(): string {
   </div>`;
 }
 
-/** 설명용 바다 지도: 고국에 가까운 순으로 늘어선 예시 */
+/** 설명용 바다 지도: 모든 함대가 트로이 전장(출발 거리)에서 출발 */
 function exampleSea(): string {
-  const dist: Record<TeamId, number> = { A: -2, B: 3, C: 7, D: 10, E: 15 };
-  const scores = Object.fromEntries(TEAM_IDS.map((t) => [t, START_DISTANCE + START_SCORE - dist[t]]));
+  const scores = Object.fromEntries(TEAM_IDS.map((t) => [t, START_SCORE]));
   return `<div class="slide-sea">${seaMap([...TEAM_IDS], scores, { key: 'tutorial' })}</div>`;
 }
 
@@ -140,7 +139,7 @@ const shortTitle = (id: number): string => (AGENDAS[id] ? `${AGENDAS[id].icon} $
 function roundText(): string {
   const { pub } = eng();
   if (isPractice()) return `🎲 연습 항해 · ${STAGE_LABEL[pub.stage]}`;
-  return pub.stage === 'final' ? '최종 결과' : `${pub.round}일차/${ROUNDS} · ${STAGE_LABEL[pub.stage]}`;
+  return pub.stage === 'final' ? '최종 결과' : `${pub.round}일차/${ROUNDS}일차 · ${STAGE_LABEL[pub.stage]}`;
 }
 
 function topbar(): string {
@@ -157,6 +156,12 @@ function topbar(): string {
     <div class="timer" data-timer></div>
     ${tools}
   </header>`;
+}
+
+/** 화면에 있는 해역 번호(0부터). 4번 해역(최종 결전)은 FINAL_OPEN_ROUND 순서 발표 때 생김 */
+function visibleTables(): number[] {
+  const { pub } = eng();
+  return pub.tables.map((_, i) => i).filter((i) => i < INITIAL_TABLES.length || pub.round >= FINAL_OPEN_ROUND);
 }
 
 /** 공개 중인 마지막 사건 (공개 단계에서만) */
@@ -212,7 +217,7 @@ function banner(): string {
       const e = latestEvent();
       if (!e) return '';
       const d = describeEvent(e);
-      return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}${trailStrip(e)}</div>`;
+      return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}</div>`;
     }
     default:
       return '';
@@ -226,7 +231,7 @@ function eventRail(): string {
     .slice(0, pub.revealed)
     .map((e) => describeEvent(e))
     .reverse()
-    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}${d.trail ? `<small>${esc(d.trail)}</small>` : ''}</li>`)
+    .map((d) => `<li class="${d.tone ?? ''}">${d.icon} ${esc(d.title)}</li>`)
     .join('');
   return `<div class="rail-events"><h3>오늘의 항해</h3><ol>${items}</ol></div>`;
 }
@@ -246,12 +251,13 @@ function gameView(): string {
   if (pub.stage === 'final') return topbar() + finalView();
   const snap = snapshot(pub);
   const looks = tableLooks();
-  const tables = snap.tables.map((t, i) => feltTable(t, i, pub.round, looks[i])).join('');
+  const shown = visibleTables();
+  const tables = shown.map((i) => feltTable(snap.tables[i], i, looks[i])).join('');
   if (isConsole) return topbar() + dock() + secretPanel();
   return `${topbar()}
     <div class="arena">
       <section class="felt">
-        <div class="felt-tables">${tables}</div>
+        <div class="felt-tables" style="--cols:${shown.length}">${tables}</div>
         ${banner()}
       </section>
       <aside class="rail">${deck(eventQueue())}${eventRail()}</aside>
@@ -323,8 +329,9 @@ function inputRow(t: TeamId, pos: number): string {
   const score = pub.teams[t]?.score ?? 0;
   const btn = (action: string, value: string | number, label: string, on: boolean, enabled = true) =>
     `<button class="pill${on ? ' on' : ''}" data-action="${action}" data-team="${t}" data-value="${value}" ${enabled ? '' : 'disabled'}>${label}</button>`;
-  const tableBtns = pub.tables
-    .map((tb, i) => btn('sub-table', i + 1, `${i + 1}번 <small>${esc(shortTitle(tb.agenda))}</small>`, sub?.table === i + 1, tb.agenda > 0))
+  const shown = visibleTables();
+  const tableBtns = shown
+    .map((i) => btn('sub-table', i + 1, `${i + 1}번 <small>${esc(shortTitle(pub.tables[i].agenda))}</small>`, sub?.table === i + 1, pub.tables[i].agenda > 0))
     .join('');
   const mainCards: CardId[] = ['basic', 'blitz', 'practice'];
   const cards = mainCards
@@ -341,15 +348,15 @@ function inputRow(t: TeamId, pos: number): string {
     ...EXTRA_CARDS.map((c) => btn('sub-extra', c, `${CARDS[c].name} ×${hand?.[c] ?? 0}`, extra?.card === c, (hand?.[c] ?? 0) > 0)),
   ].join('');
   const extraTables = extra
-    ? `<div class="in-group"><span class="in-label">추가 카드 해역</span>${pub.tables
-        .map((tb, i) => btn('sub-extra-table', i + 1, `${i + 1}번 <small>${esc(shortTitle(tb.agenda))}</small>`, extra.table === i + 1, tb.agenda > 0))
+    ? `<div class="in-group"><span class="in-label">추가 카드 해역</span>${shown
+        .map((i) => btn('sub-extra-table', i + 1, `${i + 1}번 <small>${esc(shortTitle(pub.tables[i].agenda))}</small>`, extra.table === i + 1, pub.tables[i].agenda > 0))
         .join('')}</div>`
     : '';
   const cuts = [
     btn('sub-cut', 0, '안 함', !sub?.cutIn),
     ...pub.order.map((_, i) => btn('sub-cut', i + 1, `${i + 1}번째`, sub?.cutIn === i + 1, score >= CUT_IN_COST)),
   ].join('');
-  const scouts = pub.tables.map((tb, i) => btn('scout', i + 1, `${i + 1}번`, false, tb.agenda > 0 && score >= SCOUT_COST)).join('');
+  const scouts = shown.map((i) => btn('scout', i + 1, `${i + 1}번`, false, pub.tables[i].agenda > 0 && score >= SCOUT_COST)).join('');
   const extraText = extra ? ` · + ${CARDS[extra.card].name} ${extra.table ? `${extra.table}번` : '(해역 선택!)'}` : '';
   const state = sub?.table ? `✅ ${sub.table}번 · ${CARDS[sub.card].name}${extraText}${sub.cutIn ? ` · 순풍 ${sub.cutIn}번째` : ''}` : '⌛ 미입력 (쉼)';
   return `<div class="in-row${sub?.table ? ' done' : ''}">
@@ -380,8 +387,9 @@ function scoutModal(): string {
 /** 진행자 창 전용: 남은 생명력, 보유 무기, 함대별 결과 기록 */
 function secretPanel(): string {
   const s = eng();
-  const tables = s.pub.tables
-    .map((t, i) => {
+  const tables = visibleTables()
+    .map((i) => {
+      const t = s.pub.tables[i];
       if (!t.agenda) return `<li><b>${i + 1}번</b> ${esc(agendaTitle(t.agenda))} <strong class="secret-num">-</strong></li>`;
       const hits = (s.secret.trail?.[i] ?? []).map((h) => `${esc(teamName(h.team))} −${h.amount}`).join(', ');
       return `<li><b>${i + 1}번</b> ${esc(agendaTitle(t.agenda))} <strong class="secret-num">${s.secret.remaining[i]} / ${hpOf(t.agenda)}</strong>${hits ? `<br><span class="muted small">${hits}</span>` : ''}</li>`;
