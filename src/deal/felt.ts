@@ -89,7 +89,7 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
 export const deck = (queue: number): string => deckOf(activeSetup().queue.slice(queue), hpOf, lootOf);
 
 /** 대기열 목록. 항해 설명은 기준 배치(SETUP)의 생명력·전리품으로 그림 */
-export function deckOf(rest: number[], hp: (id: number) => number, loot: (id: number) => SpecialCardId | undefined, SHOW = 10): string {
+export function deckOf(rest: number[], hp: (id: number) => number, loot: (id: number) => SpecialCardId | undefined, SHOW = 5): string {
   // 다음 SHOW 개까지만 이름을 보여 줌
   const more = rest.length > SHOW ? `<p class="deck-more">외 ${rest.length - SHOW}개</p>` : '';
   const list = rest

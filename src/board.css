@@ -231,7 +231,7 @@ body.live:has(.home-board) {
 /* ───── 테이블(펠트) ───── */
 .arena {
   display: grid;
-  grid-template-columns: 1fr minmax(170px, 15%);
+  grid-template-columns: 1fr minmax(170px, 17%);
   gap: 14px;
   min-height: 0;
 }
@@ -788,7 +788,7 @@ body.live:has(.home-board) {
 .deck-label {
   text-align: center;
   font-weight: 800;
-  font-size: 1.15rem;
+  font-size: 1.35rem;
 }
 
 .deck-label span {
@@ -803,14 +803,15 @@ body.live:has(.home-board) {
 .deck-list {
   margin: 8px 0 0;
   padding-left: 1.4em;
-  font-size: 0.85rem;
+  font-size: 1.15rem;
+  line-height: 1.4;
   color: var(--muted);
 }
 
 .deck-more {
   margin: 4px 0 0;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 1rem;
   color: var(--muted);
 }
 
@@ -820,6 +821,11 @@ body.live:has(.home-board) {
 
 .deck-list small {
   opacity: 0.8;
+  white-space: nowrap;
+}
+
+.deck-list li {
+  margin: 2px 0;
 }
 
 /* 바다 지도: 왼쪽 이타카 섬 ← 바다 → 오른쪽 트로이 전장 */
