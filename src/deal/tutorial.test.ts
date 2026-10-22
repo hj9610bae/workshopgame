@@ -42,10 +42,10 @@ describe('돌파 발표 문구', () => {
     const base = { kind: 'proposal' as const, result: 'deal' as const, team: 'A' as const, agenda: 4, reward: 3, tables: [], scores: {} };
     expect(describeEvent({ ...base, weapon: 'basic' }).title).toBe('A함대, 🗡️ 기본 무기 단검으로 키르케의 환락 돌파!');
     const blitz = describeEvent({ ...base, weapon: 'blitz' });
-    expect(blitz.title).toBe('A함대, 🏹 특수 무기 아폴론의 전갈 화살로 키르케의 환락 돌파!');
+    expect(blitz.title).toBe('A함대, 🔱 특수 무기 삼지창으로 키르케의 환락 돌파!');
     expect(blitz.detail).toContain('생명력 6 감소');
-    expect(describeEvent({ ...base, kind: 'promoDeal', weapon: 'promo' }).title).toContain('아테나의 쇠사슬로');
-    expect(describeEvent({ ...base, stolenBy: 'C', weapon: 'basic' }).detail).toContain('마지막 일격은 A함대의 🗡️ 기본 무기 단검 · ⚡ 헤르메스의 투척 창: 그날 그 해역의 돌파 보상을 가로챔');
+    expect(describeEvent({ ...base, kind: 'promoDeal', weapon: 'promo' }).title).toContain('🏹 특수 무기 전갈 화살로');
+    expect(describeEvent({ ...base, stolenBy: 'C', weapon: 'basic' }).detail).toContain('마지막 일격은 A함대의 🗡️ 기본 무기 단검 · ⚡ 투척 창: 그날 그 해역의 돌파 보상을 가로챔');
   });
 });
 

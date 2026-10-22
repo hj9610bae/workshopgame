@@ -34,22 +34,33 @@ export type CardId = 'basic' | 'blitz' | 'practice' | 'promo' | 'hold';
 export type SpecialCardId = Exclude<CardId, 'basic'>;
 
 /** icon·power 는 화면에 쓰는 픽토그램과 공격력 표기 (역경 카드와 같은 양식의 무기 카드) */
+/** name 은 항해 설명에 쓰는 풀네임, short 는 게임 화면(연습·실전)에 쓰는 짧은 이름 */
 /** effect: 돌파 발표에 붙이는 짧은 효과 설명 (다른 함대는 특수 무기 효과를 모르므로) */
-export const CARDS: Record<CardId, { name: string; icon: string; power: number; powerText: string; effect: string; desc: string }> = {
-  basic: { name: '단검', icon: '🗡️', power: 2, powerText: '−2', effect: '생명력 2 감소', desc: '생명력 2 감소 · 매일 사용' },
-  blitz: { name: '아폴론의 전갈 화살', icon: '🏹', power: 6, powerText: '−6', effect: '생명력 6 감소', desc: '생명력 6 감소 · 1회용' },
+export const CARDS: Record<CardId, { name: string; short: string; icon: string; power: number; powerText: string; effect: string; desc: string }> = {
+  basic: { name: '단검', short: '단검', icon: '🗡️', power: 2, powerText: '−2', effect: '생명력 2 감소', desc: '생명력 2 감소 · 매일 사용' },
+  blitz: { name: '포세이돈의 삼지창', short: '삼지창', icon: '🔱', power: 6, powerText: '−6', effect: '생명력 6 감소', desc: '생명력 6 감소 · 1회용' },
   practice: {
     name: '헤르메스의 투척 창',
+    short: '투척 창',
     icon: '⚡',
     power: 6,
     powerText: '가로채기',
     effect: '가로챌 돌파가 없으면 다음 날 시작 시 생명력 6 감소',
     desc: '오늘 그 해역에서 역경이 쓰러지면 전진 보상을 가로챔. 못 가로채면 다음 날 시작 시 6 감소 · 비공개',
   },
-  promo: { name: '아테나의 쇠사슬', icon: '⛓️', power: 1, powerText: '매일 −1', effect: '해역에 걸어 두면 매일 끝날 때 생명력 1 감소', desc: '공격 무기와 함께 추가로 냄. 해역에 걸어 두면 매일 끝날 때 1 감소' },
+  promo: {
+    name: '아폴론의 전갈 화살',
+    short: '전갈 화살',
+    icon: '🏹',
+    power: 1,
+    powerText: '매일 −1',
+    effect: '해역에 꽂아 두면 매일 끝날 때 생명력 1 감소',
+    desc: '공격 무기와 함께 추가로 냄. 해역에 꽂아 두면 매일 끝날 때 1 감소',
+  },
   hold: {
-    name: '포세이돈의 삼지창',
-    icon: '🔱',
+    name: '아테나의 쇠사슬',
+    short: '쇠사슬',
+    icon: '⛓️',
     power: 0,
     powerText: '동결',
     effect: '그날 그 해역의 모든 공격 무효',

@@ -422,25 +422,27 @@ body.live:has(.home-board) {
   color: var(--red);
 }
 
-/* 전리품: 전진 거리 + 특수 무기 이름 */
+/* 무기 카드 아래 한 줄 설명 (구분선 없이) */
 .reward {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 4px 8px;
   margin-top: auto;
-  padding-top: 6px;
-  border-top: 2px dashed rgba(212, 175, 55, 0.4);
   font-weight: 800;
   color: var(--mint);
 }
 
-.reward .loot {
-  padding: 1px 8px;
+/* 역경 카드의 전리품: 특수 무기 이름 */
+.agenda-card .loot {
+  align-self: center;
+  margin: 0;
+  padding: 1px 10px;
   border-radius: 999px;
   background: var(--navy);
   color: var(--gold);
-  font-size: 0.9em;
+  font-weight: 800;
+  font-size: 0.95em;
   white-space: nowrap;
 }
 
@@ -496,6 +498,24 @@ body.live:has(.home-board) {
 .agenda-card.weapon .reward {
   font-size: 0.8rem;
   color: var(--ink-muted);
+}
+
+/* 해역과 대기열 설명: 예시 해역 3곳 옆에 대기열 */
+.waters-example {
+  display: flex;
+  gap: 22px;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.waters-example .deck {
+  width: 15em;
+  border: 2px solid var(--gold-deep);
+}
+
+.waters-example .deck-list {
+  font-size: 1rem;
+  text-align: left;
 }
 
 /* 설명 화면의 예시 해역 (게임 화면과 같은 지도 바탕) */
@@ -804,15 +824,50 @@ body.live:has(.home-board) {
 
 /* 바다 지도: 왼쪽 이타카 섬 ← 바다 → 오른쪽 트로이 전장 */
 .sea {
-  --row: 2.2em;
+  /* 한 줄 = 금빛 돛 핀 + 아래 말풍선 */
+  --row: 3.1em;
   position: relative;
-  height: calc(var(--rows) * var(--row) + 3.2em);
+  height: calc(var(--rows) * var(--row) + 3.6em);
   border-radius: var(--radius);
   overflow: hidden;
   background:
-    repeating-linear-gradient(170deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 22px),
-    linear-gradient(90deg, #24346a, var(--navy-2) 55%, var(--navy));
+    radial-gradient(ellipse 70% 120% at 60% 50%, rgba(72, 202, 228, 0.1), transparent 70%),
+    linear-gradient(90deg, #1d2c5c, var(--navy-2) 55%, #08102a);
   border: 2px solid var(--gold-deep);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55);
+}
+
+/* 어두운 파도 잔물결: 두 겹이 서로 다른 속도로 흐름 */
+.sea-waves,
+.sea-waves::after {
+  position: absolute;
+  inset: 0 -120px 0 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='28'%3E%3Cpath d='M0 14 Q15 6 30 14 T60 14 T90 14 T120 14' fill='none' stroke='%23a8d8ff' stroke-opacity='.13' stroke-width='1.4'/%3E%3C/svg%3E") repeat;
+  animation: waves 14s linear infinite;
+  pointer-events: none;
+}
+
+.sea-waves::after {
+  content: '';
+  inset: 14px -120px 0 0;
+  opacity: 0.6;
+  background-size: 90px 22px;
+  animation-duration: 9s;
+  animation-direction: reverse;
+}
+
+@keyframes waves {
+  to {
+    transform: translateX(-120px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sea-waves,
+  .sea-waves::after,
+  .ship-pin {
+    animation: none !important;
+  }
 }
 
 .sea-land {
@@ -843,6 +898,7 @@ body.live:has(.home-board) {
   bottom: 0;
   left: var(--port);
   border-left: 3px dashed var(--gold);
+  filter: drop-shadow(0 0 6px rgba(244, 196, 48, 0.7));
   transition: left 1.2s ease-in-out;
 }
 
@@ -868,20 +924,40 @@ body.live:has(.home-board) {
   right: 10px;
 }
 
+/* 해리 눈금: 은은하게 빛나는 세로 점선 */
 .sea-ticks {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 4px;
-  height: 1.2em;
+  inset: 0;
+  pointer-events: none;
 }
 
 .sea-tick {
   position: absolute;
+  top: 0;
+  bottom: 0;
   left: var(--x);
+  width: 0;
+  border-left: 1px dashed rgba(72, 202, 228, 0.45);
+  box-shadow: 0 0 8px 1px rgba(72, 202, 228, 0.25);
+}
+
+.sea-tick.land {
+  border-left-color: rgba(255, 255, 255, 0.25);
+  box-shadow: none;
+}
+
+.sea-tick small {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
   transform: translateX(-50%);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(8, 16, 42, 0.75);
   font-size: 0.72em;
-  color: rgba(255, 255, 255, 0.55);
+  font-weight: 700;
+  color: rgba(168, 230, 245, 0.85);
+  white-space: nowrap;
 }
 
 .sea-ships {
@@ -890,21 +966,14 @@ body.live:has(.home-board) {
   padding: 0;
 }
 
+/* 배 한 척: 거리 자리(left)에 너비 0인 기준점, 핀은 그 위 가운데, 말풍선은 아래 */
 .ship {
   position: absolute;
-  top: calc(1.9em + var(--i) * var(--row));
+  top: calc(1.7em + var(--i) * var(--row));
   left: var(--x);
-  /* 왼쪽 끝에선 왼쪽 정렬, 오른쪽 끝에선 오른쪽 정렬이 되도록 위치 비율만큼 당김 */
-  transform: translateX(calc(var(--x) * -1));
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: calc(var(--row) - 0.4em);
-  padding: 0 12px 0 4px;
-  border-radius: 999px;
-  white-space: nowrap;
-  background: rgba(9, 20, 40, 0.8);
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  width: 0;
+  height: var(--row);
+  z-index: 1;
 }
 
 .ship.sail {
@@ -914,29 +983,99 @@ body.live:has(.home-board) {
 @keyframes sail {
   from {
     left: var(--from);
-    transform: translateX(calc(var(--from) * -1));
   }
 }
 
-.ship.active {
-  border-color: var(--gold);
-  box-shadow: 0 0 18px rgba(244, 196, 48, 0.6);
+.ship-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1.75em;
+  height: 1.75em;
+  margin-left: -0.875em;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 28%, #3b4f8c, #141f45 70%);
+  border: 2px solid var(--gold);
+  box-shadow:
+    0 0 10px rgba(244, 196, 48, 0.45),
+    0 4px 0 #0a1230,
+    0 6px 10px rgba(0, 0, 0, 0.55);
+  animation: bob 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.6s);
 }
 
+@keyframes bob {
+  50% {
+    transform: translateY(-3px) rotate(-3deg);
+  }
+}
+
+.ship-art {
+  width: 1.3em;
+  height: 1.3em;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+/* 핀 오른쪽 위 작은 순번 배지 (구조선 함대는 닻) */
 .ship-pos {
-  width: 1.6em;
-  height: 1.6em;
-  border-radius: 50%;
+  position: absolute;
+  top: -0.35em;
+  right: -0.55em;
+  min-width: 1.15em;
+  height: 1.15em;
+  padding: 0 2px;
+  border-radius: 999px;
   display: grid;
   place-items: center;
   background: var(--accent);
   color: var(--accent-text);
   font-weight: 900;
-  font-size: 0.85em;
+  font-size: 0.7em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
-.ship-icon {
-  font-size: 1.15em;
+/* 말풍선: 바다 안에 머물도록 위치 비율만큼 당기고, 꼬리는 핀 쪽을 가리킴 */
+.ship-tag {
+  position: absolute;
+  top: 1.85em;
+  left: 0;
+  transform: translateX(calc(var(--x) * -1));
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  font-size: 0.85em;
+  line-height: 1.35;
+  background: rgba(9, 20, 40, 0.88);
+  border: 1px solid rgba(212, 175, 55, 0.55);
+}
+
+.ship-tag::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: clamp(8px, var(--x), calc(100% - 8px));
+  margin-left: -5px;
+  border: 5px solid transparent;
+  border-top: 0;
+  border-bottom-color: rgba(212, 175, 55, 0.8);
+}
+
+.ship.active .ship-pin {
+  border-color: #fff3c4;
+  box-shadow:
+    0 0 20px rgba(244, 196, 48, 0.9),
+    0 4px 0 #0a1230,
+    0 6px 10px rgba(0, 0, 0, 0.55);
+}
+
+.ship.active .ship-tag {
+  border-color: var(--gold);
+  box-shadow: 0 0 14px rgba(244, 196, 48, 0.55);
 }
 
 .ship-name {
@@ -967,7 +1106,7 @@ body.live:has(.home-board) {
 }
 
 .ship-status {
-  font-size: 0.8em;
+  font-size: 0.85em;
   color: var(--muted);
 }
 
@@ -1734,22 +1873,17 @@ button.dot-btn.on {
   font-size: 1rem;
 }
 
-.final-board .sea {
-  --row: 2.1em;
-}
-
+/* 핀 + 말풍선이 겹치지 않게 줄 높이(--row)는 그대로 두고 글자 크기로 줄임 */
 @media (max-height: 950px) {
   .sea {
-    --row: 1.9em;
+    font-size: 0.9rem;
   }
 }
 
 /* 1366×768 같은 낮은 화면: 바다 지도를 납작하게 */
 @media (max-height: 800px) {
   .sea {
-    --row: 1.6em;
-    font-size: 0.8rem;
-    height: calc(var(--rows) * var(--row) + 2.8em);
+    font-size: 0.72rem;
   }
 
   .felt {

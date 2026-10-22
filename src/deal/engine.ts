@@ -191,7 +191,7 @@ class Turn {
 const shown = ({ card, winner, stolen, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: card } : {}), ...(stolen ? { stolenBy: winner } : {}) });
 
 const dealText = (deal: Deal) =>
-  `${agendaTitle(deal.agenda)} 돌파! ${deal.reward}해리 전진${deal.card ? ` · 특수 무기 [${CARDS[deal.card].name}] 획득 (${CARDS[deal.card].desc})` : ''}`;
+  `${agendaTitle(deal.agenda)} 돌파! ${deal.reward}해리 전진${deal.card ? ` · 특수 무기 [${CARDS[deal.card].short}] 획득 (${CARDS[deal.card].desc})` : ''}`;
 
 function shuffle<T>(items: T[], rng: Rng): T[] {
   for (let i = items.length - 1; i > 0; i--) {
@@ -274,7 +274,7 @@ export function startRound(state: EngineState, rng: Rng = Math.random): Step {
     const deal = turn.damage(table, 'practice', team);
     if (deal) {
       turn.event({ kind: 'practiceDeal', team, table, ...shown(deal) });
-      turn.note(team, `⚡ 헤르메스의 투척 창 발동! ${dealText(deal)}`);
+      turn.note(team, `⚡ 투척 창 발동! ${dealText(deal)}`);
     } else if (before) {
       turn.note(team, `⚡ 투척 창(못 가로챈 창) 발동: ${table}번 해역 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
     } else {
@@ -319,7 +319,7 @@ function nearestFree(slots: (TeamId | undefined)[], want: number): number {
   return -1;
 }
 
-/** 공격 공개: 순풍(새치기) → 삼지창(동결) → 투척 창 → 순서대로 공격 → 쇠사슬 → 동결 해제 */
+/** 공격 공개: 순풍(새치기) → 쇠사슬(동결) → 투척 창 → 순서대로 공격 → 전갈 화살 → 동결 해제 */
 export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Submission>>): Step {
   const turn = new Turn(state, 'reveal');
   const { pub, secret } = turn.s;
@@ -348,7 +348,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     turn.note(t, cutInPos.has(t) ? `🌬️ 제피로스의 순풍: ${cutInPos.get(t)}번째로 공격 (${CUT_IN_COST}해리 후퇴)` : '순풍 실패: 더 물러설 수 없어요');
   }
 
-  // 추가 카드(쇠사슬·삼지창)는 extra 로, 주 카드 자리에 낸 것도 같은 효과
+  // 추가 카드(전갈 화살·쇠사슬)는 extra 로, 주 카드 자리에 낸 것도 같은 효과
   const extraOf = (t: TeamId) => {
     const sub = subs[t];
     if (sub?.extra) return sub.extra;
@@ -359,7 +359,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     return sub && sub.card !== 'promo' && sub.card !== 'hold' ? sub : undefined;
   };
 
-  // ① 포세이돈의 삼지창(동결): 순번과 관계없이 가장 먼저 적용, 쓴 함대는 다음 날 그 해역 우선권
+  // ① 아테나의 쇠사슬(동결): 순번과 관계없이 가장 먼저 적용, 쓴 함대는 다음 날 그 해역 우선권
   const lastPriority = secret.priority ?? [];
   secret.priority = [];
   const held = new Set<TeamId>();
@@ -369,7 +369,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     turn.hand(t).hold -= 1;
     held.add(t);
     if (pub.round < ROUNDS) secret.priority.push({ team: t, table: x.table });
-    // 삼지창은 쓴 함대를 공개 (같은 해역에 두 함대가 쓰면 둘 다 발표)
+    // 쇠사슬은 쓴 함대를 공개 (같은 해역에 두 함대가 쓰면 둘 다 발표)
     const table = pub.tables[x.table - 1];
     table.frozen = true;
     turn.event({ kind: 'hold', team: t, table: x.table, agenda: table.agenda });
@@ -386,7 +386,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   }
   const stealing = new Set([...turn.steals.values()].flat());
 
-  // ③ 지난 날 삼지창 우선권: 그 해역에 낸 공격을 가장 먼저
+  // ③ 지난 날 쇠사슬 우선권: 그 해역에 낸 공격을 가장 먼저
   const first = order.filter((t) => lastPriority.some((p) => p.team === t && mainOf(t)?.table === p.table));
   const sequence = [...first, ...order.filter((t) => !first.includes(t))];
 
@@ -396,7 +396,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
       turn.note(deal.winner, `⚡ 투척 창으로 가로채기 성공! ${dealText(deal)}`);
       turn.note(t, `${agendaTitle(deal.agenda)}에 마지막 일격을 넣었지만 투척 창에 보상을 빼앗겼어요`);
     } else {
-      turn.note(t, `${kind === 'promoDeal' ? '⛓️ 쇠사슬 효과로 ' : '🎉 '}${dealText(deal)}`);
+      turn.note(t, `${kind === 'promoDeal' ? `${CARDS.promo.icon} ${CARDS.promo.short} 효과로 ` : '🎉 '}${dealText(deal)}`);
     }
   };
 
@@ -408,35 +408,35 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
       turn.note(t, '제출하지 않아 오늘은 쉬었어요');
       continue;
     }
-    // 추가 카드: 쇠사슬은 이 함대 차례에 공개, 삼지창은 위에서 처리
+    // 추가 카드: 전갈 화살은 이 함대 차례에 공개, 쇠사슬은 위에서 처리
     const x = extraOf(t);
-    if (x?.card === 'hold' && !held.has(t)) turn.note(t, '포세이돈의 삼지창을 쓸 수 없어 무효가 됐어요');
+    if (x?.card === 'hold' && !held.has(t)) turn.note(t, `${CARDS.hold.short}을 쓸 수 없어 무효가 됐어요`);
     if (x?.card === 'hold' && held.has(t)) {
-      turn.note(t, `🔱 ${x.table}번 해역 동결 성공! 오늘 이 해역의 공격은 모두 무효${pub.round < ROUNDS ? ', 내일 이 해역에 낸 우리 공격이 가장 먼저 적용돼요' : ''}`, -1);
+      turn.note(t, `${CARDS.hold.icon} ${x.table}번 해역 동결 성공! 오늘 이 해역의 공격은 모두 무효${pub.round < ROUNDS ? ', 내일 이 해역에 낸 우리 공격이 가장 먼저 적용돼요' : ''}`, -1);
     }
     if (x?.card === 'promo') {
       const table = pub.tables[x.table - 1];
       if (!turn.has(t, 'promo') || !turn.isOpen(x.table)) {
-        turn.note(t, '쇠사슬을 걸 수 없어 무효가 됐어요 (무기는 돌려받았어요)');
+        turn.note(t, `${CARDS.promo.short}을 꽂을 수 없어 무효가 됐어요 (무기는 돌려받았어요)`);
       } else if (table.frozen) {
-        turn.note(t, `🔱 ${x.table}번 해역이 동결되어 쇠사슬 무효 (무기는 돌려받았어요)`);
+        turn.note(t, `${CARDS.hold.icon} ${x.table}번 해역이 동결되어 ${CARDS.promo.short} 무효 (무기는 돌려받았어요)`);
       } else {
         turn.hand(t).promo -= 1;
         table.promos.push(t);
         turn.event({ kind: 'proposal', team: t, result: 'promo', table: x.table, agenda: table.agenda });
-        turn.note(t, `⛓️ ${x.table}번 해역에 아테나의 쇠사슬 — 매일 끝날 때 −${CARDS.promo.power}`);
+        turn.note(t, `${CARDS.promo.icon} ${x.table}번 해역에 ${CARDS.promo.short} — 매일 끝날 때 −${CARDS.promo.power}`);
       }
     }
     const main = mainOf(t);
     if (!main) {
-      // 추가 카드만 낸 경우 (주 카드 자리에 삼지창·쇠사슬을 쓴 경우)
+      // 추가 카드만 낸 경우 (주 카드 자리에 쇠사슬·전갈 화살을 쓴 경우)
       if (x?.card === 'hold') turn.event({ kind: 'proposal', team: t, result: held.has(t) ? 'done' : 'void', ...(held.has(t) ? {} : { reason: 'invalid' as const }) });
       continue;
     }
     const { table: tableNo, card } = main;
     if (card === 'practice' && stealing.has(t)) {
       turn.event({ kind: 'proposal', team: t, result: 'done', ...isFirst });
-      turn.note(t, `⚡ ${tableNo}번 해역에 헤르메스의 투척 창 — 오늘 이 해역에서 역경이 쓰러지면 보상을 가로채요`);
+      turn.note(t, `⚡ ${tableNo}번 해역에 투척 창 — 오늘 이 해역에서 역경이 쓰러지면 보상을 가로채요`);
       continue;
     }
     if (!turn.has(t, card)) {
@@ -453,7 +453,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     const table = pub.tables[tableNo - 1];
     if (table.frozen) {
       turn.event({ kind: 'proposal', team: t, result: 'void', reason: 'hold', table: tableNo });
-      turn.note(t, `🔱 ${tableNo}번 해역이 동결되어 무효${returned}`);
+      turn.note(t, `${CARDS.hold.icon} ${tableNo}번 해역이 동결되어 무효${returned}`);
       continue;
     }
     const before = table.agenda;
@@ -464,11 +464,11 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
       if (isFirst.first) pub.events[pub.events.length - 1].first = true;
     } else {
       turn.event({ kind: 'proposal', team: t, result: 'done', ...isFirst });
-      turn.note(t, `${tableNo}번 해역 ${agendaTitle(before)}에 [${CARDS[card].name}] 적용 (−${CARDS[card].power})`);
+      turn.note(t, `${tableNo}번 해역 ${agendaTitle(before)}에 [${CARDS[card].short}] 적용 (−${CARDS[card].power})`);
     }
   }
 
-  // 하루 끝: 쇠사슬 효과 (동결된 해역은 쉼)
+  // 하루 끝: 전갈 화살 효과 (동결된 해역은 쉼)
   pub.tables.forEach((table, i) => {
     if (table.frozen) return;
     for (const owner of table.promos) {

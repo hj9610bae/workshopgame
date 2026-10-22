@@ -73,12 +73,12 @@ describe('규칙서 5장 예시 1일차', () => {
     expect(state.secret.trail[2]).toEqual([{ team: 'E', card: 'basic', amount: 2 }]);
   });
 
-  it('전리품은 앞쪽 역경에 쇠사슬 → 삼지창 순으로 붙고, 돌파 사건에 무기 이름 공개', () => {
+  it('전리품은 앞쪽 역경에 전갈 화살 → 쇠사슬 순으로 붙고, 돌파 사건에 무기 이름 공개', () => {
     expect(state.hands.A).toMatchObject({ promo: 1, hold: 0 });
     expect(state.hands.D).toMatchObject({ hold: 1, promo: 0 });
     const deals = state.pub.events.filter((e) => e.result === 'deal');
     expect(deals.map((e) => e.loot)).toEqual(['promo', 'hold']);
-    expect(notes.A?.[0].text).toContain('아테나의 쇠사슬');
+    expect(notes.A?.[0].text).toContain('[전갈 화살] 획득');
   });
 
   it('돌파된 역경은 해역의 지나간 역경 목록에 쌓임 (공개 정보)', () => {
@@ -99,7 +99,7 @@ describe('특수 무기', () => {
     return s;
   }
 
-  it('포세이돈의 삼지창: 순번과 관계없이 앞 순번 함대의 공격도 무효, 특수 무기는 반환', () => {
+  it('아테나의 쇠사슬: 순번과 관계없이 앞 순번 함대의 공격도 무효, 특수 무기는 반환', () => {
     const s = withHand('E', 'hold');
     s.hands.A!.blitz = 1;
     const { state, notes } = resolveRound(s, {
@@ -111,11 +111,11 @@ describe('특수 무기', () => {
     expect(state.hands.E!.hold).toBe(0);
     expect(state.pub.tables[1].frozen).toBe(false);
     expect(notes.A?.[0].text).toContain('동결');
-    // 삼지창은 쓴 함대를 공개
+    // 쇠사슬은 쓴 함대를 공개
     expect(state.pub.events.find((e) => e.kind === 'hold')?.team).toBe('E');
   });
 
-  it('같은 해역에 두 함대가 삼지창을 쓰면 둘 다 공개', () => {
+  it('같은 해역에 두 함대가 쇠사슬을 쓰면 둘 다 공개', () => {
     const s = withHand('E', 'hold');
     s.hands.D!.hold = 1;
     const { state } = resolveRound(s, { D: { table: 1, card: 'hold', cutIn: 0 }, E: { table: 1, card: 'hold', cutIn: 0 } });
@@ -174,11 +174,11 @@ describe('특수 무기', () => {
     expect(state.pub.events.find((e) => e.team === 'C')).toMatchObject({ result: 'void', reason: 'hold' });
   });
 
-  it('삼지창은 공격 무기와 함께 추가로: 내 공격은 그대로, 다음 날 그 해역 우선 적용', () => {
+  it('쇠사슬은 공격 무기와 함께 추가로: 내 공격은 그대로, 다음 날 그 해역 우선 적용', () => {
     const s = withHand('E', 'hold');
     s.hands.A!.blitz = 1;
     const { state } = resolveRound(s, { A: { table: 2, card: 'blitz', cutIn: 0 }, E: { ...basic(3), extra: { card: 'hold', table: 2 } } });
-    expect(state.secret.remaining[1]).toBe(3); // A의 화살 무효
+    expect(state.secret.remaining[1]).toBe(3); // A의 삼지창 무효
     expect(state.hands.A!.blitz).toBe(1);
     expect(state.secret.remaining[2]).toBe(2); // E의 단검은 그대로 적용
     expect(state.secret.priority).toEqual([{ team: 'E', table: 2 }]);
@@ -194,20 +194,20 @@ describe('특수 무기', () => {
     expect(after.secret.priority).toEqual([]);
   });
 
-  it('쇠사슬은 공격 무기와 함께 추가로 걸고, 공격도 그대로 적용', () => {
+  it('전갈 화살은 공격 무기와 함께 추가로 꽂고, 공격도 그대로 적용', () => {
     const s = withHand('B', 'promo');
     const { state } = resolveRound(s, { A: basic(2), B: { ...basic(1), extra: { card: 'promo', table: 2 } } });
-    // B: 로투스 섬 돌파(+2) + 바람 자루 3 − 2(A) − 1(쇠사슬) = 0 → B 돌파(+3)
+    // B: 로투스 섬 돌파(+2) + 바람 자루 3 − 2(A) − 1(전갈 화살) = 0 → B 돌파(+3)
     expect(state.pub.teams.B!.score).toBe(15);
-    expect(state.hands.B!.promo).toBe(1); // 쓴 1장 − 로투스 섬 전리품(쇠사슬) 1장
+    expect(state.hands.B!.promo).toBe(1); // 쓴 1장 − 로투스 섬 전리품(전갈 화살) 1장
     expect(state.pub.tables[1].promos).toEqual(['B']);
     expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 2 });
   });
 
-  it('쇠사슬: 매일 끝날 때 1 감소, 돌파 시 건 함대가 보상', () => {
+  it('전갈 화살: 매일 끝날 때 1 감소, 돌파 시 꽂은 함대가 보상', () => {
     const s = withHand('B', 'promo');
     const { state } = resolveRound(s, { A: basic(2), B: { table: 2, card: 'promo', cutIn: 0 } });
-    // 바람 자루 3 − 2(A) − 1(쇠사슬) = 0 → B 돌파
+    // 바람 자루 3 − 2(A) − 1(전갈 화살) = 0 → B 돌파
     expect(state.pub.teams.B!.score).toBe(13);
     expect(state.pub.tables[1]).toMatchObject({ agenda: 4, promos: ['B'] });
     expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 2, reward: 3, weapon: 'promo' });
@@ -221,7 +221,7 @@ describe('특수 무기', () => {
     expect(state.secret.trail[0]).toEqual([]);
   });
 
-  it('아폴론의 전갈 화살: 6 감소, 넘친 수치는 사라짐', () => {
+  it('포세이돈의 삼지창: 6 감소, 넘친 수치는 사라짐', () => {
     const s = withHand('A', 'blitz');
     const { state } = resolveRound(s, { A: { table: 1, card: 'blitz', cutIn: 0 }, B: basic(1) });
     expect(state.pub.teams.A!.score).toBe(12);

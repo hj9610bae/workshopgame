@@ -419,15 +419,15 @@ function inputRow(t: TeamId, pos: number): string {
   const cards = mainCards
     .map((c) => {
       const n = c === 'basic' ? Infinity : (hand?.[c] ?? 0);
-      const label = `${CARDS[c].name}${c === 'basic' ? '' : ` ×${n}`}`;
+      const label = `${CARDS[c].short}${c === 'basic' ? '' : ` ×${n}`}`;
       return btn('sub-card', c, label, (sub?.card ?? 'basic') === c && !!sub?.table, n > 0);
     })
     .join('');
-  // 추가 카드(쇠사슬·삼지창)는 공격 무기와 함께 1장
+  // 추가 카드(전갈 화살·쇠사슬)는 공격 무기와 함께 1장
   const extra = sub?.extra;
   const extras = [
     btn('sub-extra', '', '안 함', !extra),
-    ...EXTRA_CARDS.map((c) => btn('sub-extra', c, `${CARDS[c].name} ×${hand?.[c] ?? 0}`, extra?.card === c, (hand?.[c] ?? 0) > 0)),
+    ...EXTRA_CARDS.map((c) => btn('sub-extra', c, `${CARDS[c].short} ×${hand?.[c] ?? 0}`, extra?.card === c, (hand?.[c] ?? 0) > 0)),
   ].join('');
   const extraTables = extra
     ? `<div class="in-group"><span class="in-label">추가 카드 해역</span>${shown
@@ -439,8 +439,8 @@ function inputRow(t: TeamId, pos: number): string {
     ...pub.order.map((_, i) => btn('sub-cut', i + 1, `${i + 1}번째`, sub?.cutIn === i + 1, score >= CUT_IN_COST)),
   ].join('');
   const scouts = shown.map((i) => btn('scout', i + 1, `${i + 1}번`, false, pub.tables[i].agenda > 0 && score >= SCOUT_COST)).join('');
-  const extraText = extra ? ` · + ${CARDS[extra.card].name} ${extra.table ? `${extra.table}번` : '(해역 선택!)'}` : '';
-  const state = sub?.table ? `✅ ${sub.table}번 · ${CARDS[sub.card].name}${extraText}${sub.cutIn ? ` · 순풍 ${sub.cutIn}번째` : ''}` : '⌛ 미입력 (쉼)';
+  const extraText = extra ? ` · + ${CARDS[extra.card].short} ${extra.table ? `${extra.table}번` : '(해역 선택!)'}` : '';
+  const state = sub?.table ? `✅ ${sub.table}번 · ${CARDS[sub.card].short}${extraText}${sub.cutIn ? ` · 순풍 ${sub.cutIn}번째` : ''}` : '⌛ 미입력 (쉼)';
   return `<div class="in-row${sub?.table ? ' done' : ''}">
     <div class="in-team"><b>${pos + 1}. ${esc(teamName(t))}</b><span>🧭 ${distanceOf(score)}해리</span><span class="in-state">${state}</span>
       ${sub ? `<button class="pill ghost" data-action="sub-clear" data-team="${t}">지우기</button>` : ''}</div>
@@ -480,7 +480,7 @@ function secretPanel(): string {
   const hands = s.pub.teamIds
     .map((t) => {
       const h = s.hands[t];
-      const cards = h ? (Object.keys(h) as (keyof typeof h)[]).filter((c) => h[c] > 0).map((c) => `${CARDS[c].name} ${h[c]}`) : [];
+      const cards = h ? (Object.keys(h) as (keyof typeof h)[]).filter((c) => h[c] > 0).map((c) => `${CARDS[c].short} ${h[c]}`) : [];
       return `<li><b>${esc(teamName(t))}</b> ${cards.length ? cards.join(' · ') : `<span class="muted">${CARDS.basic.name}만</span>`}</li>`;
     })
     .join('');

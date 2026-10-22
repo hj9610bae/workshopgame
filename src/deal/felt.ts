@@ -9,7 +9,7 @@ export interface TableLook {
   deal?: { team: TeamId; agenda: number; reward: number };
   /** 방금 새 역경이 들어옴 */
   fresh?: boolean;
-  /** 방금 쇠사슬이 걸림 */
+  /** 방금 전갈 화살이 꽂힘 */
   promo?: boolean;
 }
 
@@ -29,16 +29,17 @@ function pile(table: TableState): { html: string; depth: number } {
 }
 
 /**
- * 역경 카드: 픽토그램 + 역경 이름 + 생명력 + 전리품(전진 거리, 특수 무기 이름).
- * 실제 게임·연습 항해·항해 설명이 모두 이 양식을 씀
+ * 역경 카드: 픽토그램 + 역경 이름 + 생명력 + 전리품 특수 무기.
+ * 전진 거리는 처음 생명력과 같아서 따로 적지 않음. 실제 게임·연습 항해·항해 설명이 모두 이 양식을 씀.
+ * full: 항해 설명에서는 무기 풀네임, 게임 화면에서는 짧은 이름
  */
-export function adversaryCard(id: number, hp: number, loot?: SpecialCardId, shownHp: string = String(hp)): string {
+export function adversaryCard(id: number, hp: number, loot?: SpecialCardId, shownHp: string = String(hp), full = false): string {
   const a = AGENDAS[id];
   return `<div class="agenda-card">
       <div class="pictogram" aria-hidden="true">${a.icon}</div>
       <h3>${esc(a.title)}</h3>
       <p class="hp">❤️ 생명력 <b>${shownHp}</b></p>
-      <div class="reward"><span>⛵ ${hp}해리 전진</span>${loot ? `<span class="loot">${CARDS[loot].icon} ${CARDS[loot].name}</span>` : ''}</div>
+      ${loot ? `<p class="loot">${CARDS[loot].icon} ${full ? CARDS[loot].name : CARDS[loot].short}</p>` : ''}
     </div>`;
 }
 
@@ -74,25 +75,26 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
   }
   // 처음 생명력은 공개, 남은 생명력은 비공개 (아폴론의 예지로만 확인)
   const promos = table.promos
-    .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">⛓️ ${esc(teamName(t))}</span>`)
+    .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">${CARDS.promo.icon} ${esc(teamName(t))}</span>`)
     .join('');
   return `<article class="${cls}">
     ${head}
     <div class="stack" style="--n:${past.depth}">${past.html}${adversaryCard(a.id, hpOf(a.id), lootOf(a.id))}</div>
     ${promos ? `<div class="stickers">${promos}</div>` : ''}
-    ${table.frozen ? '<div class="frozen-cover">🔱 동결</div>' : ''}
+    ${table.frozen ? `<div class="frozen-cover">${CARDS.hold.icon} 동결</div>` : ''}
     ${stamp}
   </article>`;
 }
 
-export function deck(queue: number): string {
-  const rest = activeSetup().queue.slice(queue);
-  // 다음 10개까지만 이름을 보여 줌
-  const SHOW = 10;
+export const deck = (queue: number): string => deckOf(activeSetup().queue.slice(queue), hpOf, lootOf);
+
+/** 대기열 목록. 항해 설명은 기준 배치(SETUP)의 생명력·전리품으로 그림 */
+export function deckOf(rest: number[], hp: (id: number) => number, loot: (id: number) => SpecialCardId | undefined, SHOW = 10): string {
+  // 다음 SHOW 개까지만 이름을 보여 줌
   const more = rest.length > SHOW ? `<p class="deck-more">외 ${rest.length - SHOW}개</p>` : '';
   const list = rest
     .slice(0, SHOW)
-    .map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)} <small>❤️${hpOf(id)}${lootOf(id) ? ` ${CARDS[lootOf(id)!].icon}` : ''}</small></li>`)
+    .map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)} <small>❤️${hp(id)}${loot(id) ? ` ${CARDS[loot(id)!].icon}` : ''}</small></li>`)
     .join('');
   return `<div class="deck">
     <div class="deck-label">대기열 <span>${rest.length}</span></div>
@@ -110,6 +112,17 @@ export interface SeatLook {
   /** 배 위치를 기억해 움직임을 그리는 단위 (게임 화면·설명·최종 결과가 서로 섞이지 않게) */
   key?: string;
 }
+
+/** 바다 지도의 배 핀: 짙은 선체 + 금빛 돛 두 장 (앞 돛은 밝게, 뒤 돛은 어둡게 해 입체감) */
+const SHIP_SVG = `<svg class="ship-art" viewBox="0 0 32 32" aria-hidden="true">
+  <path d="M15.5 3v20" stroke="#5a3a1a" stroke-width="1.6"/>
+  <path d="M14.6 5 L14.6 21 L5 21 Q9 13 14.6 5Z" fill="#ffd95a"/>
+  <path d="M14.6 5 L14.6 21 L10.5 21 Q12 13 14.6 5Z" fill="#f4c430"/>
+  <path d="M16.6 7 L16.6 21 L25 21 Q22 14 16.6 7Z" fill="#d4af37"/>
+  <path d="M15.5 2 l4 1.6 -4 1.4z" fill="#e63946"/>
+  <path d="M3.5 22.5 H28.5 L24.5 28.5 H7.5Z" fill="#6b3f1d"/>
+  <path d="M3.5 22.5 H28.5 L27.6 24 H4.4Z" fill="#d4af37"/>
+</svg>`;
 
 /** 지난번에 그린 배의 가로 위치(%). 거리가 바뀌면 그 자리에서 새 자리로 항해해 오게 */
 const lastX = new Map<string, number>();
@@ -139,9 +152,10 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
   const x = (d: number) => ((d - lo) / (hi - lo)) * 100;
   const port = x(0);
   const step = tickStep(hi - lo);
+  // 눈금마다 은은하게 빛나는 세로 점선 (항구 0은 따로 굵게 그림)
   const ticks: string[] = [];
   for (let v = Math.ceil(lo / step) * step; v < hi; v += step) {
-    if (v !== 0) ticks.push(`<span class="sea-tick" style="--x:${x(v).toFixed(2)}%">${v}</span>`);
+    if (v !== 0) ticks.push(`<span class="sea-tick${v < 0 ? ' land' : ''}" style="--x:${x(v).toFixed(2)}%"><small>${v > 0 ? `${v}해리` : v}</small></span>`);
   }
   const ships = order
     .map((t, i) => {
@@ -156,18 +170,19 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
       const delta = dd ? `<span class="delta ${dd > 0 ? 'up' : 'down'}">${dd > 0 ? '−' : '+'}${Math.abs(dd)}</span>` : '';
       const status = look.status?.[t];
       const style = `--i:${i};--x:${px.toFixed(2)}%${sail ? `;--from:${prev!.toFixed(2)}%` : ''}`;
+      // 금빛 돛 핀이 정확히 거리 자리에 뜨고, 아래 말풍선에 함대 이름 (거리)
       return `<li class="ship${look.active === t ? ' active' : ''}${sail ? ' sail' : ''}" style="${style}">
-        <span class="ship-pos">${look.docked?.includes(t) ? '⚓' : i + 1}</span><span class="ship-icon" aria-hidden="true">⛵</span>
-        <b class="ship-name">${esc(teamName(t))}</b><span class="ship-dist">${distanceLabel(d)}</span>${delta}
-        ${status ? `<span class="ship-status">${status}</span>` : ''}
+        <span class="ship-pin">${SHIP_SVG}<span class="ship-pos">${look.docked?.includes(t) ? '⚓' : i + 1}</span></span>
+        <span class="ship-tag"><b class="ship-name">${esc(teamName(t))}</b> <span class="ship-dist">(${distanceLabel(d)})</span>${delta}${status ? `<span class="ship-status">${status}</span>` : ''}</span>
       </li>`;
     })
     .join('');
   return `<section class="sea" style="--rows:${order.length};--port:${port.toFixed(2)}%">
+    <div class="sea-waves" aria-hidden="true"></div>
     <div class="sea-land"><span>🏛️ 이타카</span></div>
+    <div class="sea-ticks">${ticks.join('')}</div>
     <div class="sea-port"><span>⚓ 이타카 항구 0</span></div>
     <div class="sea-troy"><span>⚔️ 트로이 전장</span></div>
-    <div class="sea-ticks">${ticks.join('')}</div>
     <ol class="sea-ships">${ships}</ol>
   </section>`;
 }

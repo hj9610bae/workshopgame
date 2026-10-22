@@ -4,7 +4,7 @@
  * 연습 게임은 역경 순서·전리품을 무작위로 정해요. (생명력은 처음부터 공개라 실제 값을 그대로 씀)
  */
 import { AGENDAS, CARDS, PRACTICE_DAYS, CUT_IN_COST, CUT_IN_NAME, FINAL_AGENDA, INITIAL_TABLES, LOOT, LOOT_ORDER, QUEUE, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, SUBMIT_SECONDS, type CardId, type Setup } from './data';
-import { adversaryCard, weaponCard } from './felt';
+import { adversaryCard, deckOf, weaponCard } from './felt';
 import type { Rng } from './engine';
 
 export interface Slide {
@@ -43,11 +43,15 @@ export function practiceSetup(rng: Rng = Math.random): Setup {
   };
 }
 
-/** 설명용 해역: 실제 게임의 처음 해역 3곳 (역경 카드는 실제 게임과 같은 양식) */
+/** 설명용 역경 카드: 실제 게임과 같은 양식, 무기는 풀네임 */
+const card = (id: number, shownHp?: string): string => adversaryCard(id, AGENDAS[id].demand, LOOT[id], shownHp, true);
+
+/** 설명용 해역: 실제 게임의 처음 해역 3곳 + 옆에 대기열 예시 */
 const exampleWaters = (): string =>
-  `<div class="chart-mini">${INITIAL_TABLES.map(
-    (id, i) => `<div class="ftable"><div class="ftable-no"><span>⚑ ${i + 1}번 해역</span></div>${adversaryCard(id, AGENDAS[id].demand, LOOT[id])}</div>`,
-  ).join('')}</div>`;
+  `<div class="waters-example">
+    <div class="chart-mini">${INITIAL_TABLES.map((id, i) => `<div class="ftable"><div class="ftable-no"><span>⚑ ${i + 1}번 해역</span></div>${card(id)}</div>`).join('')}</div>
+    ${deckOf(QUEUE, (id) => AGENDAS[id].demand, (id) => LOOT[id], 6)}
+  </div>`;
 
 const weapons = (ids: CardId[], secret = false): string =>
   `<div class="weapon-cards">${ids.map((id) => weaponCard(id, secret && id !== 'basic')).join('')}</div>`;
@@ -61,9 +65,9 @@ const nextInQueue = QUEUE[0];
 /** ①: 바람 자루(3)를 C −2(남은 생명력 비공개) → D −2로 돌파, 넘친 1은 소멸 */
 const sceneOverkill = (): string =>
   `<div class="scene">
-    ${panel(adversaryCard(wind, AGENDAS[wind].demand, LOOT[wind]), '2번 해역')}
+    ${panel(card(wind), '2번 해역')}
     ${step('1번째 · C함대<br>🗡️ 단검 −2')}
-    ${panel(adversaryCard(wind, AGENDAS[wind].demand, LOOT[wind], '?'), '남은 생명력은 <b>비공개</b>', 'mystery')}
+    ${panel(card(wind, '?'), '남은 생명력은 <b>비공개</b>', 'mystery')}
     ${step('2번째 · D함대<br>🗡️ 단검 −2')}
     ${panel(`<div class="scene-burst"><b>돌파!</b><span>D함대 ${AGENDAS[wind].demand}해리 전진</span><span>${CARDS[LOOT[wind]!].icon} ${CARDS[LOOT[wind]!].name} 획득</span></div>`, '넘친 공격력 1은 <b>소멸</b>')}
   </div>`;
@@ -71,11 +75,11 @@ const sceneOverkill = (): string =>
 /** ②: A가 1번 해역 로투스를 돌파 → 마지막 공격 함대 공개 → 대기열 맨 위가 1번 해역으로 → 뒤 순서 B는 새 역경을 공격 */
 const sceneRefill = (): string =>
   `<div class="scene">
-    ${panel(adversaryCard(lotus, AGENDAS[lotus].demand, LOOT[lotus]), '1번 해역')}
+    ${panel(card(lotus), '1번 해역')}
     ${step('1번째 · A함대<br>🗡️ 단검 −2')}
     ${panel(`<div class="scene-burst"><b>돌파!</b><span>A함대 공개</span><span>${AGENDAS[lotus].demand}해리 전진 · ${CARDS[LOOT[lotus]!].icon} 획득</span></div>`, '마지막 공격 함대가 보상')}
     ${step('대기열 맨 위가<br>빈자리로')}
-    ${panel(adversaryCard(nextInQueue, AGENDAS[nextInQueue].demand, LOOT[nextInQueue]), '새로 온 역경 (1번 해역)')}
+    ${panel(card(nextInQueue), '새로 온 역경 (1번 해역)')}
     ${step('2번째 · B함대<br>1번 해역 선택')}
     ${panel(`<div class="scene-burst calm"><b>−2</b><span>B함대는 새 역경을 공격</span></div>`, '같은 해역 번호 그대로')}
   </div>`;
@@ -94,7 +98,7 @@ export const INTRO_SLIDES: Slide[] = [
     html: `<div class="slide-row">
         <ul class="slide-list">
           <li>모든 함대는 고국에서부터 <b>${START_DISTANCE}해리</b> 떨어진 <b>트로이 전장</b>에서 출발해요.</li>
-          <li>모든 함대는 <b>${CARDS.basic.name}</b>만 가지고 출발해요.</li>
+          <li>모든 함대는 <b>${CARDS.basic.name} (기본 무기)</b>만 가지고 출발해요.</li>
         </ul>
       </div>`,
   },
@@ -107,7 +111,7 @@ export const INTRO_SLIDES: Slide[] = [
         <li>첫날은 <b>랜덤</b>으로 순서가 정해져요.</li>
         <li>단, 둘째 날부터 고국과의 거리가 <b>같은</b> 경우 전날에 공격 순서가 <b>빨랐던 함대를 뒤 순서</b>로 배치해요.</li>
       </ul>
-      <p class="muted">예) B·C함대가 모두 9해리, 전날 C함대가 먼저 공격했다면 → 오늘은 <b>B → C</b></p>`,
+      <p class="muted">예) B·C함대가 모두 9해리, 전날 C함대가 먼저 공격했다면 오늘은 <b>B → C</b></p>`,
   },
   {
     kind: 'slide',
