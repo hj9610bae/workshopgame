@@ -253,6 +253,7 @@ function tableLooks(): TableLook[] {
     if (e.kind === 'finalOpen') looks[i] = { fresh: true };
     else if (e.agenda && e.reward && e.team) looks[i] = { deal: { team: e.stolenBy ?? e.team, agenda: e.agenda, reward: e.reward }, fresh: true };
     else if (e.kind === 'proposal' && e.result === 'promo') looks[i] = { promo: true };
+    else if (e.kind === 'hold') looks[i] = { freeze: true };
   }
   return looks;
 }

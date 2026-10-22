@@ -641,6 +641,10 @@ body.live:has(.home-board) {
   background: rgba(200, 30, 40, 0.92);
   transform: rotate(-8deg);
   border-radius: 8px;
+}
+
+/* 동결되는 순간에만 찍히고, 이후 사건에서는 움직이지 않고 그대로 */
+.frozen-cover.new {
   animation: slap 0.5s ease-out;
 }
 

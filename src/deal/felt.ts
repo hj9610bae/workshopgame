@@ -9,6 +9,8 @@ export interface TableLook {
   deal?: { team: TeamId; agenda: number; reward: number };
   /** 방금 새 역경이 들어옴 */
   fresh?: boolean;
+  /** 방금 쇠사슬로 동결됨 (동결 표식은 이때 한 번만 찍히는 연출, 그 뒤로는 그대로 유지) */
+  freeze?: boolean;
   /** 방금 전갈 화살이 꽂힘 */
   promo?: boolean;
 }
@@ -81,7 +83,7 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
     ${head}
     <div class="stack" style="--n:${past.depth}">${past.html}${adversaryCard(a.id, hpOf(a.id), lootOf(a.id))}</div>
     ${promos ? `<div class="stickers">${promos}</div>` : ''}
-    ${table.frozen ? `<div class="frozen-cover">${CARDS.hold.icon} 동결</div>` : ''}
+    ${table.frozen ? `<div class="frozen-cover${look.freeze ? ' new' : ''}">${CARDS.hold.icon} 동결</div>` : ''}
     ${stamp}
   </article>`;
 }

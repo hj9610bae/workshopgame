@@ -145,10 +145,12 @@ export function describeEvent(e: GameEvent): {
         case 'promo':
           return { icon: CARDS.promo.icon, title: `${team}, ${e.table}번 해역에 ${CARDS.promo.short}`, detail: '매일 끝날 때 생명력 1 감소' };
         case 'void':
+          // 동결된 해역에 낸 공격은 평소 공격과 똑같이 보여 줌 (동결 표식은 해역에 계속 남아 있고, 낸 해역도 드러나지 않게)
+          if (e.reason === 'hold') return { icon: '⚔️', title: `${team} 공격 완료${firstMark}`, detail: '역경은 아직 버티고 있습니다' };
           return {
             icon: '🚫',
             title: `${team} 공격 무효`,
-            detail: e.reason === 'hold' ? `${e.table}번 해역 동결` : e.reason === 'empty' ? `${e.table}번 해역에 역경 없음` : undefined,
+            detail: e.reason === 'empty' ? `${e.table}번 해역에 역경 없음` : undefined,
             tone: 'bad',
           };
         case 'pass':

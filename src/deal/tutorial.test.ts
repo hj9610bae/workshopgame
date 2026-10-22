@@ -45,6 +45,9 @@ describe('돌파 발표 문구', () => {
     expect(blitz.title).toBe('A함대, 🔱 특수 무기 삼지창으로 키르케의 환락 돌파!');
     expect(blitz.detail).toContain('생명력 6 감소');
     expect(describeEvent({ ...base, kind: 'promoDeal', weapon: 'promo' }).title).toContain('🏹 특수 무기 전갈 화살로');
+    // 동결된 해역에 낸 공격은 평소 공격과 똑같이 (낸 해역·무효 여부를 드러내지 않음)
+    const frozen = describeEvent({ ...base, result: 'void', reason: 'hold', table: 2 });
+    expect(frozen).toEqual(describeEvent({ ...base, result: 'done' }));
     expect(describeEvent({ ...base, stolenBy: 'C', weapon: 'basic' }).detail).toContain('마지막 일격은 A함대의 🗡️ 기본 무기 단검 · ⚡ 투척 창: 그날 그 해역의 돌파 보상을 가로챔');
   });
 });
