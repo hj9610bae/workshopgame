@@ -4,8 +4,8 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, RESCUE_DISTANCE, RESCUE_ROUND, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, distanceOf, type CardId, type ExtraCardId, type TeamId } from './deal/data';
-import { agendaTitle, beginSubmit, canOpenRescue, createGame, finish, openRescue, pickRescue, ranking, rescuedTeam, resolveRound, revealNext, scout, settleRescue, startRound, type EngineState } from './deal/engine';
+import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, QUIZ_FROM_RANK, QUIZ_LABEL, QUIZ_LEVELS, QUIZ_REWARD, QUIZ_THINK_SECONDS, RESCUE_ROUND, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, distanceOf, type CardId, type ExtraCardId, type QuizLevel, type TeamId } from './deal/data';
+import { agendaTitle, beginSubmit, canOpenRescue, createGame, finish, markQuiz, openRescue, quizQueue, ranking, resolveRound, revealNext, scout, settleRescue, startQuizTimer, startRound, type EngineState } from './deal/engine';
 import { deck, distanceLabel, feltTable, seaMap, type TableLook } from './deal/felt';
 import {
   beatConsole,
@@ -192,48 +192,79 @@ function visibleTables(): number[] {
   return pub.tables.map((_, i) => i).filter((i) => i < INITIAL_TABLES.length || pub.round >= FINAL_OPEN_ROUND);
 }
 
-/** 바다 지도에 그릴 함대: 오늘 공격 순서 + 구조선으로 귀환한 함대(맨 아래, 닻 표시) */
-function seaOrder(): TeamId[] {
+/** 스핑크스 퀴즈를 정산한 그날 공개 단계: 바다 지도·순위를 보상이 반영된 지금 거리로 */
+function quizSettledToday(): boolean {
   const { pub } = eng();
-  const rescued = rescuedTeam(pub);
-  return rescued ? [...pub.order.filter((t) => t !== rescued), rescued] : pub.order;
+  return pub.rescue?.phase === 'done' && pub.round === RESCUE_ROUND && pub.stage === 'reveal' && pub.revealed >= pub.events.length;
 }
 
-/** 구조선 hidden event 배너 (프로젝터) */
+const quizReward = (level: QuizLevel) => `${QUIZ_LABEL[level]} +${QUIZ_REWARD[level]}해리`;
+const QUIZ_DOT: Record<QuizLevel, string> = { low: '🟢', mid: '🟡', high: '🔴' };
+const THINK = QUIZ_THINK_SECONDS % 60 === 0 ? `${QUIZ_THINK_SECONDS / 60}분` : `${QUIZ_THINK_SECONDS}초`;
+
+/** 배너는 처음 나타날 때(단계가 바뀔 때)만 튀어나오게. 진행자가 입력할 때마다 다시 튀지 않도록 */
+let lastRescueKey = '';
+function popOnce(key: string): string {
+  const pop = key !== lastRescueKey;
+  lastRescueKey = key;
+  return pop ? ' pop' : '';
+}
+
+/** 7일차 특별 이벤트: 올림포스의 스핑크스 (프로젝터). 고른 난도·정답 여부는 공개 */
 function rescueBanner(): string {
-  const { pub } = eng();
-  const r = pub.rescue!;
+  const r = eng().pub.rescue!;
   const name = (t: TeamId) => esc(teamName(t));
-  const deal = `구조선에 타면 <b>이타카 내륙 ${-RESCUE_DISTANCE}해리</b>에 확실히 도착해요. 대신 <b>내일부터 남은 항해에는 참여할 수 없어요.</b> (공격 불가)`;
-  if (r.phase === 'offer' && !r.chosen) {
-    return `<div class="banner pop rescue"><div class="banner-icon">🚢</div><h2>히든 이벤트! 고국으로 가는 구조선이 나타났다</h2>
-      <p>${deal}</p>
-      <p>탑승 기회: 1등을 뺀 <b>${r.candidates.map(name).join(' · ')}</b> 중 <b>가위바위보</b>로 이긴 한 함대!</p></div>`;
-  }
+  // 도전 순서는 5위 → 4위 → 3위
+  const challengers = [...r.candidates].reverse();
+  const place = (t: TeamId) => r.candidates.indexOf(t) + QUIZ_FROM_RANK;
+  const mark = (t: TeamId) => (r.phase === 'done' ? (r.rewards?.[t] ? ' ✅' : r.correct?.[t] === false ? ' ❌' : '') : r.correct?.[t] === true ? ' ✅' : r.correct?.[t] === false ? ' ❌' : '');
+  const levels = QUIZ_LEVELS.map((l) => {
+    const picks = challengers.filter((t) => r.level?.[t] === l).map((t) => `<span class="quiz-chip">${name(t)}${mark(t)}</span>`).join('');
+    return `<div class="quiz-level ${l}"><b>${QUIZ_DOT[l]} 난이도 [${QUIZ_LABEL[l]}]</b><span>성공: <em>+${QUIZ_REWARD[l]}해리</em></span><span class="muted">실패: 무보상</span>
+      <div class="quiz-picks">${picks}</div></div>`;
+  }).join('');
+  const team = (t: TeamId) => `<span class="quiz-team${r.timer?.team === t ? ' on' : ''}">${place(t)}위 ${name(t)}${mark(t)}</span>`;
+  const head = `<div class="sphinx-head"><div class="banner-icon">🗿</div><h2>[${RESCUE_ROUND}일차 특별 이벤트] 올림포스의 스핑크스 등장!</h2></div>
+    <p class="sphinx-quote">"지친 탐험대여, 나의 수수께끼를 풀어 구원선에 올라타라!"</p>
+    <div class="quiz-levels">${levels}</div>`;
   if (r.phase === 'offer') {
-    const now = distanceLabel(distanceOf(pub.teams[r.chosen!]!.score));
-    return `<div class="banner pop rescue"><div class="banner-icon">🚢</div><h2>${name(r.chosen!)}, 구조선에 타시겠어요?</h2>
-      <p>${deal}</p>
-      <p>지금 <b>${now}</b> → 탑승하면 <b>내륙 ${-RESCUE_DISTANCE}해리 확정</b> · 거절하면 남은 항해를 계속</p></div>`;
+    const timer = r.timer ? `<div class="quiz-timer"><span>${name(r.timer.team)} 생각 시간</span><b data-quiz-timer></b></div>` : '';
+    return `<div class="banner rescue sphinx${popOnce('offer')}">${head}
+      <p class="quiz-line">🎯 도전팀 : ${challengers.map(team).join(' ➔ ')}</p>
+      <p class="quiz-line">⏱️ 제한시간 : 난이도 선택 후 생각시간 <b>${THINK}</b> · 문제는 난이도 [하]부터</p>
+      ${timer}</div>`;
   }
-  if (r.boarded) {
-    return `<div class="banner pop rescue deal"><div class="banner-icon">🚢</div><h2>${name(r.chosen!)}, 구조선 탑승! 이타카 내륙 ${-RESCUE_DISTANCE}해리에 귀환</h2>
-      <p>남은 항해에는 참여하지 않아요. 나머지 함대는 항해를 계속합니다.</p></div>`;
-  }
-  return `<div class="banner pop rescue"><div class="banner-icon">🌊</div><h2>${r.chosen ? `${name(r.chosen)}가 구조선을 거절했어요` : '구조선이 떠났어요'}</h2>
-    <p>모든 함대가 항해를 계속합니다.</p></div>`;
+  const won = challengers.filter((t) => r.rewards?.[t]);
+  const result = won.length
+    ? won.map((t) => `<li><b>${name(t)}</b> 정답! 고국으로 <b>${r.rewards![t]}해리</b> 전진</li>`).join('')
+    : '<li>스핑크스의 수수께끼를 푼 함대가 없어요</li>';
+  return `<div class="banner rescue sphinx${won.length ? ' deal' : ''}${popOnce('done')}">${head}
+    <ul class="quiz-rows">${result}</ul>
+    <p class="muted">모든 함대가 남은 항해를 계속합니다.</p></div>`;
 }
 
-/** 진행자용 구조선 조작: 가위바위보 승자 고르기 → 탑승/거절 */
+/** 진행자용 스핑크스 조작: 함대가 고른 난도 → (문제 공개) 생각 시간 → 정답/오답 → 결과 발표. 문제 순서는 난도 하부터 */
 function rescueControls(): string {
   const r = eng().pub.rescue!;
-  const picks = r.candidates
-    .map((t) => `<button class="pill${r.chosen === t ? ' on' : ''}" data-action="rescue-pick" data-team="${t}">${esc(teamName(t))}</button>`)
+  const pill = (action: string, t: TeamId, value: string, label: string, on: boolean) =>
+    `<button class="pill${on ? ' on' : ''}" data-action="${action}" data-team="${t}" data-value="${value}">${label}</button>`;
+  const allPicked = r.candidates.every((t) => r.level?.[t]);
+  // 난도를 모두 고르면 문제 공개 순서(하 → 중 → 상)로 줄을 세움
+  const rows = (allPicked ? quizQueue(r) : [...r.candidates].reverse())
+    .map((t, i) => {
+      const level = r.level?.[t];
+      const ok = r.correct?.[t];
+      const timing = r.timer?.team === t;
+      return `<div class="in-group"><span class="in-label">${allPicked ? `${i + 1}. ` : ''}${esc(teamName(t))}</span>
+        ${QUIZ_LEVELS.map((l) => pill('quiz-level', t, l, `${QUIZ_DOT[l]} ${quizReward(l)}`, level === l)).join('')}
+        <span class="quiz-sep"></span>
+        ${pill('quiz-timer', t, timing ? 'stop' : 'start', timing ? '⏹ 시간 멈춤' : `⏱ 생각 시간 ${THINK}`, timing)}
+        ${pill('quiz-correct', t, 'yes', '✅ 정답', ok === true)}${pill('quiz-correct', t, 'no', '❌ 오답', ok === false)}</div>`;
+    })
     .join('');
-  const off = r.chosen ? '' : 'disabled';
-  return `<div class="rescue-ctl"><div class="in-group"><span class="in-label">✊✌️✋ 가위바위보 승리</span>${picks}</div>
-    <div class="row"><button class="wide" data-action="rescue-board" ${off}>🚢 탑승</button>
-      <button class="secondary narrow" data-action="rescue-decline" ${off}>거절 (항해 계속)</button>
+  const ready = r.candidates.every((t) => r.level?.[t] && r.correct?.[t] !== undefined);
+  return `<div class="rescue-ctl">${rows}
+    <div class="row"><button class="wide" data-action="quiz-settle" ${ready ? '' : 'disabled'}>🗿 결과 발표 · 맞힌 함대 전진</button>
       <button class="secondary narrow" data-action="rescue-skip">이벤트 건너뛰기</button></div></div>`;
 }
 
@@ -315,12 +346,12 @@ function seatLook() {
   const { pub } = eng();
   const status: Partial<Record<TeamId, string>> = {};
   if (pub.stage === 'submit') for (const t of pub.order) status[t] = game.subs[t]?.table ? '✅ 입력 완료' : '⌛ 대기';
-  const rescued = rescuedTeam(pub);
-  if (rescued) status[rescued] = '🚢 구조선으로 귀환';
   const e = latestEvent();
   const prevScores = pub.stage === 'reveal' ? pub.events[pub.revealed - 2]?.scores : undefined;
+  // 구조선 퀴즈 정산 뒤에는 퀴즈 보상을 전진으로 표시
+  if (quizSettledToday()) return { status, deltas: pub.rescue?.rewards ?? {} };
   const deltas = e && prevScores ? Object.fromEntries(pub.teamIds.map((t) => [t, (e.scores[t] ?? 0) - (prevScores[t] ?? 0)])) : {};
-  return { status, deltas, active: e?.team, docked: rescued ? [rescued] : [] };
+  return { status, deltas, active: e?.team };
 }
 
 function gameView(): string {
@@ -339,7 +370,7 @@ function gameView(): string {
       </section>
       <aside class="rail">${deck(eventQueue())}</aside>
     </div>
-    ${seaMap(seaOrder(), snap.scores, seatLook())}
+    ${seaMap(pub.order, quizSettledToday() ? Object.fromEntries(pub.teamIds.map((t) => [t, pub.teams[t]?.score ?? 0])) : snap.scores, seatLook())}
     ${showDock() ? dock() : ''}`;
 }
 
@@ -379,7 +410,7 @@ function dock(): string {
             : isPractice()
             ? `<button class="wide" data-action="next-round">🎲 연습 ${next}일차 출항 ▶</button>`
             : canOpenRescue(eng())
-            ? '<button class="wide" data-action="rescue-open">🚢 히든 이벤트: 구조선 등장 ▶</button>'
+            ? '<button class="wide" data-action="rescue-open">🗿 특별 이벤트: 스핑크스 등장 ▶</button>'
             : pub.rescue?.phase === 'offer'
             ? rescueControls()
             : pub.round < ROUNDS
@@ -507,7 +538,7 @@ function rankView(): string {
   const winners = rows.filter((r) => r.rank === 1);
   const medal = ['🥇', '🥈', '🥉'];
   const list = rows
-    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">돌파 ${r.deals}회${r.team === rescuedTeam(eng().pub) ? ' · 🚢 구조선 귀환' : ''}</span></li>`)
+    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">돌파 ${r.deals}회${eng().pub.rescue?.rewards?.[r.team] ? ` · 🗿 스핑크스 +${eng().pub.rescue!.rewards![r.team]}해리` : ''}</span></li>`)
     .join('');
   const best = winners[0] ? distanceOf(winners[0].score) : START_DISTANCE;
   const where = best <= 0 ? `고국 이타카에 도착해 내륙 ${-best}해리까지 들어간` : `고국까지 ${best}해리를 남긴`;
@@ -607,6 +638,13 @@ function tickTimer() {
     el.classList.toggle('over', left <= 0);
     el.closest('.submit-guide')?.classList.toggle('over', left <= 0);
   }
+  // 스핑크스 생각 시간
+  const quiz = pub?.rescue?.timer;
+  for (const el of app.querySelectorAll<HTMLElement>('[data-quiz-timer]')) {
+    const left = quiz ? quiz.until - Date.now() : 0;
+    el.textContent = left > 0 ? formatTimer(left) : '시간 종료!';
+    el.closest('.quiz-timer')?.classList.toggle('over', left <= 0);
+  }
 }
 
 /* ───────── 동작 ───────── */
@@ -627,9 +665,10 @@ const ALLOWED: Record<string, Stage[]> = {
   'next-round': ['reveal'],
   'practice-end': ['reveal'],
   'rescue-open': ['reveal'],
-  'rescue-pick': ['reveal'],
-  'rescue-board': ['reveal'],
-  'rescue-decline': ['reveal'],
+  'quiz-level': ['reveal'],
+  'quiz-correct': ['reveal'],
+  'quiz-settle': ['reveal'],
+  'quiz-timer': ['reveal'],
   'rescue-skip': ['reveal'],
   finish: ['reveal'],
 };
@@ -772,18 +811,25 @@ function act(action: string, el: HTMLElement) {
       return save(commit(game, { engine: finish(eng()), agendasShown: false, creditsShown: false }));
     case 'rescue-open':
       return save(commit(game, { engine: openRescue(eng()) }));
-    case 'rescue-pick':
-      return save(commit(game, { engine: pickRescue(eng(), team) }));
-    case 'rescue-board': {
-      const chosen = eng().pub.rescue?.chosen;
-      if (!chosen || !confirm(`${teamName(chosen)}: 구조선에 타면 이타카 내륙 ${-RESCUE_DISTANCE}해리로 가고, 남은 항해에는 참여하지 않아요. 탑승할까요?`)) return;
-      return save(commit(game, { engine: settleRescue(eng(), true) }));
+    case 'quiz-level': {
+      if (!team) return;
+      const level = el.dataset.value as QuizLevel;
+      // 같은 난도를 다시 누르면 지움
+      return save(commit(game, { engine: markQuiz(eng(), team, { level: eng().pub.rescue?.level?.[team] === level ? null : level }) }));
     }
-    case 'rescue-decline':
-      return save(commit(game, { engine: settleRescue(eng(), false) }));
+    case 'quiz-correct': {
+      if (!team) return;
+      const ok = el.dataset.value === 'yes';
+      return save(commit(game, { engine: markQuiz(eng(), team, { correct: eng().pub.rescue?.correct?.[team] === ok ? null : ok }) }));
+    }
+    case 'quiz-timer':
+      if (!team) return;
+      return save(commit(game, { engine: startQuizTimer(eng(), el.dataset.value === 'start' ? team : undefined, Date.now()) }));
+    case 'quiz-settle':
+      return save(commit(game, { engine: settleRescue(eng()) }));
     case 'rescue-skip':
-      if (!confirm('구조선 이벤트를 건너뛸까요? (아무도 타지 않음)')) return;
-      return save(commit(game, { engine: settleRescue(pickRescue(eng(), undefined), false) }));
+      if (!confirm('스핑크스 이벤트를 건너뛸까요? (아무도 전진하지 않음)')) return;
+      return save(commit(game, { engine: settleRescue(eng(), true) }));
     case 'final-tab':
       return save({ ...game, agendasShown: !game.agendasShown, creditsShown: false });
     case 'credits':

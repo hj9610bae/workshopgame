@@ -2008,7 +2008,7 @@ button.dot-btn.on {
   }
 }
 
-/* ───── 구조선 hidden event ───── */
+/* ───── 7일차 특별 이벤트: 올림포스의 스핑크스 (구조선 퀴즈) ───── */
 .banner.rescue {
   background: linear-gradient(135deg, var(--navy-2), var(--navy-3));
   border: 2px solid var(--gold);
@@ -2022,6 +2022,176 @@ button.dot-btn.on {
   animation: bob 2.4s ease-in-out infinite;
 }
 
+/* 해역 위에 겹쳐 띄움 (해역 영역 높이는 그대로, 화면이 넘치지 않게) */
+.banner.sphinx {
+  position: absolute;
+  inset: 12px;
+  /* .banner 의 align-self: center 가 남으면 절대 위치 상자가 내용 높이로 줄어듦 */
+  align-self: stretch;
+  z-index: 5;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(244, 196, 48, 0.16), transparent 60%),
+    linear-gradient(135deg, rgba(20, 29, 58, 0.98), rgba(43, 58, 103, 0.98));
+}
+
+.banner.sphinx.deal {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(72, 202, 228, 0.18), transparent 60%),
+    linear-gradient(135deg, rgba(20, 29, 58, 0.98), rgba(20, 95, 115, 0.98));
+}
+
+.banner.sphinx .sphinx-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.banner.sphinx .banner-icon {
+  font-size: 2.6rem;
+  line-height: 1;
+}
+
+.banner.sphinx h2 {
+  font-family: var(--font-title);
+  color: var(--gold);
+}
+
+.banner.sphinx .quiz-levels {
+  width: min(100%, 1000px);
+  align-self: center;
+}
+
+.sphinx-quote {
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.quiz-levels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 12px 0 4px;
+}
+
+.quiz-level {
+  --lv: var(--mint);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: rgba(11, 19, 43, 0.75);
+  border: 2px solid var(--lv);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--lv) 35%, transparent);
+  font-size: 1.05rem;
+}
+
+.quiz-level.low {
+  --lv: #3ccf7a;
+}
+
+.quiz-level.mid {
+  --lv: #f4c430;
+}
+
+.quiz-level.high {
+  --lv: #e63946;
+}
+
+.quiz-level > b {
+  font-size: 1.15rem;
+  color: var(--lv);
+}
+
+.quiz-level em {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 1.3em;
+  color: var(--mint);
+}
+
+.quiz-picks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  min-height: 1.9em;
+  margin-top: 4px;
+}
+
+.quiz-chip {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--lv);
+  color: var(--navy);
+  font-weight: 900;
+}
+
+.banner .quiz-line {
+  font-size: 1.15rem;
+}
+
+.quiz-team {
+  display: inline-block;
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  color: var(--gold);
+  border: 1px solid transparent;
+}
+
+.quiz-team.on {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(244, 196, 48, 0.7);
+}
+
+.quiz-timer {
+  align-self: center;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 4px 20px;
+  border-radius: 14px;
+  border: 2px solid var(--gold);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.quiz-timer span {
+  font-weight: 800;
+}
+
+.quiz-timer b {
+  font-size: 2.2rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+
+.quiz-timer.over {
+  border-color: var(--red);
+}
+
+.quiz-timer.over b {
+  color: var(--red);
+}
+
+.quiz-rows {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  font-size: 1.25rem;
+}
+
 .rescue-ctl {
   display: grid;
   gap: 10px;
@@ -2029,7 +2199,12 @@ button.dot-btn.on {
 
 .rescue-ctl .in-label {
   width: auto;
+  min-width: 6em;
   margin-right: 6px;
+}
+
+.quiz-sep {
+  width: 14px;
 }
 
 /* ───── 항해 설명: 공격 적용 예시 장면 ───── */

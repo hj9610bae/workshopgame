@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FINAL_AGENDA, FINAL_OPEN_ROUND, RESCUE_DISTANCE, RESCUE_ROUND, ROUNDS, START_DISTANCE, TEAM_IDS, distanceOf, type TeamId } from './data';
-import { beginSubmit, canOpenRescue, createGame, finish, openRescue, pickRescue, ranking, resolveRound, scout, settleRescue, startRound, type EngineState } from './engine';
+import { FINAL_AGENDA, FINAL_OPEN_ROUND, QUIZ_REWARD, QUIZ_THINK_SECONDS, RESCUE_ROUND, ROUNDS, START_DISTANCE, TEAM_IDS, distanceOf, type TeamId } from './data';
+import { beginSubmit, canOpenRescue, createGame, finish, markQuiz, openRescue, quizQueue, ranking, resolveRound, scout, settleRescue, startQuizTimer, startRound, type EngineState } from './engine';
 import type { Submission } from './types';
 
 /** shuffle 이 원래 순서를 유지하도록 하는 난수 → 1라운드 순서 A,B,C,D,E */
@@ -337,8 +337,8 @@ describe('고국과의 거리', () => {
   });
 });
 
-describe('구조선 hidden event', () => {
-  /** RESCUE_ROUND 공개가 끝난 상태. A가 1등, 나머지는 동점 */
+describe('7일차 특별 이벤트: 스핑크스 (구조선 퀴즈)', () => {
+  /** RESCUE_ROUND 공개가 끝난 상태. A가 1등, B가 2등, C·D·E는 같은 거리 */
   function day7(): EngineState {
     let s = startRound(createGame(TEAM_IDS), keepOrder).state;
     for (let d = 1; d < RESCUE_ROUND; d++) s = startRound(resolveRound(beginSubmit(s, 0), {}).state, keepOrder).state;
@@ -349,38 +349,47 @@ describe('구조선 hidden event', () => {
     return s;
   }
 
-  it('7일차 공개가 끝난 뒤에만 열리고, 1등을 뺀 함대가 후보', () => {
+  it('7일차 공개가 끝난 뒤에만 열리고, 3·4·5등이 도전. 거리가 같으면 오늘 먼저 공격한 함대가 뒤 등수', () => {
     const s = day7();
-    expect(s.pub.round).toBe(RESCUE_ROUND);
     expect(canOpenRescue(s)).toBe(true);
     expect(canOpenRescue({ ...s, pub: { ...s.pub, revealed: 0 } })).toBe(false);
     const o = openRescue(s);
-    expect(o.pub.rescue).toEqual({ phase: 'offer', candidates: ['B', 'C', 'D', 'E'] });
+    const tied = s.pub.order.filter((t) => t !== 'A' && t !== 'B').reverse();
+    expect(o.pub.rescue).toEqual({ phase: 'offer', candidates: tied, level: {}, correct: {} });
     expect(canOpenRescue(o)).toBe(false);
-    expect(pickRescue(o, 'A')).toBe(o);
+    expect(markQuiz(o, 'A', { level: 'low' })).toBe(o);
   });
 
-  it('탑승: 이타카 내륙 3해리로 가고, 8일차부터 순서에서 빠지며 제출·예지도 무시', () => {
-    const s = settleRescue(pickRescue(openRescue(day7()), 'E'), true);
-    expect(distanceOf(s.pub.teams.E!.score)).toBe(RESCUE_DISTANCE);
-    const d8 = startRound(s).state;
-    expect(d8.pub.round).toBe(FINAL_OPEN_ROUND);
-    expect(d8.pub.order).not.toContain('E');
-    expect(d8.pub.order).toHaveLength(4);
-    const sub = beginSubmit(d8, 0);
-    expect(scout(sub, 'E', 1).result.error).toBeDefined();
-    const { state } = resolveRound(sub, { E: basic(1) });
-    expect(state.pub.events.some((e) => e.team === 'E')).toBe(false);
-    expect(ranking(finish(state).pub).map((r) => r.team)).toContain('E');
-  });
-
-  it('거절하거나 건너뛰면 아무 변화 없이 계속 항해', () => {
+  it('맞힌 함대만 난도별 보상(하 2 · 중 3 · 상 6) 전진, 오답은 벌칙 없음, 모두 계속 항해', () => {
     const base = day7();
-    const declined = settleRescue(pickRescue(openRescue(base), 'C'), false);
-    expect(declined.pub.rescue).toMatchObject({ phase: 'done', chosen: 'C', boarded: false });
-    expect(scores(declined)).toEqual(scores(base));
-    expect(startRound(declined).state.pub.order).toHaveLength(5);
-    const skipped = settleRescue(openRescue(base), true);
-    expect(skipped.pub.rescue).toMatchObject({ phase: 'done', boarded: false });
+    let s = openRescue(base);
+    const [c3, c4, c5] = s.pub.rescue!.candidates;
+    s = markQuiz(s, c3, { level: 'high', correct: true });
+    s = markQuiz(s, c4, { level: 'low', correct: false });
+    s = markQuiz(s, c5, { level: 'mid', correct: true });
+    // 문제 공개는 난도 하부터
+    expect(quizQueue(s.pub.rescue!)).toEqual([c4, c5, c3]);
+    const done = settleRescue(s);
+    expect(done.pub.rescue!.rewards).toEqual({ [c3]: QUIZ_REWARD.high, [c5]: QUIZ_REWARD.mid });
+    expect(done.pub.teams[c3]!.score - base.pub.teams[c3]!.score).toBe(6);
+    expect(done.pub.teams[c4]!.score).toBe(base.pub.teams[c4]!.score);
+    expect(done.pub.teams[c5]!.score - base.pub.teams[c5]!.score).toBe(3);
+    const d8 = startRound(done).state;
+    expect(d8.pub.order).toHaveLength(5);
+    expect(d8.pub.order[0]).toBe('A');
+  });
+
+  it('생각 시간 타이머, 건너뛰면 아무도 전진하지 않음', () => {
+    const base = day7();
+    let s = openRescue(base);
+    const [c3] = s.pub.rescue!.candidates;
+    s = startQuizTimer(s, c3, 1000);
+    expect(s.pub.rescue!.timer).toEqual({ team: c3, until: 1000 + QUIZ_THINK_SECONDS * 1000 });
+    expect(startQuizTimer(s, 'A', 0)).toBe(s);
+    s = markQuiz(s, c3, { level: 'high', correct: true });
+    const skipped = settleRescue(s, true);
+    expect(skipped.pub.rescue).toMatchObject({ phase: 'done', rewards: {} });
+    expect(skipped.pub.rescue!.timer).toBeUndefined();
+    expect(scores(skipped)).toEqual(scores(base));
   });
 });

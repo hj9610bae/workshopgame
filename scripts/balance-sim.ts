@@ -5,17 +5,26 @@
  *   order : 역경 순서 오름차순(지금) vs 무작위(최종 결전 제외, 전리품은 처음 나오는 5개에) vs 구간 안에서만 무작위 (기본값)
  *   tier  : 구간 안에서만 무작위 두 가지만
  *   rescue: 구조선 hidden event (7일차 종료 후 한 함대를 목적지 거리로, 8~10일차 불참). 같은 난수로 '안 탐'·'탐'을 갈라 비교
+ *   quiz-order: 확정안에서 8일차 공격 순서 변화의 효과만 따로 (순서를 퀴즈 전 거리로 고정한 경우와 비교)
+ *   quiz  : 구조선 퀴즈안 (7일차 종료 후 3·4·5등이 퀴즈, 맞히면 N해리 전진, 계속 참여). 난도(정답률)·보상·제약 조합 비교
  * AI: 남은 생명력을 노이즈(σ1.5) 섞어 추정, 쓰러뜨릴 수 있어 보이는 큰 역경을 노리고 아니면 보상/남은 비율이 큰 역경을 깎음.
  *     화살은 6 이하로 보이는 큰 역경에, 투척 창은 가장 큰 역경에, 쇠사슬은 얻자마자, 삼지창은 가끔. 순풍은 드물게(맨 뒤로).
  * v3.3부터 data.ts 기준 배치가 22개라 '지금'·'역경 +4' 이름의 변형은 v3.2(18개) 때 결과와 기준이 다름 (2026-10-20 결과는 docs/progress.md).
  * 추가 역경은 id 100+로 대기열 중간에 끼워 넣음. 4번 해역 개시일(FINAL_OPEN_ROUND)은 data.ts 값 그대로.
  */
-import { AGENDAS, FINAL_AGENDA, LOOT_ORDER, SETUP, START_DISTANCE, START_SCORE, TEAM_IDS, shuffledSetup, type SpecialCardId, type Setup, type TeamId } from '../src/deal/data';
+import { AGENDAS, CARDS, FINAL_AGENDA, LOOT_ORDER, SETUP, START_DISTANCE, START_SCORE, TEAM_IDS, shuffledSetup, type SpecialCardId, type Setup, type TeamId } from '../src/deal/data';
 import { beginSubmit, createGame, ranking, resolveRound, startRound, type EngineState } from '../src/deal/engine';
 import type { Submission } from '../src/deal/types';
 
 let seed = 12345;
-const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+// mulberry32 (32비트 정수 연산). 2026-10-22 전에는 부동소수 LCG라 정밀도가 깎여 약 1만 번마다 같은 수열이 반복됐음 → 그 전 결과는 서로 다른 판이 수십 개뿐
+const rnd = () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = seed;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
 const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
 const SIGMA = 1.5;
 const DAYS = 10;
@@ -88,7 +97,7 @@ interface Stat {
 }
 
 /** AI 함대들의 오늘 제출 (skip: 제출하지 않는 함대, 예: 구조선을 탄 함대) */
-function decide(s: EngineState, setup: Setup, d: number, skip: ReadonlySet<TeamId> = new Set()): Partial<Record<TeamId, Submission>> {
+function decide(s: EngineState, setup: Setup, d: number, skip: ReadonlySet<TeamId> = new Set(), weak: ReadonlySet<TeamId> = new Set()): Partial<Record<TeamId, Submission>> {
   const open = s.pub.tables.map((t, i) => (t.agenda ? i : -1)).filter((i) => i >= 0);
   const subs: Partial<Record<TeamId, Submission>> = {};
   const est = s.secret.remaining.map((r) => r + gauss() * SIGMA);
@@ -99,7 +108,7 @@ function decide(s: EngineState, setup: Setup, d: number, skip: ReadonlySet<TeamI
     const e = (i: number) => Math.max(1, Math.round(est[i]));
     const last = d === DAYS;
     let card: Submission['card'] = 'basic';
-    let killable = open.filter((i) => e(i) <= 2).sort((a, b) => reward(b) - reward(a));
+    let killable = open.filter((i) => e(i) <= (weak.has(t) ? WEAK_POWER : 2)).sort((a, b) => reward(b) - reward(a));
     if (!killable.length && h.blitz > 0) {
       const k = open.filter((i) => e(i) <= 6 && (reward(i) >= 5 || last)).sort((a, b) => reward(b) - reward(a));
       if (k.length) {
@@ -288,7 +297,147 @@ function rescueSim(n: number, dests: Dest[]) {
   console.log(`     꼴찌 최종 평균 등수: 아무도 안 탐 ${avg(giftLastStay)} · 1등만 탐(선물 없음) ${avg(giftLastNoGift)} · 1등 탐 + 화살 ${avg(giftLastRide)}`);
 }
 
+/* ───── 구조선 퀴즈 (2026-10-22 검토): 7일차 종료 후 3·4·5등에게 퀴즈, 맞히면 전진. 8~10일차도 그대로 참여 ───── */
+
+/** 약화된 기본 무기 공격력 (제약안) */
+const WEAK_POWER = 1;
+let attacker: TeamId | undefined;
+let weakTeams: ReadonlySet<TeamId> = new Set();
+// 엔진은 그대로 두고 시뮬레이션 안에서만 함대별 단검 공격력을 바꿈:
+// resolveRound 는 각 함대 차례에 subs[t] 를 읽은 직후 그 함대의 공격을 적용하므로, 마지막으로 읽힌 함대를 공격 함대로 봄
+Object.defineProperty(CARDS.basic, 'power', { get: () => (attacker && weakTeams.has(attacker) ? WEAK_POWER : 2) });
+const tracked = (subs: Partial<Record<TeamId, Submission>>) =>
+  new Proxy(subs, { get: (o, k) => ((attacker = k as TeamId), o[k as TeamId]) });
+
+interface QuizPlan {
+  name: string;
+  /** 정답률 (난도: 하 0.9 · 중 0.6 · 상 0.3 가정) */
+  p: number;
+  /** 7일차 3·4·5등 각각의 보상 (해리) */
+  reward: [number, number, number];
+  /** 맞힌 함대의 8~10일차 단검 공격력 −1 */
+  weak?: boolean;
+  /** 맞힌 함대는 8일차 하루 쉼 */
+  rest?: boolean;
+  /** 보상으로 7일차 2등보다 앞서지는 못함 (2등 거리까지만) */
+  cap?: boolean;
+  /** 비교용: 보상은 그대로 주되 8일차 공격 순서는 퀴즈 전 거리로 정함 (순서가 바뀌는 효과만 뺀 것) */
+  orderFixed?: boolean;
+}
+
+function quizContinue(s0: EngineState, setup: Setup, weak: ReadonlySet<TeamId>, rest: ReadonlySet<TeamId>, late: Partial<Record<TeamId, number>> = {}): EngineState {
+  let s = s0;
+  for (let d = RESCUE_DAY + 1; d <= DAYS; d++) {
+    s = startRound(s, rnd).state;
+    // orderFixed: 8일차 순서가 정해진 뒤에 보상을 더함
+    if (d === RESCUE_DAY + 1) for (const [t, r] of Object.entries(late)) s.pub.teams[t as TeamId]!.score += r!;
+    s = beginSubmit(s, 0);
+    weakTeams = weak;
+    s = resolveRound(s, tracked(decide(s, setup, d, d === RESCUE_DAY + 1 ? rest : new Set(), weak))).state;
+    weakTeams = new Set();
+    attacker = undefined;
+  }
+  return s;
+}
+
+function quizSim(n: number, plans: QuizPlan[]) {
+  type Row = { win1: boolean[]; rank2: number[]; rank345: number[]; win345: boolean[]; solvedRank: number[]; solvedWin: boolean[]; pass1: boolean[]; pass2: boolean[]; final345: boolean[]; finalSolved: boolean[] };
+  const empty = (): Row => ({ win1: [], rank2: [], rank345: [], win345: [], solvedRank: [], solvedWin: [], pass1: [], pass2: [], final345: [], finalSolved: [] });
+  const rows = plans.map(empty);
+  const base = empty();
+  const gap: number[][] = [[], [], [], []];
+  const d7: number[][] = [[], [], [], [], []];
+  for (let g = 0; g < n; g++) {
+    const setup = shuffledSetup(rnd);
+    let s: EngineState = createGame(TEAM_IDS, setup);
+    for (let d = 1; d <= RESCUE_DAY; d++) {
+      s = beginSubmit(startRound(s, rnd).state, 0);
+      s = resolveRound(s, decide(s, setup, d)).state;
+    }
+    const o7 = ranking(s.pub).map((r) => r.team);
+    o7.forEach((t, r) => d7[r].push(distOf(s, t)));
+    for (let r = 0; r < 4; r++) gap[r].push(distOf(s, o7[r + 1]) - distOf(s, o7[r]));
+    const record = (row: Row, end: EngineState, solved: TeamId[]) => {
+      const win = ranking(end.pub)[0].team;
+      row.win1.push(win === o7[0]);
+      row.rank2.push(rankOf(end, o7[1]));
+      o7.slice(2).forEach((t) => row.rank345.push(rankOf(end, t)));
+      row.win345.push(o7.slice(2).includes(win));
+      // 최종 결전(4번 해역)을 돌파한 함대
+      const fin = end.pub.tables[3]?.done?.find((x) => x.agenda === FINAL_AGENDA)?.team;
+      if (fin) {
+        row.final345.push(o7.slice(2).includes(fin));
+        if (solved.length) row.finalSolved.push(solved.includes(fin));
+      }
+      solved.forEach((t) => {
+        row.solvedRank.push(rankOf(end, t));
+        row.solvedWin.push(win === t);
+      });
+    };
+    const fork = seed;
+    record(base, quizContinue(s, setup, new Set(), new Set()), []);
+    plans.forEach((plan, k) => {
+      // 정답 여부는 판마다 따로 뽑고, 그 뒤 8~10일차는 같은 난수로 진행
+      seed = (fork ^ Math.imul(k + 1, 0x9e3779b9)) | 0;
+      const solved = o7.slice(2).filter(() => rnd() < plan.p);
+      const q = structuredClone(s);
+      const floor = START_DISTANCE + START_SCORE - distOf(s, o7[1]);
+      const late: Partial<Record<TeamId, number>> = {};
+      solved.forEach((t) => {
+        const r = o7.indexOf(t) - 2;
+        const team = q.pub.teams[t]!;
+        const before = team.score;
+        team.score += plan.reward[r];
+        if (plan.cap) team.score = Math.min(team.score, floor);
+        if (plan.orderFixed) {
+          late[t] = team.score - before;
+          team.score = before;
+        }
+      });
+      const after = ranking(q.pub).map((x) => x.team);
+      rows[k].pass1.push(solved.some((t) => after.indexOf(t) < after.indexOf(o7[0])));
+      rows[k].pass2.push(solved.some((t) => after.indexOf(t) < after.indexOf(o7[1])));
+      seed = fork;
+      record(rows[k], quizContinue(q, setup, new Set(plan.weak ? solved : []), new Set(plan.rest ? solved : []), late), solved);
+    });
+  }
+  const avg = (a: number[]) => f(mean(a));
+  console.log(`\n■ 구조선 퀴즈 (7일차 종료 후 3·4·5등, ${n}판, 역경 22개·구간 안 무작위)`);
+  console.log(`  7일차 평균 거리: ${d7.map((a, r) => `${r + 1}등 ${avg(a)}`).join(' · ')}해리`);
+  console.log(`  7일차 등수 사이 평균 간격: ${gap.map((a, r) => `${r + 1}→${r + 2}등 ${avg(a)}`).join(' · ')}해리  (2→3등 간격 중앙값 ${[...gap[1]].sort((a, b) => a - b)[Math.floor(n / 2)]})`);
+  const line = (name: string, r: Row) =>
+    `  ${name.padEnd(34)} 7일차1등 우승 ${pct(r.win1).padStart(4)} · 3~5등 중 우승 ${pct(r.win345).padStart(4)} · 3~5등 평균 ${avg(r.rank345)}등 · 2등 평균 ${avg(r.rank2)}등` +
+    (r.solvedRank.length ? ` | 맞힌 함대 평균 ${avg(r.solvedRank)}등·우승 ${pct(r.solvedWin)} | 보상 직후 1등 추월 ${pct(r.pass1)}·2등 추월 ${pct(r.pass2)}` : '') +
+    ` | 최종 결전 3~5등 돌파 ${pct(r.final345)}${r.finalSolved.length ? `·맞힌 함대 ${pct(r.finalSolved)}` : ''}`;
+  console.log(line('기준: 퀴즈 없음', base));
+  plans.forEach((plan, k) => console.log(line(plan.name, rows[k])));
+}
+
 const mode = process.argv[2] ?? 'order';
+if (mode === 'quiz-order') {
+  // 확정안(하 2 · 중 3 · 상 6)에서 8일차 공격 순서가 바뀌는 효과가 얼마나 되는지
+  const plans: QuizPlan[] = [];
+  for (const [name, p, r] of [['하(90%) 2해리', 0.9, 2], ['중(60%) 3해리', 0.6, 3], ['상(30%) 6해리', 0.3, 6], ['모두 정답 6해리', 1, 6]] as const) {
+    plans.push({ name, p, reward: [r, r, r] });
+    plans.push({ name: `${name} · 8일차 순서 고정`, p, reward: [r, r, r], orderFixed: true });
+  }
+  quizSim(Number(process.argv[3] ?? 2000), plans);
+  process.exit(0);
+}
+if (mode === 'quiz') {
+  const P = { 하: 0.9, 중: 0.6, 상: 0.3 } as const;
+  const plans: QuizPlan[] = [];
+  for (const [lv, p] of Object.entries(P)) for (const r of [1, 2, 3, 4, 5, 6]) plans.push({ name: `${lv}(${p * 100}%) ${r}해리`, p, reward: [r, r, r] });
+  for (const r of [2, 3, 4, 5]) plans.push({ name: `모두 정답 ${r}해리`, p: 1, reward: [r, r, r] });
+  for (const r of [3, 4, 5, 6]) plans.push({ name: `모두 정답 ${r}해리 + 단검 −1`, p: 1, reward: [r, r, r], weak: true });
+  for (const r of [3, 4, 5, 6]) plans.push({ name: `모두 정답 ${r}해리 + 8일차 쉼`, p: 1, reward: [r, r, r], rest: true });
+  for (const r of [4, 6]) plans.push({ name: `모두 정답 ${r}해리 · 2등 거리까지`, p: 1, reward: [r, r, r], cap: true });
+  plans.push({ name: '모두 정답 차등 3·4·5해리', p: 1, reward: [3, 4, 5] });
+  plans.push({ name: '모두 정답 차등 2·3·4해리', p: 1, reward: [2, 3, 4] });
+  plans.push({ name: '중(60%) 차등 3·4·5해리', p: 0.6, reward: [3, 4, 5] });
+  quizSim(Number(process.argv[3] ?? 2000), plans);
+  process.exit(0);
+}
 if (mode === 'rescue') {
   rescueSim(2000, process.argv[3] === 'second' ? ['second'] : [0, -3, 3, 'second']);
   process.exit(0);

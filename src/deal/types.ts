@@ -1,4 +1,4 @@
-import type { CardId, ExtraCardId, SpecialCardId, TeamId } from './data';
+import type { CardId, ExtraCardId, QuizLevel, SpecialCardId, TeamId } from './data';
 
 /** 역경의 생명력을 깎은 기록 (비공개, 진행자 창에만) */
 export interface Hit {
@@ -72,16 +72,20 @@ export interface PublicState {
   events: GameEvent[];
   /** 사회자 화면에 공개된 사건 수 */
   revealed: number;
-  /** 구조선 hidden event (RESCUE_ROUND 공개 뒤). 예전 저장 게임엔 없음 */
+  /** 구조선 퀴즈 hidden event (RESCUE_ROUND 공개 뒤). 예전 저장 게임엔 없음 */
   rescue?: RescueState;
 }
 
-/** 구조선: 1등을 뺀 함대(candidates) 중 가위바위보로 뽑힌 함대(chosen)가 탈지(boarded) 정함 */
+/** 구조선 퀴즈: 7일차 3·4·5등(candidates)이 난도(level)를 골라 퀴즈, 맞히면(correct) 전진(rewards). 모두 계속 항해 */
 export interface RescueState {
   phase: 'offer' | 'done';
   candidates: TeamId[];
-  chosen?: TeamId;
-  boarded?: boolean;
+  level?: Partial<Record<TeamId, QuizLevel>>;
+  correct?: Partial<Record<TeamId, boolean>>;
+  /** 정산 뒤 받은 전진 거리 */
+  rewards?: Partial<Record<TeamId, number>>;
+  /** 지금 생각 시간을 재는 함대와 끝나는 시각 (ms) */
+  timer?: { team: TeamId; until: number };
 }
 
 /** Firebase rooms/{code}/secret — 사회자만 읽음 */

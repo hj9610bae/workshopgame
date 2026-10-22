@@ -22,8 +22,16 @@ export const FINAL_OPEN_ROUND = 8;
 export const TABLE_COUNT = 4;
 /** 이 일차 공개가 끝난 뒤 구조선 hidden event (4번 해역이 생기기 전) */
 export const RESCUE_ROUND = 7;
-/** 구조선에 타면 도착하는 고국과의 거리 (음수 = 이타카 내륙). scripts/balance-sim.ts rescue 결과로 정함 */
-export const RESCUE_DISTANCE = -3;
+/** 구조선 퀴즈 난도 (함대가 고름) */
+export type QuizLevel = 'low' | 'mid' | 'high';
+export const QUIZ_LEVELS: QuizLevel[] = ['low', 'mid', 'high'];
+export const QUIZ_LABEL: Record<QuizLevel, string> = { low: '하', mid: '중', high: '상' };
+/** 맞히면 전진하는 거리. 정답률 하 90% · 중 60% · 상 30% 가정에서 기대값이 같도록 (scripts/balance-sim.ts quiz, 2026-10-22). 오답 벌칙 없음 */
+export const QUIZ_REWARD: Record<QuizLevel, number> = { low: 2, mid: 3, high: 6 };
+/** 퀴즈 기회: 7일차 순위표에서 이 등수부터 (3·4·5등) */
+export const QUIZ_FROM_RANK = 3;
+/** 문제를 공개한 뒤 생각 시간 (진행자가 함대마다 시작) */
+export const QUIZ_THINK_SECONDS = 60;
 export const SCOUT_COST = 1;
 export const CUT_IN_COST = 2;
 
