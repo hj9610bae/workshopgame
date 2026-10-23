@@ -11,7 +11,7 @@ export const ROUNDS = 10;
  */
 export const START_SCORE = 10;
 /** 출발 시 고국(이타카)까지의 거리 (해리) */
-export const START_DISTANCE = 15;
+export const START_DISTANCE = 30;
 /** 고국과의 거리: 작을수록(음수면 내륙까지) 좋음 */
 export const distanceOf = (score: number): number => START_DISTANCE + START_SCORE - score;
 export const SUBMIT_SECONDS = 180;

@@ -6,6 +6,7 @@
  *   tier  : 구간 안에서만 무작위 두 가지만
  *   rescue: 구조선 hidden event (7일차 종료 후 한 함대를 목적지 거리로, 8~10일차 불참). 같은 난수로 '안 탐'·'탐'을 갈라 비교
  *   quiz-order: 확정안에서 8일차 공격 순서 변화의 효과만 따로 (순서를 퀴즈 전 거리로 고정한 경우와 비교)
+ *   start : 초기 출발 거리 (실제 진행 그대로 10일 + 7일차 스핑크스 퀴즈). 최종 1등이 전진한 거리 분포 → 1등이 내륙 3~7해리에 오는 출발 거리
  *   quiz  : 구조선 퀴즈안 (7일차 종료 후 3·4·5등이 퀴즈, 맞히면 N해리 전진, 계속 참여). 난도(정답률)·보상·제약 조합 비교
  * AI: 남은 생명력을 노이즈(σ1.5) 섞어 추정, 쓰러뜨릴 수 있어 보이는 큰 역경을 노리고 아니면 보상/남은 비율이 큰 역경을 깎음.
  *     화살은 6 이하로 보이는 큰 역경에, 투척 창은 가장 큰 역경에, 쇠사슬은 얻자마자, 삼지창은 가끔. 순풍은 드물게(맨 뒤로).
@@ -160,7 +161,7 @@ function play(setup: Setup): Stat {
     lootIds.forEach((id, k) => {
       if (!lootDay[k] && doneNow.includes(id)) lootDay[k] = d;
     });
-    for (const e of s.pub.events) if (e.agenda && e.reward && ((e.weapon && e.weapon !== 'basic') || e.stolenBy)) specialGain += e.reward;
+    for (const e of s.pub.events) if (e.agenda && e.reward && ((e.weapon && e.weapon !== 'basic') || e.kind === 'steal')) specialGain += e.reward;
     slain = doneNow.length;
     slainBy[d] = slain;
     if (!firstDeal && slain) firstDeal = d;
@@ -413,7 +414,43 @@ function quizSim(n: number, plans: QuizPlan[]) {
   plans.forEach((plan, k) => console.log(line(plan.name, rows[k])));
 }
 
+/* ───── 초기 출발 거리 (2026-10-23): 출발 거리는 모든 함대의 거리를 똑같이 옮길 뿐이라(아이템 한계는 전진 거리 기준) 1등의 총 전진 거리 분포만 보면 됨 ───── */
+function startSim(n: number) {
+  // 스핑크스: 3·4·5등이 난도를 고르고(무작위) 맞히면 전진. 정답률 하 90% · 중 60% · 상 30% 가정
+  const levels = [[0.9, 2], [0.6, 3], [0.3, 6]] as const;
+  const gain: number[][] = [[], [], [], [], []];
+  for (let g = 0; g < n; g++) {
+    const setup = shuffledSetup(rnd);
+    let s: EngineState = createGame(TEAM_IDS, setup);
+    for (let d = 1; d <= DAYS; d++) {
+      s = beginSubmit(startRound(s, rnd).state, 0);
+      s = resolveRound(s, decide(s, setup, d)).state;
+      if (d === RESCUE_DAY) {
+        for (const r of ranking(s.pub).slice(2)) {
+          const [p, reward] = levels[Math.floor(rnd() * 3)];
+          if (rnd() < p) s.pub.teams[r.team]!.score += reward;
+        }
+      }
+    }
+    ranking(s.pub).forEach((r, k) => gain[k].push(r.score - START_SCORE));
+  }
+  const q = (a: number[], x: number) => [...a].sort((u, v) => u - v)[Math.floor((a.length - 1) * x)];
+  console.log(`\n■ 최종 등수별 총 전진 거리 (${n}판, 실제 배치·스핑크스 포함)`);
+  gain.forEach((a, k) => console.log(`  ${k + 1}등: 평균 ${f(mean(a))} · 중앙값 ${q(a, 0.5)} · 10~90% ${q(a, 0.1)}~${q(a, 0.9)} · 25~75% ${q(a, 0.25)}~${q(a, 0.75)}`));
+  const g1 = gain[0];
+  console.log('  출발 거리별 최종 1등 거리 (내륙 3~7해리 = −3~−7 안에 드는 비율, 중앙값):');
+  const pc = (a: number[], ok: (x: number) => boolean) => `${Math.round((100 * a.filter(ok).length) / a.length)}%`.padStart(4);
+  for (let start = 15; start <= 46; start++) {
+    const fin = g1.map((x) => start - x);
+    console.log(`    ${String(start).padStart(2)}해리 → 1등 중앙값 ${String(q(fin, 0.5)).padStart(3)} (25~75% ${q(fin, 0.25)}~${q(fin, 0.75)}) · −3~−7 안 ${pc(fin, (x) => x <= -3 && x >= -7)} · 내륙 도착(<0) ${pc(fin, (x) => x < 0)} · 2등 중앙값 ${q(gain[1].map((x) => start - x), 0.5)} · 꼴찌 중앙값 ${q(gain[4].map((x) => start - x), 0.5)}`);
+  }
+}
+
 const mode = process.argv[2] ?? 'order';
+if (mode === 'start') {
+  startSim(Number(process.argv[3] ?? 3000));
+  process.exit(0);
+}
 if (mode === 'quiz-order') {
   // 확정안(하 2 · 중 3 · 상 6)에서 8일차 공격 순서가 바뀌는 효과가 얼마나 되는지
   const plans: QuizPlan[] = [];
