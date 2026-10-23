@@ -2343,3 +2343,418 @@ button.dot-btn.on {
     var(--card-grain),
     linear-gradient(160deg, rgba(59, 50, 22, 0.75), rgba(92, 74, 23, 0.7));
 }
+
+/* ───── 이타카 내륙의 말 · 결승선(왕궁) · 왕좌 복위 ───── */
+.ship-horse {
+  font-size: 1.3em;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+.sea-goal {
+  position: absolute;
+  top: 50%;
+  left: 0.4em;
+  right: calc(100% - var(--goal));
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 14px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 30%, rgba(255, 228, 140, 0.35), rgba(58, 52, 24, 0.85) 75%);
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 22px rgba(244, 196, 48, 0.55);
+  animation: goal-glow 2.6s ease-in-out infinite;
+}
+
+/* 결승선: 왕궁 바로 오른쪽의 체크무늬 세로줄 */
+.sea-goal::after {
+  content: '';
+  position: absolute;
+  top: -40vh;
+  bottom: -40vh;
+  right: -9px;
+  width: 8px;
+  background: repeating-conic-gradient(#fff 0 25%, #111 0 50%) 0 0 / 8px 8px;
+  opacity: 0.85;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.goal-art {
+  display: flex;
+  gap: 2px;
+  font-size: 2.7em;
+  line-height: 1.1;
+}
+
+.sea-goal b {
+  font-family: var(--font-title);
+  font-size: 1.15em;
+  color: var(--gold);
+  line-height: 1.2;
+}
+
+.sea-goal small {
+  font-size: 0.85em;
+  font-weight: 800;
+}
+
+@keyframes goal-glow {
+  50% {
+    box-shadow: 0 0 36px rgba(244, 196, 48, 0.9);
+  }
+}
+
+.sea-goal.reached {
+  border-color: #fff3c4;
+  box-shadow: 0 0 46px rgba(255, 220, 120, 1);
+}
+
+.sea-goal.reached .goal-art span:last-child {
+  animation: bob 1.6s ease-in-out infinite;
+}
+
+/* 1등 함대가 결승선까지 천천히 항해해 들어옴 */
+.ship.home {
+  z-index: 2;
+}
+
+.ship.home.sail {
+  animation-duration: 3.2s;
+}
+
+.ship.home .ship-pin {
+  border-color: #fff3c4;
+  background: radial-gradient(circle at 35% 28%, #ffe58a, #b8860b 75%);
+  box-shadow:
+    0 0 26px rgba(255, 220, 120, 1),
+    0 4px 0 #6b4a0a;
+}
+
+.ship-crown {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+  color: var(--navy);
+  font-weight: 900;
+}
+
+.ship.home .ship-tag {
+  border-color: var(--gold);
+  box-shadow: 0 0 16px rgba(244, 196, 48, 0.7);
+}
+
+/* 8일차: 순서 발표 뒤 '해역 공개'로 띄우는 최종 결전 배너 */
+.banner.final-open {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(244, 196, 48, 0.3), transparent 65%),
+    linear-gradient(135deg, rgba(28, 37, 65, 0.98), rgba(90, 60, 15, 0.97));
+  border-color: var(--gold);
+  box-shadow: 0 0 40px rgba(244, 196, 48, 0.55);
+}
+
+.banner.final-open h2 {
+  font-size: 2.1rem;
+  color: var(--gold);
+}
+
+.banner.final-open .banner-icon {
+  font-size: 2.8rem;
+  animation: bob 2.4s ease-in-out infinite;
+}
+
+/* ───── 최종 피날레: 이타카의 왕좌 복위식 ───── */
+.finale {
+  position: relative;
+  flex: 1;
+  min-height: calc(100dvh - 90px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 18px;
+  padding-top: 4vh;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #02040c;
+  text-align: center;
+  animation: finale-dawn 2.4s ease-out both;
+}
+
+/* 어두운 화면 → 황금빛 */
+@keyframes finale-dawn {
+  from {
+    background: #000;
+  }
+  to {
+    background: #1a1405;
+  }
+}
+
+.finale-aura {
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 236, 160, 0.75), rgba(244, 196, 48, 0.35) 22%, rgba(212, 175, 55, 0.08) 45%, transparent 60%),
+    repeating-conic-gradient(from 0deg at 50% 45%, rgba(255, 220, 120, 0.13) 0 6deg, transparent 6deg 18deg);
+  animation:
+    aura-in 2.4s ease-out both,
+    aura-spin 60s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes aura-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes aura-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.finale-temple {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 30%;
+  pointer-events: none;
+  animation: aura-in 3s ease-out 0.4s both;
+}
+
+.finale-temple .isle {
+  fill: rgba(20, 16, 6, 0.85);
+}
+
+.finale-temple .temple {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1.2;
+  filter: drop-shadow(0 0 4px rgba(255, 220, 120, 0.9));
+}
+
+.finale-temple .sea-line {
+  fill: none;
+  stroke: rgba(255, 220, 120, 0.35);
+  stroke-width: 0.8;
+}
+
+.finale-card {
+  position: relative;
+  z-index: 2;
+  width: min(1100px, 92%);
+  padding: 22px 40px 26px;
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgba(11, 19, 43, 0.92), rgba(40, 30, 8, 0.92));
+  border: 2px solid var(--gold);
+  box-shadow:
+    0 0 60px rgba(244, 196, 48, 0.55),
+    inset 0 0 0 6px rgba(212, 175, 55, 0.18);
+  animation: finale-rise 1.2s cubic-bezier(0.2, 1.2, 0.4, 1) 1.1s both;
+}
+
+@keyframes finale-rise {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.92);
+  }
+}
+
+.finale-card .laurel {
+  width: 110px;
+  color: var(--gold);
+  filter: drop-shadow(0 0 8px rgba(255, 220, 120, 0.8));
+}
+
+.finale-kicker {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+
+.finale-card h1 {
+  margin: 6px 0 16px;
+  font-size: 2.3rem;
+  color: #fff3c4;
+  text-shadow: 0 0 18px rgba(244, 196, 48, 0.6);
+}
+
+.finale-winner {
+  padding: 16px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(244, 196, 48, 0.6);
+  background: rgba(244, 196, 48, 0.08);
+  animation: finale-rise 1s cubic-bezier(0.2, 1.4, 0.4, 1) 2s both;
+}
+
+.finale-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 2.6rem;
+  font-weight: 900;
+}
+
+.finale-title b {
+  background: linear-gradient(180deg, #fff3c4, var(--gold) 55%, var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px rgba(244, 196, 48, 0.7));
+}
+
+.finale-quote {
+  margin: 10px 0 0;
+  font-size: 1.3rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.finale-stats {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 1.25rem;
+  text-align: left;
+  justify-content: center;
+  animation: finale-rise 1s ease-out 2.8s both;
+}
+
+.finale-stats b {
+  color: var(--mint);
+}
+
+.finale-stats .finale-who {
+  margin-top: 6px;
+  font-weight: 900;
+  color: var(--gold);
+}
+
+.finale-nav {
+  position: relative;
+  z-index: 3;
+  animation: finale-rise 0.8s ease-out 3.4s both;
+}
+
+/* 황금 가루: 위에서 반짝이며 내려옴 */
+.finale-dust i {
+  position: absolute;
+  top: -12px;
+  left: calc(var(--i) * 2.5% + 0.6%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7d1, var(--gold) 60%, transparent 70%);
+  box-shadow: 0 0 8px rgba(255, 220, 120, 0.9);
+  animation: dust-fall calc(5s + var(--i) * 0.07s) linear infinite;
+  animation-delay: calc(var(--i) * -0.29s + 1s);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.finale-dust i:nth-child(3n) {
+  width: 10px;
+  height: 4px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, var(--gold-deep), #fff3c4);
+}
+
+@keyframes dust-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) translateX(40px) rotate(540deg);
+    opacity: 0.2;
+  }
+}
+
+/* 황금 폭죽: 여러 자리에서 번갈아 터짐 */
+.burst {
+  position: absolute;
+  left: calc(12% + var(--b) * 15%);
+  width: 0;
+  height: 0;
+  z-index: 1;
+}
+
+.burst:nth-child(odd) {
+  top: 14%;
+}
+
+.burst:nth-child(even) {
+  top: 34%;
+}
+
+.burst i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
+  border-radius: 50%;
+  background: #ffe58a;
+  box-shadow: 0 0 10px 2px rgba(244, 196, 48, 0.9);
+  rotate: calc(var(--k) * 30deg);
+  animation: burst 2.6s ease-out infinite;
+  animation-delay: calc(1.2s + var(--b) * 0.45s);
+  opacity: 0;
+}
+
+@keyframes burst {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  45% {
+    opacity: 1;
+  }
+  70%,
+  100% {
+    transform: translateY(-110px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finale-aura,
+  .finale-dust i,
+  .burst i {
+    animation: none !important;
+  }
+}
+
+@media (max-height: 800px) {
+  .finale-card {
+    padding: 14px 28px 16px;
+  }
+
+  .finale-card h1 {
+    font-size: 1.8rem;
+  }
+
+  .finale-title {
+    font-size: 2rem;
+  }
+}

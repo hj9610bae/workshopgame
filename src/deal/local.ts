@@ -29,6 +29,10 @@ export interface LocalGame {
   log: LogEntry[];
   /** 최종 결과에서 안건별 요구 수치 공개 화면을 보여 주는 중 (진행자 창과 같이 바뀜) */
   agendasShown?: boolean;
+  /** FINAL_OPEN_ROUND 순서 발표 뒤 '해역 공개'를 눌러 4번 해역(최종 결전)을 보여 줌 */
+  finalShown?: boolean;
+  /** 최종 결과: 피날레(왕좌 복위식)를 넘기고 순위를 보여 주는 중 */
+  rankShown?: boolean;
   /** 항해 일지 다음 마지막 페이지: 엔딩 크레딧 */
   creditsShown?: boolean;
   /** 되돌리기용 이전 상태 (가장 최근이 마지막) */

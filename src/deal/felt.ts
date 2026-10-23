@@ -113,7 +113,14 @@ export interface SeatLook {
   docked?: TeamId[];
   /** 배 위치를 기억해 움직임을 그리는 단위 (게임 화면·설명·최종 결과가 서로 섞이지 않게) */
   key?: string;
+  /** 이타카 내륙 왼쪽에 결승선(왕궁) 표시 (FINAL_OPEN_ROUND 부터) */
+  goal?: boolean;
+  /** 결승선에 완전히 도착해 왕좌를 되찾은 함대 (10일차 끝·최종 결과의 1등) */
+  arrive?: TeamId[];
 }
+
+/** 결승선의 가로 위치(%): 왼쪽 왕궁 그림 바로 오른쪽 */
+const GOAL_X = 13;
 
 /** 바다 지도의 배 핀: 짙은 선체 + 금빛 돛 두 장 (앞 돛은 밝게, 뒤 돛은 어둡게 해 입체감) */
 const SHIP_SVG = `<svg class="ship-art" viewBox="0 0 32 32" aria-hidden="true">
@@ -149,39 +156,54 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
   const near = Math.min(0, ...dist);
   const far = Math.max(0, ...dist);
   const span = Math.max(far - near, 6);
-  const lo = near - Math.max(2, span * 0.15);
   const hi = far + Math.max(1.5, span * 0.1);
+  // 결승선이 있으면 가장 안쪽 함대도 결승선보다 오른쪽(지도의 약 20% 이후)에 오도록 내륙을 넓힘
+  const lo = near - Math.max(2, span * 0.15, look.goal ? (hi - near) * 0.26 : 0);
   const x = (d: number) => ((d - lo) / (hi - lo)) * 100;
   const port = x(0);
   const step = tickStep(hi - lo);
   // 눈금마다 은은하게 빛나는 세로 점선 (항구 0은 따로 굵게 그림)
   const ticks: string[] = [];
   for (let v = Math.ceil(lo / step) * step; v < hi; v += step) {
-    if (v !== 0) ticks.push(`<span class="sea-tick${v < 0 ? ' land' : ''}" style="--x:${x(v).toFixed(2)}%"><small>${v > 0 ? `${v}해리` : v}</small></span>`);
+    // 결승선 왼쪽(왕궁 그림 밑)의 눈금은 그리지 않음
+    if (v !== 0 && !(look.goal && x(v) < GOAL_X + 1)) ticks.push(`<span class="sea-tick${v < 0 ? ' land' : ''}" style="--x:${x(v).toFixed(2)}%"><small>${v > 0 ? `${v}해리` : v}</small></span>`);
   }
   const ships = order
     .map((t, i) => {
       const d = dist[i];
-      const px = x(d);
+      const home = !!look.goal && !!look.arrive?.includes(t);
+      const px = home ? GOAL_X : x(d);
       const id = `${key}:${t}`;
-      const prev = lastX.get(id);
+      // 처음 그리는 도착 함대도 제자리에서 결승선까지 항해해 오게
+      const prev = lastX.get(id) ?? (home ? x(d) : undefined);
       lastX.set(id, px);
       const sail = prev !== undefined && Math.abs(prev - px) > 0.05;
+      // 이타카 내륙(음수)에 들어가면 배 대신 말
+      const art = d < 0 || home ? '<span class="ship-horse">🐎</span>' : SHIP_SVG;
+      const badge = home ? '👑' : look.docked?.includes(t) ? '⚓' : i + 1;
       // delta 는 전진 거리 변화: 전진하면 고국과의 거리가 줄어듦
       const dd = look.deltas?.[t] ?? 0;
       const delta = dd ? `<span class="delta ${dd > 0 ? 'up' : 'down'}">${dd > 0 ? '−' : '+'}${Math.abs(dd)}</span>` : '';
       const status = look.status?.[t];
       const style = `--i:${i};--x:${px.toFixed(2)}%${sail ? `;--from:${prev!.toFixed(2)}%` : ''}`;
       // 금빛 돛 핀이 정확히 거리 자리에 뜨고, 아래 말풍선에 함대 이름 (거리)
-      return `<li class="ship${look.active === t ? ' active' : ''}${sail ? ' sail' : ''}" style="${style}">
-        <span class="ship-pin">${SHIP_SVG}<span class="ship-pos">${look.docked?.includes(t) ? '⚓' : i + 1}</span></span>
-        <span class="ship-tag"><b class="ship-name">${esc(teamName(t))}</b> <span class="ship-dist">(${distanceLabel(d)})</span>${delta}${status ? `<span class="ship-status">${status}</span>` : ''}</span>
+      return `<li class="ship${look.active === t ? ' active' : ''}${sail ? ' sail' : ''}${home ? ' home' : ''}" style="${style}">
+        <span class="ship-pin">${art}<span class="ship-pos">${badge}</span></span>
+        <span class="ship-tag"><b class="ship-name">${esc(teamName(t))}</b> <span class="ship-dist">(${distanceLabel(d)})</span>${delta}${home ? '<span class="ship-crown">👑 왕좌 복위</span>' : ''}${status ? `<span class="ship-status">${status}</span>` : ''}</span>
       </li>`;
     })
     .join('');
-  return `<section class="sea" style="--rows:${order.length};--port:${port.toFixed(2)}%">
+  // 결승선: 이타카 왕궁과 기다리는 페넬로페
+  const goal = look.goal
+    ? `<div class="sea-goal${look.arrive?.length ? ' reached' : ''}" style="--goal:${GOAL_X}%">
+        <div class="goal-art" aria-hidden="true"><span>🏛️</span><span>👸</span></div>
+        <b>이타카 왕궁</b><small>🏁 결승선</small>
+      </div>`
+    : '';
+  return `<section class="sea${look.goal ? ' has-goal' : ''}" style="--rows:${order.length};--port:${port.toFixed(2)}%">
     <div class="sea-waves" aria-hidden="true"></div>
     <div class="sea-land"><span>🏛️ 이타카</span></div>
+    ${goal}
     <div class="sea-ticks">${ticks.join('')}</div>
     <div class="sea-port"><span>⚓ 이타카 항구 0</span></div>
     <div class="sea-troy"><span>⚔️ 트로이 전장</span></div>

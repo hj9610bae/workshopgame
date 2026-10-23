@@ -186,10 +186,26 @@ function topbar(): string {
   </header>`;
 }
 
-/** 화면에 있는 해역 번호(0부터). 4번 해역(최종 결전)은 FINAL_OPEN_ROUND 순서 발표 때 생김 */
+/** FINAL_OPEN_ROUND 순서 발표 중이고 아직 '해역 공개'를 누르지 않음 (4번 해역은 엔진에 이미 있지만 화면엔 숨김) */
+function finalPending(): boolean {
+  const { pub } = eng();
+  return pub.stage === 'order' && pub.events.some((e) => e.kind === 'finalOpen') && !game.finalShown;
+}
+
+/** 화면에 있는 해역 번호(0부터). 4번 해역(최종 결전)은 FINAL_OPEN_ROUND 순서 발표 뒤 '해역 공개'로 생김 */
 function visibleTables(): number[] {
   const { pub } = eng();
-  return pub.tables.map((_, i) => i).filter((i) => i < INITIAL_TABLES.length || pub.round >= FINAL_OPEN_ROUND);
+  return pub.tables.map((_, i) => i).filter((i) => i < INITIAL_TABLES.length || (pub.round >= FINAL_OPEN_ROUND && !finalPending()));
+}
+
+/** 바다 지도의 결승선(이타카 왕궁): FINAL_OPEN_ROUND 부터 */
+const showGoal = (): boolean => !isPractice() && eng().pub.round >= FINAL_OPEN_ROUND;
+
+/** 마지막 날 '오늘의 항해 끝'까지 공개되면 1등 함대가 결승선에 도착 */
+function arrivedTeams(): TeamId[] {
+  const { pub } = eng();
+  const over = pub.stage === 'final' || (pub.round >= ROUNDS && pub.stage === 'reveal' && pub.revealed >= pub.events.length);
+  return !isPractice() && over ? ranking(pub).filter((r) => r.rank === 1).map((r) => r.team) : [];
 }
 
 /** 스핑크스 퀴즈를 정산한 그날 공개 단계: 바다 지도·순위를 보상이 반영된 지금 거리로 */
@@ -294,7 +310,14 @@ function banner(): string {
   const done = pub.order.filter((t) => game.subs[t]?.table).length;
   switch (pub.stage) {
     case 'order': {
-      const news = pub.events.map((e) => describeEvent(e)).map((d) => `<li>${d.icon} ${esc(d.title)}${d.detail ? ` <span class="muted">${esc(d.detail)}</span>` : ''}</li>`);
+      // 최종 결전 등장은 순서 발표와 따로, '해역 공개' 뒤에 띄움
+      const open = pub.events.find((e) => e.kind === 'finalOpen');
+      if (open && game.finalShown) {
+        const d = describeEvent(open);
+        return `<div class="banner deal final-open pop"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}
+          <p class="muted small">${pub.round}일차 순서: ${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p></div>`;
+      }
+      const news = pub.events.filter((e) => e.kind !== 'finalOpen').map((e) => describeEvent(e)).map((d) => `<li>${d.icon} ${esc(d.title)}${d.detail ? ` <span class="muted">${esc(d.detail)}</span>` : ''}</li>`);
       const tie = pub.round === 1 ? '1일차 순서는 추첨!' : '고국에 가까운 함대부터. 같으면 지난 날 뒤 순번이 먼저.';
       return `<div class="banner calm"><h2>${pub.round}일차 순서 발표</h2><p>${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p>
         ${news.length ? `<ul class="news">${news.join('')}</ul>` : ''}<p class="muted small">${tie}</p></div>`;
@@ -349,9 +372,9 @@ function seatLook() {
   const e = latestEvent();
   const prevScores = pub.stage === 'reveal' ? pub.events[pub.revealed - 2]?.scores : undefined;
   // 구조선 퀴즈 정산 뒤에는 퀴즈 보상을 전진으로 표시
-  if (quizSettledToday()) return { status, deltas: pub.rescue?.rewards ?? {} };
+  if (quizSettledToday()) return { status, deltas: pub.rescue?.rewards ?? {}, goal: showGoal() };
   const deltas = e && prevScores ? Object.fromEntries(pub.teamIds.map((t) => [t, (e.scores[t] ?? 0) - (prevScores[t] ?? 0)])) : {};
-  return { status, deltas, active: e?.team };
+  return { status, deltas, active: e?.team, goal: showGoal(), arrive: arrivedTeams() };
 }
 
 function gameView(): string {
@@ -390,7 +413,9 @@ function dock(): string {
   let main = '';
   switch (pub.stage) {
     case 'order':
-      main = `<button class="wide" data-action="submit">📝 제출 받기 시작 (${SUBMIT_SECONDS / 60}분) ▶</button>`;
+      main = finalPending()
+        ? '<button class="wide" data-action="final-open">🌊 해역 공개 ▶</button>'
+        : `<button class="wide" data-action="submit">📝 제출 받기 시작 (${SUBMIT_SECONDS / 60}분) ▶</button>`;
       break;
     case 'submit': {
       const done = pub.order.filter((t) => game.subs[t]?.table).length;
@@ -530,7 +555,65 @@ function secretPanel(): string {
 }
 
 function finalView(): string {
-  return game.creditsShown ? credits() : game.agendasShown ? agendaReveal() : rankView();
+  return game.creditsShown ? credits() : game.agendasShown ? agendaReveal() : game.rankShown ? rankView() : finale();
+}
+
+/** 최종 피날레: 이타카의 왕좌 복위식. 어두운 화면이 황금빛 오라로 바뀌며 우승 함대 발표 */
+function finale(): string {
+  const { pub } = eng();
+  const winners = ranking(pub).filter((r) => r.rank === 1);
+  const names = winners.map((w) => esc(teamName(w.team))).join(' · ');
+  const best = winners[0] ? distanceOf(winners[0].score) : START_DISTANCE;
+  const home = best <= 0;
+  const where = best < 0 ? '이타카 내륙 안착' : best === 0 ? '이타카 항구 도착' : '고국을 눈앞에 둠';
+  const stats = winners
+    .map((w) => {
+      // 최종 결전을 돌파했으면 맨 앞에
+      const slain = pub.tables.flatMap((t) => t.done ?? []).filter((d) => d.team === w.team).map((d) => d.agenda)
+        .sort((a, b) => Number(b === FINAL_AGENDA) - Number(a === FINAL_AGENDA));
+      const titles = slain.slice(0, 3).map((id) => esc(AGENDAS[id].title)).join(', ');
+      const gates = slain.length ? `${titles}${slain.length > 3 ? ' 등' : ''} 총 <b>${slain.length}개</b> 관문 돌파` : '돌파한 관문 없이 끝까지 항해';
+      return `${winners.length > 1 ? `<li class="finale-who">${esc(teamName(w.team))}</li>` : ''}
+        <li>🏛️ 최종 도달 거리 : <b>[ ${distanceOf(w.score)}해리 (${where}) ]</b></li>
+        <li>⚔️ 극복한 관문 : ${gates}</li>`;
+    })
+    .join('');
+  const dust = Array.from({ length: 40 }, (_, i) => `<i style="--i:${i}"></i>`).join('');
+  const bursts = Array.from({ length: 6 }, (_, b) => `<span class="burst" style="--b:${b}">${Array.from({ length: 12 }, (_, k) => `<i style="--k:${k}"></i>`).join('')}</span>`).join('');
+  return `<section class="finale">
+    <div class="finale-aura" aria-hidden="true"></div>
+    ${templeArt()}
+    <div class="finale-dust" aria-hidden="true">${dust}</div>
+    <div class="finale-bursts" aria-hidden="true">${bursts}</div>
+    <div class="finale-card">
+      ${laurel()}
+      <p class="finale-kicker">👑 [ ${home ? '고국 이타카 귀환 성공' : '고국 이타카를 눈앞에'} ]</p>
+      <h1>"20년의 거친 바다를 헤치고 마침내 왕이 돌아왔다!"</h1>
+      <div class="finale-winner">
+        <p class="finale-title">🏆 최종 우승 : <b>[ ${names} ]</b></p>
+        <p class="finale-quote">"왕좌를 위협하던 구혼자들을 물리치고,<br />사랑하는 가족의 품으로 돌아가 이타카의 왕좌를 되찾았습니다!"</p>
+      </div>
+      <ul class="finale-stats">${stats}</ul>
+    </div>
+    ${showDock() ? '<div class="row center-row finale-nav"><button class="narrow" data-action="rank">🏆 전체 순위 보기 ▶</button></div>' : ''}
+  </section>`;
+}
+
+/** 피날레 배경: 바다 너머 고향 섬 위에 빛나는 신전 (라인 아트) */
+function templeArt(): string {
+  const cols = Array.from({ length: 6 }, (_, k) => `<rect x="${121 + k * 13}" y="62" width="6" height="34" rx="1"/>`).join('');
+  return `<svg class="finale-temple" viewBox="0 0 320 140" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <path class="isle" d="M0 140 L0 118 Q60 108 100 100 Q160 90 220 100 Q270 108 320 118 L320 140Z"/>
+    <g class="temple">
+      <path d="M112 60 L160 38 L208 60Z"/>
+      <rect x="112" y="58" width="96" height="5"/>
+      ${cols}
+      <rect x="108" y="96" width="104" height="4"/>
+      <rect x="104" y="100" width="112" height="4"/>
+    </g>
+    <path class="sea-line" d="M0 126 Q20 122 40 126 T80 126 T120 126 T160 126 T200 126 T240 126 T280 126 T320 126"/>
+    <path class="sea-line" d="M0 134 Q20 130 40 134 T80 134 T120 134 T160 134 T200 134 T240 134 T280 134 T320 134"/>
+  </svg>`;
 }
 
 function rankView(): string {
@@ -545,7 +628,7 @@ function rankView(): string {
   return `<section class="final-board">
     <div class="confetti">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
     <h1>🏆 최종 결과 · 고국과의 거리</h1>
-    ${seaMap(rows.map((r) => r.team), Object.fromEntries(rows.map((r) => [r.team, r.score])), { key: 'final' })}
+    ${seaMap(rows.map((r) => r.team), Object.fromEntries(rows.map((r) => [r.team, r.score])), { key: 'final', goal: true, arrive: arrivedTeams() })}
     <ol class="podium">${list}</ol>
     <blockquote class="closing">
       "${ROUNDS}일간의 험난한 항해가 모두 끝났습니다! 오늘 가장 먼저 귀환한 함대는 ${where}
@@ -553,7 +636,7 @@ function rankView(): string {
       이번 항해에서는 역경의 남은 생명력을 가늠하고 마지막 일격을 넣는 타이밍이 핵심이었습니다.
       실제 교섭에서도 큰 역경을 함께 깎아 내는 끈기와, 제시안을 내는 '타이밍 전략'이 성공적인 타결을 만든다는 점을 기억해 주시기 바랍니다!"
     </blockquote>
-    ${showDock() ? '<div class="row center-row"><button class="narrow" data-action="final-tab">🗺️ 항해 일지 보기 ▶</button></div>' : ''}
+    ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="rank">◀ 왕좌 복위식</button><button class="narrow" data-action="final-tab">🗺️ 항해 일지 보기 ▶</button></div>' : ''}
   </section>`;
 }
 
@@ -652,6 +735,7 @@ function tickTimer() {
 /** 각 진행 버튼이 눌릴 수 있는 단계 (두 번 눌러도 한 번만 처리) */
 const ALLOWED: Record<string, Stage[]> = {
   submit: ['order'],
+  'final-open': ['order'],
   resolve: ['submit'],
   'sub-table': ['submit'],
   'sub-card': ['submit'],
@@ -751,6 +835,8 @@ function act(action: string, el: HTMLElement) {
     case 'input-toggle':
       inputOpen = !inputOpen;
       return draw();
+    case 'final-open':
+      return save(commit(game, { finalShown: true }));
     case 'submit':
       inputOpen = false;
       return save(commit(game, { engine: beginSubmit(eng(), Date.now()), subs: {} }));
@@ -808,7 +894,9 @@ function act(action: string, el: HTMLElement) {
       return save(commit(game, { engine: step.state, log: [...game.log, ...logNotes(step)] }));
     }
     case 'finish':
-      return save(commit(game, { engine: finish(eng()), agendasShown: false, creditsShown: false }));
+      return save(commit(game, { engine: finish(eng()), rankShown: false, agendasShown: false, creditsShown: false }));
+    case 'rank':
+      return save({ ...game, rankShown: !game.rankShown, agendasShown: false, creditsShown: false });
     case 'rescue-open':
       return save(commit(game, { engine: openRescue(eng()) }));
     case 'quiz-level': {
@@ -852,8 +940,8 @@ function primaryAction(): string | null {
   if (mode === 'tutorial') return 'tut-next';
   if (mode !== 'game' || !game.engine || !showDock()) return null;
   const { pub } = eng();
-  if (pub.stage === 'order') return 'submit';
-  if (pub.stage === 'final') return !game.agendasShown ? 'final-tab' : !game.creditsShown ? 'credits' : null;
+  if (pub.stage === 'order') return finalPending() ? 'final-open' : 'submit';
+  if (pub.stage === 'final') return !game.rankShown ? 'rank' : !game.agendasShown ? 'final-tab' : !game.creditsShown ? 'credits' : null;
   if (pub.stage === 'reveal') {
     if (pub.revealed < pub.events.length) return 'reveal';
     if (isPractice()) return pub.round < PRACTICE_DAYS ? 'next-round' : null;
