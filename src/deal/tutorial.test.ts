@@ -48,7 +48,9 @@ describe('돌파 발표 문구', () => {
     // 동결된 해역에 낸 공격은 평소 공격과 똑같이 (낸 해역·무효 여부를 드러내지 않음)
     const frozen = describeEvent({ ...base, result: 'void', reason: 'hold', table: 2 });
     expect(frozen).toEqual(describeEvent({ ...base, result: 'done' }));
-    expect(describeEvent({ ...base, stolenBy: 'C', weapon: 'basic' }).detail).toContain('마지막 일격은 A함대의 🗡️ 기본 무기 단검 · ⚡ 투척 창: 그날 그 해역의 돌파 보상을 가로챔');
+    const steal = describeEvent({ ...base, kind: 'steal', team: 'C', victim: 'A', loot: 'hold' });
+    expect(steal.title).toBe('C함대, 투척 창으로 A함대의 키르케의 환락 돌파를 가로챘다!');
+    expect(steal.detail).toBe('⚡ 투척 창: 그날 그 해역의 돌파 보상을 가로챔 · A함대 3해리 후퇴, C함대 3해리 전진 · ⛓️ 쇠사슬 획득');
   });
 });
 

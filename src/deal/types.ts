@@ -25,7 +25,7 @@ export interface TeamState {
   deals: number;
 }
 
-export type EventKind = 'finalOpen' | 'practiceDeal' | 'start' | 'hold' | 'proposal' | 'promoDeal' | 'end';
+export type EventKind = 'finalOpen' | 'practiceDeal' | 'start' | 'hold' | 'proposal' | 'promoDeal' | 'steal' | 'end';
 export type ProposalResult = 'done' | 'deal' | 'promo' | 'void' | 'pass';
 export type VoidReason = 'hold' | 'empty' | 'invalid';
 
@@ -42,8 +42,8 @@ export interface GameEvent {
   weapon?: CardId;
   result?: ProposalResult;
   reason?: VoidReason;
-  /** 합의 사건: 실무 교섭 병행으로 보상을 가로챈 팀 */
-  stolenBy?: TeamId;
+  /** steal: 헤르메스의 투척 창에 돌파 보상(전진 거리)을 빼앗긴 함대 (team 이 가로챈 함대) */
+  victim?: TeamId;
   /** proposal: 지난 라운드 안건 보류 우선권으로 순번보다 먼저 적용됨 */
   first?: boolean;
   /** start: 새치기로 순서가 바뀌었는지, 바뀐 순서 */

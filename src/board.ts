@@ -290,7 +290,8 @@ function latestEvent(): GameEvent | undefined {
   return pub.stage === 'reveal' ? pub.events[pub.revealed - 1] : undefined;
 }
 
-const isDeal = (e: GameEvent): boolean => !!(e.agenda && e.reward && e.team);
+/** 돌파 사건 (해역에 새 역경이 올라옴). 투척 창 가로채기(steal)는 전진만 옮기는 사건이라 제외 */
+const isDeal = (e: GameEvent): boolean => e.kind !== 'steal' && !!(e.agenda && e.reward && e.team);
 
 function tableLooks(): TableLook[] {
   const { pub } = eng();
@@ -304,7 +305,7 @@ function tableLooks(): TableLook[] {
     if (!e?.table) continue;
     const i = e.table - 1;
     if (e.kind === 'finalOpen') looks[i] = { fresh: true };
-    else if (isDeal(e)) looks[i] = { deal: { team: e.stolenBy ?? e.team!, agenda: e.agenda!, reward: e.reward! }, fresh: true, slain: reveal };
+    else if (isDeal(e)) looks[i] = { deal: { team: e.team!, agenda: e.agenda!, reward: e.reward! }, fresh: true, slain: reveal };
     else if (e.kind === 'proposal' && e.result === 'promo') looks[i] = { promo: true };
     else if (e.kind === 'hold') looks[i] = { freeze: true };
   }
@@ -364,14 +365,14 @@ function banner(): string {
       const e = latestEvent();
       if (!e) return '';
       const d = describeEvent(e);
-      if (!isDeal(e)) return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}</div>`;
+      if (!isDeal(e) && e.kind !== 'steal') return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}</div>`;
       // 돌파: 주인공 함대는 금빛 배지, 얻은 특수 무기는 따로 크게
       let title = esc(d.title);
-      for (const t of [e.team, e.stolenBy]) if (t) title = title.replace(esc(teamName(t)), `<b class="team-badge">${esc(teamName(t))}</b>`);
+      if (e.team) title = title.replace(esc(teamName(e.team)), `<b class="team-badge">${esc(teamName(e.team))}</b>`);
       const loot = e.loot ? CARDS[e.loot] : undefined;
       const detail = loot ? (d.detail ?? '').replace(` · ${loot.icon} ${loot.short} 획득`, '') : d.detail;
       const gain = loot ? `<span class="loot-gain"><span class="loot-ring">${loot.icon}</span><span><b>${loot.short}</b> 획득</span></span>` : '';
-      return `<div class="banner pop deal" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${title}</h2>${detail || gain ? `<p class="deal-detail">${detail ? esc(detail) : ''}${gain}</p>` : ''}</div>`;
+      return `<div class="banner pop deal${e.kind === 'steal' ? ' steal' : ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${title}</h2>${detail || gain ? `<p class="deal-detail">${detail ? esc(detail) : ''}${gain}</p>` : ''}</div>`;
     }
     default:
       return '';

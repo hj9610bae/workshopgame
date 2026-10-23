@@ -2946,3 +2946,8 @@ button.dot-btn.on {
     deal-in 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) 0.9s both,
     live-glow 2.8s ease-in-out 1.6s infinite;
 }
+
+/* 투척 창 가로채기 발표: 효과 설명 + 전리품이 한 줄에 들어가게 넓게 */
+.banner.steal {
+  max-width: 1200px;
+}

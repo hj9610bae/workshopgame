@@ -129,7 +129,14 @@ describe('특수 무기', () => {
     expect(state.pub.teams.C!.score).toBe(13);
     expect(state.pub.teams.B!.score).toBe(10);
     expect(state.hands.C).toMatchObject({ practice: 0, hold: 1 });
-    expect(state.pub.events.find((e) => e.result === 'deal')).toMatchObject({ team: 'B', stolenBy: 'C', agenda: 2 });
+    // 먼저 B의 돌파(B 전진) → C 차례에 가로채기(B 후퇴, C 전진)
+    const deal = state.pub.events.findIndex((e) => e.result === 'deal');
+    expect(state.pub.events[deal]).toMatchObject({ team: 'B', agenda: 2, reward: 3 });
+    expect(state.pub.events[deal].scores).toMatchObject({ B: 13, C: 10 });
+    expect(state.pub.events[deal + 1]).toMatchObject({ kind: 'steal', team: 'C', victim: 'B', agenda: 2, reward: 3, scores: { B: 10, C: 13 } });
+    expect(state.pub.events.filter((e) => e.team === 'C')).toHaveLength(1);
+    expect(state.pub.teams.C!.deals).toBe(1);
+    expect(state.pub.teams.B!.deals).toBe(0);
     expect(state.pub.tables[1].done).toEqual([{ agenda: 2, team: 'C' }]);
     expect(notes.B?.at(-1)?.text).toContain('빼앗겼어요');
     expect(state.secret.practice).toEqual([]);
@@ -140,6 +147,20 @@ describe('특수 무기', () => {
     const { state } = resolveRound(s, { A: basic(1), E: { table: 1, card: 'practice', cutIn: 0 } });
     expect(state.pub.teams.E!.score).toBe(12);
     expect(state.pub.teams.A!.score).toBe(10);
+    // 가로채기는 E의 차례에 발표
+    const kinds = state.pub.events.map((e) => `${e.kind}:${e.team ?? ''}`);
+    expect(kinds.indexOf('steal:E')).toBeGreaterThan(kinds.indexOf('proposal:A'));
+  });
+
+  it('창 주인의 차례가 이미 지났으면 돌파 바로 뒤에 가로챔', () => {
+    const s = withHand('A', 'practice');
+    const { state } = resolveRound(s, { A: { table: 1, card: 'practice', cutIn: 0 }, B: basic(1) });
+    const deal = state.pub.events.findIndex((e) => e.result === 'deal');
+    expect(state.pub.events[deal].team).toBe('B');
+    expect(state.pub.events[deal + 1]).toMatchObject({ kind: 'steal', team: 'A', victim: 'B' });
+    expect(state.pub.events.find((e) => e.team === 'A' && e.kind === 'proposal')).toMatchObject({ result: 'done' });
+    expect(state.pub.teams.A!.score).toBe(12);
+    expect(state.pub.teams.B!.score).toBe(10);
   });
 
   it('가로챌 돌파가 없으면 다음 날 시작 시 −6, 돌파되면 창 주인이 보상', () => {

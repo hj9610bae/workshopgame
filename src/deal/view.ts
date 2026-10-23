@@ -112,16 +112,6 @@ export function describeEvent(e: GameEvent): {
   const team = e.team ? teamName(e.team) : '';
   const agenda = e.agenda ? `${agendaTitle(e.agenda)}` : '';
   const reward = e.reward ? `고국으로 ${e.reward}해리 전진${e.loot ? ` · ${CARDS[e.loot].icon} ${CARDS[e.loot].short} 획득` : ''}` : '';
-  // 투척 창으로 가로챈 돌파: 보상은 가로챈 함대에게
-  if (e.stolenBy && e.agenda) {
-    const thief = teamName(e.stolenBy);
-    return {
-      icon: '⚡',
-      title: `${agenda} 돌파! 그런데… ${thief}의 투척 창이 가로챘다!`,
-      detail: `마지막 일격은 ${team}의 ${e.weapon ? weaponPhrase(e.weapon).replace(/(으)?로$/, '') : '공격'} · ⚡ 투척 창: 그날 그 해역의 돌파 보상을 가로챔 · 보상은 ${thief}: ${reward}`,
-      tone: 'deal',
-    };
-  }
   const firstMark = e.first ? ' (쇠사슬 우선권으로 먼저)' : '';
   switch (e.kind) {
     case 'finalOpen':
@@ -138,6 +128,16 @@ export function describeEvent(e: GameEvent): {
       return { icon: CARDS.promo.icon, title: `${team}, ${weaponPhrase('promo')} ${agenda} 돌파!`, detail: `${effectNote('promo')}${reward}`, tone: 'deal' };
     case 'end':
       return { icon: '🌙', title: '오늘의 항해 끝' };
+    case 'steal': {
+      // 투척 창 주인의 차례: 앞서 돌파한 함대의 전진을 가로챔
+      const victim = e.victim ? teamName(e.victim) : '';
+      return {
+        icon: CARDS.practice.icon,
+        title: `${team}, ${CARDS.practice.short}으로 ${victim}의 ${agenda} 돌파를 가로챘다!`,
+        detail: `${CARDS.practice.icon} ${CARDS.practice.short}: 그날 그 해역의 돌파 보상을 가로챔 · ${victim} ${e.reward}해리 후퇴, ${team} ${e.reward}해리 전진${e.loot ? ` · ${CARDS[e.loot].icon} ${CARDS[e.loot].short} 획득` : ''}`,
+        tone: 'deal',
+      };
+    }
     case 'proposal':
       switch (e.result) {
         case 'deal':
