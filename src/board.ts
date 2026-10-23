@@ -290,15 +290,21 @@ function latestEvent(): GameEvent | undefined {
   return pub.stage === 'reveal' ? pub.events[pub.revealed - 1] : undefined;
 }
 
+const isDeal = (e: GameEvent): boolean => !!(e.agenda && e.reward && e.team);
+
 function tableLooks(): TableLook[] {
   const { pub } = eng();
   const looks: TableLook[] = pub.tables.map(() => ({}));
-  const shown = pub.stage === 'reveal' ? [pub.events[pub.revealed - 1]] : pub.stage === 'order' ? pub.events : [];
+  const reveal = pub.stage === 'reveal';
+  // 공개 단계: 돌파 발표 동안은 돌파된 역경을 그대로 두고, 다음 사건에서 새 역경이 들어옴
+  const before = reveal ? pub.events[pub.revealed - 2] : undefined;
+  if (before?.table && isDeal(before)) looks[before.table - 1] = { fresh: true };
+  const shown = reveal ? [pub.events[pub.revealed - 1]] : pub.stage === 'order' ? pub.events : [];
   for (const e of shown) {
     if (!e?.table) continue;
     const i = e.table - 1;
     if (e.kind === 'finalOpen') looks[i] = { fresh: true };
-    else if (e.agenda && e.reward && e.team) looks[i] = { deal: { team: e.stolenBy ?? e.team, agenda: e.agenda, reward: e.reward }, fresh: true };
+    else if (isDeal(e)) looks[i] = { deal: { team: e.stolenBy ?? e.team!, agenda: e.agenda!, reward: e.reward! }, fresh: true, slain: reveal };
     else if (e.kind === 'proposal' && e.result === 'promo') looks[i] = { promo: true };
     else if (e.kind === 'hold') looks[i] = { freeze: true };
   }
@@ -358,7 +364,14 @@ function banner(): string {
       const e = latestEvent();
       if (!e) return '';
       const d = describeEvent(e);
-      return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}</div>`;
+      if (!isDeal(e)) return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}</div>`;
+      // 돌파: 주인공 함대는 금빛 배지, 얻은 특수 무기는 따로 크게
+      let title = esc(d.title);
+      for (const t of [e.team, e.stolenBy]) if (t) title = title.replace(esc(teamName(t)), `<b class="team-badge">${esc(teamName(t))}</b>`);
+      const loot = e.loot ? CARDS[e.loot] : undefined;
+      const detail = loot ? (d.detail ?? '').replace(` · ${loot.icon} ${loot.short} 획득`, '') : d.detail;
+      const gain = loot ? `<span class="loot-gain"><span class="loot-ring">${loot.icon}</span><span><b>${loot.short}</b> 획득</span></span>` : '';
+      return `<div class="banner pop deal" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${title}</h2>${detail || gain ? `<p class="deal-detail">${detail ? esc(detail) : ''}${gain}</p>` : ''}</div>`;
     }
     default:
       return '';
@@ -401,8 +414,9 @@ function gameView(): string {
 function eventQueue(): number {
   const { pub } = eng();
   let q = pub.queue;
-  // 아직 공개되지 않은 사건 중 1~3번 해역 돌파 수만큼 되돌림
-  for (const e of pub.events.slice(pub.revealed)) if (e.agenda && e.reward && e.table && e.table <= 3) q -= 1;
+  // 아직 공개되지 않은 사건 중 1~3번 해역 돌파 수만큼 되돌림. 돌파 발표 중인 사건도 새 역경이 아직 안 들어왔으니 포함
+  const from = pub.stage === 'reveal' ? Math.max(0, pub.revealed - 1) : pub.revealed;
+  for (const e of pub.events.slice(from)) if (isDeal(e) && e.table && e.table <= 3) q -= 1;
   return Math.max(0, q);
 }
 

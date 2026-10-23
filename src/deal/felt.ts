@@ -9,6 +9,8 @@ export interface TableLook {
   deal?: { team: TeamId; agenda: number; reward: number };
   /** 방금 새 역경이 들어옴 */
   fresh?: boolean;
+  /** 돌파 발표 중: 새 역경 대신 방금 돌파된 역경을 어둡게(할퀸 자국) 보여 주고 그 위에 인장 */
+  slain?: boolean;
   /** 방금 쇠사슬로 동결됨 (동결 표식은 이때 한 번만 찍히는 연출, 그 뒤로는 그대로 유지) */
   freeze?: boolean;
   /** 방금 전갈 화살이 꽂힘 */
@@ -16,8 +18,8 @@ export interface TableLook {
 }
 
 /** 이 해역에서 돌파되어 지나간 역경이 뒤로 희미하게 쌓인 모양 (최근 3장) */
-function pile(table: TableState): { html: string; depth: number } {
-  const done = table.done ?? [];
+function pile(table: TableState, skipLast = false): { html: string; depth: number } {
+  const done = (table.done ?? []).slice(0, skipLast ? -1 : undefined);
   const shown = done.slice(-3);
   const more = done.length - shown.length;
   const html = shown
@@ -60,22 +62,28 @@ export function weaponCard(id: CardId, secret = false): string {
 export function feltTable(table: TableState, index: number, look: TableLook = {}): string {
   const no = index + 1;
   const isFinal = index === 3;
-  const a = AGENDAS[table.agenda];
-  // t1~t3: 해역마다 다른 테두리 색 (board.css)
-  const cls = ['ftable', `t${no}`, isFinal ? 'final' : '', table.frozen ? 'frozen' : '', look.fresh ? 'fresh' : '']
+  const slain = look.slain && look.deal ? look.deal : undefined;
+  const a = AGENDAS[slain ? slain.agenda : table.agenda];
+  // t1~t3: 해역마다 다른 테두리 색 (board.css). live: 아직 공격할 역경이 있는 해역은 은은한 네온 글로우
+  const live = !slain && a && !table.frozen;
+  const cls = ['ftable', `t${no}`, isFinal ? 'final' : '', table.frozen ? 'frozen' : '', look.fresh && !slain ? 'fresh' : '', slain ? 'slain' : '', live ? 'live' : '']
     .filter(Boolean)
     .join(' ');
+  // 고대 인장: 크림슨 밀랍 + 금테, 카드 위에 쾅
   const stamp = look.deal
-    ? `<div class="deal-stamp"><span>돌파!</span><small>${esc(teamName(look.deal.team))} ${look.deal.reward}해리 전진</small></div>`
+    ? `<div class="deal-stamp"><span>돌파!</span><small><b>${esc(teamName(look.deal.team))}</b> ${look.deal.reward}해리 전진</small></div>`
     : '';
   const head = `<div class="ftable-no"><span>⚑ ${no}번 해역${isFinal ? ' · 최종 결전' : ''}</span></div>`;
-  const past = pile(table);
+  const past = pile(table, !!slain);
   if (!a) {
     // 4번 해역은 FINAL_OPEN_ROUND 전에는 아예 그리지 않음 (board.ts)
     const label = isFinal ? '최종 결전 종료' : '대기열 소진';
     return `<article class="${cls} empty">${head}<div class="stack" style="--n:${past.depth}">${past.html}<div class="ftable-slot"><div class="ftable-wait">${label}</div></div></div>${stamp}</article>`;
   }
   // 처음 생명력은 공개, 남은 생명력은 비공개 (아폴론의 예지로만 확인)
+  if (slain) {
+    return `<article class="${cls}">${head}<div class="stack" style="--n:${past.depth}">${past.html}${adversaryCard(a.id, hpOf(a.id), lootOf(a.id))}</div>${stamp}</article>`;
+  }
   const promos = table.promos
     .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">${CARDS.promo.icon} ${esc(teamName(t))}</span>`)
     .join('');

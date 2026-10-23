@@ -660,31 +660,52 @@ body.live:has(.home-board) {
   }
 }
 
+/* 돌파 인장: 크림슨 밀랍 + 금테 (프로젝터에서도 또렷하게 고대비) */
 .deal-stamp {
   position: absolute;
-  inset: 30% -8px auto;
-  z-index: 2;
-  padding: 10px;
-  border: 5px solid var(--deal);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--deal);
+  inset: 34% 2% auto;
+  z-index: 3;
+  padding: 10px 12px 12px;
+  border: 4px solid var(--gold);
+  border-radius: 22px 30px 24px 28px;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.18), transparent 45%),
+    radial-gradient(ellipse at 50% 55%, #b3172a, #7a0c1a 70%, #4f0611);
+  color: #fff3c4;
   text-align: center;
-  transform: rotate(-10deg);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  transform: rotate(-9deg);
+  box-shadow:
+    inset 0 0 0 3px #7a0c1a,
+    inset 0 0 0 5px rgba(244, 196, 48, 0.75),
+    0 0 26px rgba(230, 57, 70, 0.6),
+    0 10px 22px rgba(0, 0, 0, 0.6);
   animation: stamp 2.2s ease-out forwards;
   pointer-events: none;
 }
 
 .deal-stamp span {
   display: block;
-  font-size: 2rem;
+  font-family: var(--font-title);
+  font-size: 3rem;
   font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  text-shadow:
+    0 2px 0 #4f0611,
+    0 0 14px rgba(255, 220, 120, 0.7);
 }
 
 .deal-stamp small {
-  font-size: 1rem;
+  display: block;
+  margin-top: 2px;
+  font-size: 1.15rem;
   font-weight: 800;
+  color: #fff3c4;
+}
+
+.deal-stamp small b {
+  color: var(--gold);
 }
 
 @keyframes stamp {
@@ -693,16 +714,161 @@ body.live:has(.home-board) {
     opacity: 0;
   }
   15% {
-    transform: scale(1) rotate(-10deg);
+    transform: scale(1) rotate(-9deg);
     opacity: 1;
   }
   75% {
     opacity: 1;
   }
   100% {
-    transform: scale(1) rotate(-10deg) translateY(-30px);
+    transform: scale(1) rotate(-9deg) translateY(-30px);
     opacity: 0;
   }
+}
+
+/* 공개 단계의 돌파 발표: 인장은 쾅 찍힌 뒤 그대로 남음 */
+.ftable.slain .deal-stamp {
+  animation: stamp-slam 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+
+@keyframes stamp-slam {
+  0% {
+    transform: scale(3.2) rotate(-28deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.92) rotate(-9deg);
+    opacity: 1;
+  }
+}
+
+/* 돌파된 역경: 어둡게 + 사선 할퀸 자국, 인장이 찍히는 순간 카드가 흔들림 */
+.ftable.slain .agenda-card {
+  filter: grayscale(0.7) brightness(0.45);
+  animation: slain-shake 0.45s ease-out 0.25s;
+}
+
+.ftable.slain .stack::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 14px;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 30%, rgba(230, 57, 70, 0.75) 30.6%, rgba(230, 57, 70, 0.75) 31.4%, transparent 32%),
+    linear-gradient(115deg, transparent 45%, rgba(230, 57, 70, 0.75) 45.6%, rgba(230, 57, 70, 0.75) 46.6%, transparent 47.2%),
+    linear-gradient(115deg, transparent 60%, rgba(230, 57, 70, 0.75) 60.6%, rgba(230, 57, 70, 0.75) 61.4%, transparent 62%),
+    repeating-linear-gradient(115deg, rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 9px);
+  animation: claw 0.35s ease-out both;
+}
+
+@keyframes claw {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes slain-shake {
+  20% {
+    transform: translate(-6px, 3px) rotate(-1deg);
+  }
+  40% {
+    transform: translate(5px, -2px) rotate(1deg);
+  }
+  60% {
+    transform: translate(-3px, 1px);
+  }
+  80% {
+    transform: translate(2px, 0);
+  }
+}
+
+.ftable.slain .ftable-no span {
+  opacity: 0.55;
+}
+
+/* 아직 공격할 역경이 남은 해역: 테두리에 은은하게 숨 쉬는 네온 글로우 */
+.ftable.live .agenda-card {
+  animation: live-glow 2.8s ease-in-out infinite;
+}
+
+.ftable.live.fresh .agenda-card {
+  animation:
+    deal-in 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) 0.2s both,
+    live-glow 2.8s ease-in-out 1s infinite;
+}
+
+@keyframes live-glow {
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(244, 196, 48, 0.55),
+      0 0 34px 4px var(--aura),
+      0 0 10px var(--edge),
+      0 10px 18px rgba(0, 0, 0, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ftable.live .agenda-card {
+    animation: none;
+  }
+}
+
+/* 돌파 배너: 주인공 함대는 금빛 배지, 얻은 특수 무기는 금빛 고리 안에 크게 */
+.team-badge {
+  display: inline-block;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe58a, var(--gold) 55%, var(--gold-deep));
+  color: var(--navy);
+  font-weight: 900;
+  box-shadow:
+    0 0 14px rgba(244, 196, 48, 0.8),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.loot-gain {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 14px;
+  vertical-align: middle;
+  padding: 3px 16px 3px 4px;
+  border-radius: 999px;
+  border: 2px solid var(--gold);
+  background: rgba(11, 19, 43, 0.75);
+  font-size: 1.3rem;
+  animation: pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) 0.4s both;
+}
+
+.deal-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+
+.loot-gain b {
+  color: var(--gold);
+}
+
+.loot-ring {
+  display: grid;
+  place-items: center;
+  width: 2em;
+  height: 2em;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  background: radial-gradient(circle, rgba(244, 196, 48, 0.25), transparent 70%);
+  box-shadow:
+    0 0 16px rgba(244, 196, 48, 0.75),
+    inset 0 0 0 3px rgba(11, 19, 43, 0.9),
+    inset 0 0 0 4px rgba(244, 196, 48, 0.5);
+  font-size: 1.35em;
 }
 
 /* 공개 연출 배너 */
@@ -2772,4 +2938,11 @@ button.dot-btn.on {
   .finale-title {
     font-size: 2rem;
   }
+}
+
+/* 투척 창 돌파(순서 발표)는 인장이 사라질 즈음 새 역경이 들어옴 */
+.ftable.live.fresh:has(.deal-stamp) .agenda-card {
+  animation:
+    deal-in 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) 0.9s both,
+    live-glow 2.8s ease-in-out 1.6s infinite;
 }
