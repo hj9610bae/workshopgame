@@ -655,7 +655,7 @@ function agendaReveal(): string {
     const hits = (trail ?? [])
       .map((h, k, all) => `<li class="${team && k === all.length - 1 ? 'last' : ''}">${esc(teamName(h.team))} ${CARDS[h.card].icon}<b>−${h.amount}</b></li>`)
       .join('');
-    const result = team ? `⚔️ ${esc(teamName(team))} 돌파` : trail ? '살아남음' : '등장하지 않음';
+    const result = team ? `⚔️ <b>${esc(teamName(team))}</b> 돌파` : trail ? '살아남음' : '등장하지 않음';
     return `<li class="reveal-card${team ? '' : ' alive'}" style="--i:${i}">
       <div class="reveal-head"><span class="pictogram">${a.icon}</span><b>${esc(a.title)}</b><span class="reveal-hp">❤️${hpOf(id)}</span></div>
       ${hits ? `<ol class="reveal-trail">${hits}</ol>` : '<p class="reveal-trail none">공격 없음</p>'}
@@ -664,7 +664,7 @@ function agendaReveal(): string {
   }).join('');
   return `<section class="agenda-reveal">
     <h1>🗺️ 항해 일지 · 역경별 공격 기록</h1>
-    <ol class="reveal-grid">${cards}</ol>
+    <ol class="reveal-grid" style="--rows:${Math.ceil((tables.length + queue.length + 1) / 2)}">${cards}</ol>
     <blockquote class="closing lesson">
       혼자서는 쓰러뜨릴 수 없는 <b>거대한 역경</b>도, 여러 함대가 조금씩 깎아 두면 결국 쓰러집니다.<br />
       남은 힘을 읽고 <b>마지막 일격의 타이밍</b>을 잡는 것, 그것이 교섭의 기술입니다.

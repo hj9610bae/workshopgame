@@ -1771,41 +1771,51 @@ button.dot-btn.on {
   list-style: none;
   margin: 0 auto;
   padding: 0;
-  max-width: 1400px;
+  max-width: 1800px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
+  /* 역경 한 줄씩 가로로, 두 단 (위에서 아래로 채운 뒤 오른쪽 단) */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows), auto);
+  grid-auto-flow: column;
+  gap: 10px 18px;
+  text-align: left;
 }
 
+/* 한 줄: 이모지 + 역경명(생명력) | 공격 이력 | 돌파 함대 */
 .reveal-card {
   position: relative;
-  padding: 12px;
-  border-radius: 14px;
+  display: grid;
+  grid-template-columns: 15em minmax(0, 1fr) 8.5em;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  border-radius: 12px;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 5px 0 var(--navy), 0 8px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 3px 0 var(--navy), 0 6px 12px rgba(0, 0, 0, 0.35);
   animation: deal-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
-  animation-delay: calc(var(--i) * 0.12s);
+  animation-delay: calc(var(--i) * 0.08s);
 }
 
 .reveal-head {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  min-width: 0;
 }
 
 .reveal-head b {
   word-break: keep-all;
+  line-height: 1.2;
 }
 
 .reveal-head .pictogram {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
 }
 
 .reveal-hp {
-  margin-left: 4px;
+  margin-left: auto;
   font-size: 0.85rem;
   font-weight: 800;
   color: var(--red);
@@ -1815,13 +1825,12 @@ button.dot-btn.on {
 /* 공격 이력: 함대 · 무기 · 감소량 (돌파한 마지막 일격은 금색) */
 .reveal-trail {
   list-style: none;
-  margin: 6px 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 4px;
-  font-size: 0.75rem;
+  font-size: 0.9rem;
 }
 
 .reveal-trail li {
@@ -1851,9 +1860,15 @@ button.dot-btn.on {
 }
 
 .reveal-result {
-  font-size: 0.85rem;
+  text-align: right;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.reveal-result b {
+  color: var(--gold);
 }
 
 .closing.lesson {
