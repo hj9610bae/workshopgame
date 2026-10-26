@@ -2541,7 +2541,8 @@ button.dot-btn.on {
 
 /* ───── 이타카 내륙의 말 · 결승선(왕궁) · 왕좌 복위 ───── */
 .ship-horse {
-  font-size: 1.2em;
+  /* 게임 아이콘은 안쪽 여백이 있어 핀(1.75em)을 거의 채울 만큼 키움 */
+  font-size: 1.65em;
   color: var(--gold);
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
 }
