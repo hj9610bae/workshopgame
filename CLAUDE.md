@@ -35,6 +35,7 @@
 - `src/board.ts`·`src/board.css`: 현장 진행 화면, `src/deal/felt.ts`: 테이블·팀 자리 그림, `src/deal/local.ts`: localStorage 저장·되돌리기
 - `src/deal/tutorial.ts`: 설명 슬라이드 + 연습 게임 배치(`practiceSetup`). 테스트 `tutorial.test.ts`
 - 디자인(2026-10-20 기획서): `board.css` 맨 위 `body.live` 변수(네이비 `--navy`·금 `--gold`/`--gold-deep`·빨강 `--red` 생명력·민트 `--mint` 거리/승리). 제목 `--font-title`(Cinzel + Noto Serif KR), 본문 Pretendard — `board.html`에서 CDN으로 불러옴. 아이콘: 투척 창 ⚡, 예지 👁️, 순풍 🌬️, 이타카 🏛️ (겹치던 역경 아이콘은 바람 자루 💨·충전소 🔌·키클롭스 🧿·제우스의 벼락 🌩️로 바꿈)
+- 2026-10-26 정리: 해역 카드·돌파 연출은 다크 네이비 + 얇은 골드 선(`--line-gold`), 포인트는 골드·버건디(`--burgundy`)만. 역경·무기 픽토그램은 이모지 대신 `src/deal/icons.ts`(game-icons.net 단색, CC BY 3.0)의 `agendaGlyph`·`cardGlyph`·`glyph`
 - CSS 클래스 주의: `style.css`에 이미 `.board`, `.table` 같은 이름이 있어 겹치면 레이아웃이 깨짐 (현장 진행 body 클래스는 `live`)
 - 판정은 사회자 브라우저가 담당(엔진 실행 후 multi-path update). 대표는 `submissions`·`requests`·`teams/{t}`에만 씀
 - 공개 연출: `pub.events`에 사건마다 테이블·점수 스냅샷을 담고 `pub.revealed`만큼 보여줌

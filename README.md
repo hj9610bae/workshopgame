@@ -78,3 +78,6 @@ npm run dev
 - [ ] 호스트 화면은 노트북/아이패드를 충전기에 연결
 - [ ] 팀 대표에게 "화면을 끄지 말고, 끊기면 새로고침" 안내
 - [ ] 사회자 PC 절전 모드 해제
+
+## 아이콘 출처
+현장 진행 화면의 역경·무기 픽토그램(`src/deal/icons.ts`)은 [game-icons.net](https://game-icons.net)의 아이콘입니다 (Lorc, Delapouite 외, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)).

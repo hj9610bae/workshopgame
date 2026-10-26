@@ -2,6 +2,7 @@
 import { esc } from '../ui';
 import { AGENDAS, CARDS, distanceOf, type CardId, type SpecialCardId, type TeamId } from './data';
 import type { TableState } from './types';
+import { agendaGlyph, cardGlyph, glyph } from './icons';
 import { activeSetup, hpOf, lootOf, teamName } from './view';
 
 export interface TableLook {
@@ -25,7 +26,7 @@ function pile(table: TableState, skipLast = false): { html: string; depth: numbe
   const html = shown
     .map((d, k) => {
       const a = AGENDAS[d.agenda];
-      const label = `${k === 0 && more ? `외 ${more}개 · ` : ''}${a.icon} ${esc(a.title)} · ${esc(teamName(d.team))} ✔`;
+      const label = `${k === 0 && more ? `외 ${more}개 · ` : ''}${agendaGlyph(a.id)} ${esc(a.title)} · ${esc(teamName(d.team))} ✔`;
       return `<div class="past" style="--k:${shown.length - k}"><span>${label}</span></div>`;
     })
     .join('');
@@ -39,11 +40,13 @@ function pile(table: TableState, skipLast = false): { html: string; depth: numbe
  */
 export function adversaryCard(id: number, hp: number, loot?: SpecialCardId, shownHp: string = String(hp), full = false): string {
   const a = AGENDAS[id];
+  // 생명력: 숫자 배지 + 처음 생명력만큼의 눈금 게이지 (남은 생명력은 비공개라 눈금은 늘 가득)
+  const pips = Array.from({ length: hp }, () => '<i></i>').join('');
   return `<div class="agenda-card">
-      <div class="pictogram" aria-hidden="true">${a.icon}</div>
+      <div class="pictogram">${agendaGlyph(a.id)}</div>
       <h3>${esc(a.title)}</h3>
-      <p class="hp">❤️ 생명력 <b>${shownHp}</b></p>
-      ${loot ? `<p class="loot">${CARDS[loot].icon} ${full ? CARDS[loot].name : CARDS[loot].short}</p>` : ''}
+      ${loot ? `<p class="loot">${cardGlyph(loot)} ${full ? CARDS[loot].name : CARDS[loot].short}</p>` : ''}
+      <div class="hp"><span class="hp-label">생명력</span><b>${shownHp}</b><span class="hp-pips" aria-hidden="true">${pips}</span></div>
     </div>`;
 }
 
@@ -52,9 +55,9 @@ export function weaponCard(id: CardId, secret = false): string {
   const c = CARDS[id];
   const foot = id === 'basic' ? '기본 무기 · 계속 사용' : secret ? '효과는 획득한 함대만' : '특수 무기 · 1회용';
   return `<div class="agenda-card weapon ${id}${secret ? ' secret' : ''}">
-      <div class="pictogram" aria-hidden="true">${c.icon}</div>
+      <div class="pictogram">${cardGlyph(id)}</div>
       <h3>${c.name}</h3>
-      <p class="hp">⚔️ 공격력 <b>${secret ? '?' : c.powerText}</b></p>
+      <div class="hp"><span class="hp-label">공격력</span><b>${secret ? '?' : c.powerText}</b></div>
       <div class="reward"><span>${foot}</span></div>
     </div>`;
 }
@@ -64,16 +67,16 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
   const isFinal = index === 3;
   const slain = look.slain && look.deal ? look.deal : undefined;
   const a = AGENDAS[slain ? slain.agenda : table.agenda];
-  // t1~t3: 해역마다 다른 테두리 색 (board.css). live: 아직 공격할 역경이 있는 해역은 은은한 네온 글로우
+  // t1~t3: 해역 번호 (카드 색은 모두 같음). live: 아직 공격할 역경이 있는 해역은 은은한 금빛 글로우
   const live = !slain && a && !table.frozen;
   const cls = ['ftable', `t${no}`, isFinal ? 'final' : '', table.frozen ? 'frozen' : '', look.fresh && !slain ? 'fresh' : '', slain ? 'slain' : '', live ? 'live' : '']
     .filter(Boolean)
     .join(' ');
-  // 고대 인장: 크림슨 밀랍 + 금테, 카드 위에 쾅
+  // 돌파 도장: 카드를 어둡게 덮고 회전 없이 월계관 + 돌파 완료
   const stamp = look.deal
-    ? `<div class="deal-stamp"><span>돌파!</span><small><b>${esc(teamName(look.deal.team))}</b> ${look.deal.reward}해리 전진</small></div>`
+    ? `<div class="deal-stamp">${glyph('laurel-crown', 'stamp-laurel')}<span>돌파 완료</span><small><b>${esc(teamName(look.deal.team))}</b> ${look.deal.reward}해리 전진</small></div>`
     : '';
-  const head = `<div class="ftable-no"><span>⚑ ${no}번 해역${isFinal ? ' · 최종 결전' : ''}</span></div>`;
+  const head = `<div class="ftable-no"><span>${no}번 해역${isFinal ? ' · 최종 결전' : ''}</span></div>`;
   const past = pile(table, !!slain);
   if (!a) {
     // 4번 해역은 FINAL_OPEN_ROUND 전에는 아예 그리지 않음 (board.ts)
@@ -85,13 +88,13 @@ export function feltTable(table: TableState, index: number, look: TableLook = {}
     return `<article class="${cls}">${head}<div class="stack" style="--n:${past.depth}">${past.html}${adversaryCard(a.id, hpOf(a.id), lootOf(a.id))}</div>${stamp}</article>`;
   }
   const promos = table.promos
-    .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">${CARDS.promo.icon} ${esc(teamName(t))}</span>`)
+    .map((t, i) => `<span class="sticker${look.promo && i === table.promos.length - 1 ? ' new' : ''}">${cardGlyph('promo')} ${esc(teamName(t))}</span>`)
     .join('');
   return `<article class="${cls}">
     ${head}
     <div class="stack" style="--n:${past.depth}">${past.html}${adversaryCard(a.id, hpOf(a.id), lootOf(a.id))}</div>
     ${promos ? `<div class="stickers">${promos}</div>` : ''}
-    ${table.frozen ? `<div class="frozen-cover${look.freeze ? ' new' : ''}">${CARDS.hold.icon} 동결</div>` : ''}
+    ${table.frozen ? `<div class="frozen-cover${look.freeze ? ' new' : ''}">${cardGlyph('hold')}<span>동결</span></div>` : ''}
     ${stamp}
   </article>`;
 }
@@ -104,7 +107,7 @@ export function deckOf(rest: number[], hp: (id: number) => number, loot: (id: nu
   const more = rest.length > SHOW ? `<p class="deck-more">외 ${rest.length - SHOW}개</p>` : '';
   const list = rest
     .slice(0, SHOW)
-    .map((id) => `<li>${AGENDAS[id].icon} ${esc(AGENDAS[id].title)} <small>❤️${hp(id)}${loot(id) ? ` ${CARDS[loot(id)!].icon}` : ''}</small></li>`)
+    .map((id) => `<li>${agendaGlyph(id)} ${esc(AGENDAS[id].title)} <small>${hp(id)}${loot(id) ? ` ${cardGlyph(loot(id)!)}` : ''}</small></li>`)
     .join('');
   return `<div class="deck">
     <div class="deck-label">대기열 <span>${rest.length}</span></div>
@@ -194,10 +197,11 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
       const delta = dd ? `<span class="delta ${dd > 0 ? 'up' : 'down'}">${dd > 0 ? '−' : '+'}${Math.abs(dd)}</span>` : '';
       const status = look.status?.[t];
       const style = `--i:${i};--x:${px.toFixed(2)}%${sail ? `;--from:${prev!.toFixed(2)}%` : ''}`;
-      // 금빛 돛 핀이 정확히 거리 자리에 뜨고, 아래 말풍선에 함대 이름 (거리)
+      // 금빛 돛 핀이 정확히 거리 자리에 뜨고, 아래 말풍선에 함대 이름 (거리). 왕좌 복위는 말(진행 방향) 앞에 따로
       return `<li class="ship${look.active === t ? ' active' : ''}${sail ? ' sail' : ''}${home ? ' home' : ''}" style="${style}">
+        ${home ? '<span class="ship-crown">왕좌 복위</span>' : ''}
         <span class="ship-pin">${art}<span class="ship-pos">${badge}</span></span>
-        <span class="ship-tag"><b class="ship-name">${esc(teamName(t))}</b> <span class="ship-dist">(${distanceLabel(d)})</span>${delta}${home ? '<span class="ship-crown">👑 왕좌 복위</span>' : ''}${status ? `<span class="ship-status">${status}</span>` : ''}</span>
+        <span class="ship-tag"><b class="ship-name">${esc(teamName(t))}</b> <span class="ship-dist">(${distanceLabel(d)})</span>${delta}${status ? `<span class="ship-status">${status}</span>` : ''}</span>
       </li>`;
     })
     .join('');

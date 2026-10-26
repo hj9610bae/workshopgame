@@ -5,6 +5,7 @@
 import './style.css';
 import './board.css';
 import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, QUIZ_FROM_RANK, QUIZ_LABEL, QUIZ_LEVELS, QUIZ_REWARD, QUIZ_THINK_SECONDS, RESCUE_ROUND, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, distanceOf, type CardId, type ExtraCardId, type QuizLevel, type TeamId } from './deal/data';
+import { cardGlyph, glyph } from './deal/icons';
 import { agendaTitle, beginSubmit, canOpenRescue, createGame, finish, markQuiz, openRescue, quizQueue, ranking, resolveRound, revealNext, scout, settleRescue, startQuizTimer, startRound, type EngineState } from './deal/engine';
 import { deck, distanceLabel, feltTable, seaMap, type TableLook } from './deal/felt';
 import {
@@ -208,10 +209,24 @@ function arrivedTeams(): TeamId[] {
   return !isPractice() && over ? ranking(pub).filter((r) => r.rank === 1).map((r) => r.team) : [];
 }
 
-/** 스핑크스 퀴즈를 정산한 그날 공개 단계: 바다 지도·순위를 보상이 반영된 지금 거리로 */
-function quizSettledToday(): boolean {
+/** 스핑크스 퀴즈를 연 그날 공개 단계(사건 공개가 끝난 뒤): 바다 지도를 퀴즈 보상이 반영된 거리로 */
+function quizToday(): boolean {
   const { pub } = eng();
-  return pub.rescue?.phase === 'done' && pub.round === RESCUE_ROUND && pub.stage === 'reveal' && pub.revealed >= pub.events.length;
+  return !!pub.rescue && pub.round === RESCUE_ROUND && pub.stage === 'reveal' && pub.revealed >= pub.events.length;
+}
+
+/** 퀴즈 보상: 정산 뒤엔 확정 보상, 진행 중엔 진행자가 정답으로 표시한 함대의 보상을 바로 미리 반영 */
+function quizRewards(): Partial<Record<TeamId, number>> {
+  const r = eng().pub.rescue!;
+  if (r.phase === 'done') return r.rewards ?? {};
+  return Object.fromEntries(r.candidates.filter((t) => r.level?.[t] && r.correct?.[t]).map((t) => [t, QUIZ_REWARD[r.level![t]!]]));
+}
+
+/** 퀴즈 중·뒤의 바다 지도 점수 (정산 전 보상은 엔진 점수에 아직 없으므로 더해서 보여 줌) */
+function quizScores(): Partial<Record<TeamId, number>> {
+  const { pub } = eng();
+  const pending = pub.rescue?.phase === 'offer' ? quizRewards() : {};
+  return Object.fromEntries(pub.teamIds.map((t) => [t, (pub.teams[t]?.score ?? 0) + (pending[t] ?? 0)]));
 }
 
 const quizReward = (level: QuizLevel) => `${QUIZ_LABEL[level]} +${QUIZ_REWARD[level]}해리`;
@@ -321,7 +336,7 @@ function banner(): string {
       const open = pub.events.find((e) => e.kind === 'finalOpen');
       if (open && game.finalShown) {
         const d = describeEvent(open);
-        return `<div class="banner deal final-open pop"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}
+        return `<div class="banner deal final-open pop"><div class="banner-icon">${bannerIcon(d.icon)}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}
           <p class="muted small">${pub.round}일차 순서: ${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p></div>`;
       }
       const news = pub.events.filter((e) => e.kind !== 'finalOpen').map((e) => describeEvent(e)).map((d) => `<li>${d.icon} ${esc(d.title)}${d.detail ? ` <span class="muted">${esc(d.detail)}</span>` : ''}</li>`);
@@ -365,18 +380,33 @@ function banner(): string {
       const e = latestEvent();
       if (!e) return '';
       const d = describeEvent(e);
-      if (!isDeal(e) && e.kind !== 'steal') return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}</div>`;
-      // 돌파: 주인공 함대는 금빛 배지, 얻은 특수 무기는 따로 크게
-      let title = esc(d.title);
-      if (e.team) title = title.replace(esc(teamName(e.team)), `<b class="team-badge">${esc(teamName(e.team))}</b>`);
-      const loot = e.loot ? CARDS[e.loot] : undefined;
-      const detail = loot ? (d.detail ?? '').replace(` · ${loot.icon} ${loot.short} 획득`, '') : d.detail;
-      const gain = loot ? `<span class="loot-gain"><span class="loot-ring">${loot.icon}</span><span><b>${loot.short}</b> 획득</span></span>` : '';
-      return `<div class="banner pop deal${e.kind === 'steal' ? ' steal' : ''}" data-key="${pub.revealed}"><div class="banner-icon">${d.icon}</div><h2>${title}</h2>${detail || gain ? `<p class="deal-detail">${detail ? esc(detail) : ''}${gain}</p>` : ''}</div>`;
+      if (!isDeal(e) && e.kind !== 'steal') return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${bannerIcon(d.icon)}</div><h2>${glyphText(d.title)}</h2>${d.detail ? `<p>${glyphText(d.detail)}</p>` : ''}</div>`;
+      // 돌파: 알약·배지 없이 글자 굵기·색으로만 위계 (함대 금색 굵게 | 문장 흰색 | 보상 연회색)
+      const team = e.team ? teamName(e.team) : '';
+      const head = team && d.title.startsWith(`${team}, `) ? d.title.slice(team.length + 2) : d.title;
+      const detail = [d.detail, e.loot && !d.detail?.includes(`${CARDS[e.loot].short} 획득`) ? `${CARDS[e.loot].short} 획득` : ''].filter(Boolean).join(' · ');
+      return `<div class="banner pop deal${e.kind === 'steal' ? ' steal' : ''}" data-key="${pub.revealed}">
+        <div class="banner-icon">${glyph('laurel-crown')}</div>
+        <h2>${team ? `<b class="team-name">${esc(team)}</b><span class="sep">|</span>` : ''}${glyphText(head)}</h2>
+        ${detail ? `<p class="deal-detail">${glyphText(detail)}</p>` : ''}</div>`;
     }
     default:
       return '';
   }
+}
+
+/** 사건 배너 아이콘: OS 이모지 대신 단색 아이콘 (없는 것은 그대로) */
+const BANNER_GLYPH: Record<string, string> = { '⚔️': 'crossed-swords', '🌙': 'moon', '🚫': 'cancel', '💤': 'sleepy', '🌬️': 'wind-slap', '👑': 'crown' };
+function bannerIcon(icon: string): string {
+  const card = (Object.keys(CARDS) as CardId[]).find((id) => CARDS[id].icon === icon);
+  return card ? cardGlyph(card) : BANNER_GLYPH[icon] ? glyph(BANNER_GLYPH[icon]) : icon;
+}
+
+/** 문장 속 무기 이모지를 단색 아이콘으로 바꿔서 (esc 한 뒤) */
+function glyphText(text: string): string {
+  let html = esc(text);
+  for (const id of Object.keys(CARDS) as CardId[]) html = html.split(CARDS[id].icon).join(cardGlyph(id, 'inline'));
+  return html;
 }
 
 function seatLook() {
@@ -385,8 +415,8 @@ function seatLook() {
   if (pub.stage === 'submit') for (const t of pub.order) status[t] = game.subs[t]?.table ? '✅ 입력 완료' : '⌛ 대기';
   const e = latestEvent();
   const prevScores = pub.stage === 'reveal' ? pub.events[pub.revealed - 2]?.scores : undefined;
-  // 구조선 퀴즈 정산 뒤에는 퀴즈 보상을 전진으로 표시
-  if (quizSettledToday()) return { status, deltas: pub.rescue?.rewards ?? {}, goal: showGoal() };
+  // 스핑크스 퀴즈 중·뒤에는 퀴즈 보상을 전진으로 표시
+  if (quizToday()) return { status, deltas: quizRewards(), goal: showGoal() };
   const deltas = e && prevScores ? Object.fromEntries(pub.teamIds.map((t) => [t, (e.scores[t] ?? 0) - (prevScores[t] ?? 0)])) : {};
   return { status, deltas, active: e?.team, goal: showGoal(), arrive: arrivedTeams() };
 }
@@ -407,7 +437,7 @@ function gameView(): string {
       </section>
       <aside class="rail">${deck(eventQueue())}</aside>
     </div>
-    ${seaMap(pub.order, quizSettledToday() ? Object.fromEntries(pub.teamIds.map((t) => [t, pub.teams[t]?.score ?? 0])) : snap.scores, seatLook())}
+    ${seaMap(pub.order, quizToday() ? quizScores() : snap.scores, seatLook())}
     ${showDock() ? dock() : ''}`;
 }
 
