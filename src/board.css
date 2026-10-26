@@ -3002,3 +3002,19 @@ button.dot-btn.on {
 .in-label .glyph {
   color: var(--line-gold);
 }
+
+/* 결승선에 도착한 1등 핀의 왕관 배지: 순번 배지보다 크게 */
+.ship.home .ship-pos {
+  top: -0.7em;
+  right: -0.9em;
+  min-width: 1.35em;
+  height: 1.35em;
+  font-size: 1em;
+  box-shadow:
+    0 0 10px rgba(255, 220, 120, 0.9),
+    0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.ship.home .ship-pos .glyph {
+  font-size: 1.15em;
+}
