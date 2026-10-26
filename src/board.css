@@ -1329,7 +1329,7 @@ button.narrow {
 }
 
 .in-row.done {
-  border-color: var(--success);
+  border-color: var(--line-gold);
 }
 
 .in-team {
@@ -2986,4 +2986,18 @@ button.dot-btn.on {
 /* 투척 창 가로채기 발표: 효과 설명 + 전리품이 한 줄에 들어가게 넓게 */
 .banner.steal {
   max-width: 1200px;
+}
+
+/* 상단 바·버튼의 단색 아이콘 */
+.topbar .brand .glyph {
+  color: var(--line-gold);
+}
+
+.pill .lv-pips i {
+  background: currentColor;
+}
+
+.in-team .glyph,
+.in-label .glyph {
+  color: var(--line-gold);
 }

@@ -121,7 +121,7 @@ function tutorialView(): string {
   const last = tutorialIndex === steps.length - 1;
   return `<div class="tutorial">
     <header class="topbar">
-      <div class="brand">📖 항해 설명</div>
+      <div class="brand">${glyph('open-book')} 항해 설명</div>
       <div class="round-pill">${tutorialIndex + 1} / ${steps.length}</div>
       <div class="tools">
         <button class="small secondary" data-action="tut-auto">${autoplay ? '⏸ 자동 재생 멈춤' : '▶ 자동 재생'}</button>
@@ -163,11 +163,11 @@ function goTutorial(i: number) {
 /* ───────── 게임 화면 ───────── */
 
 /** 입력 버튼에 쓰는 역경 이름 */
-const shortTitle = (id: number): string => (AGENDAS[id] ? `${AGENDAS[id].icon} ${AGENDAS[id].title}` : agendaTitle(id));
+const shortTitle = (id: number): string => (AGENDAS[id] ? `${agendaGlyph(id)} ${esc(AGENDAS[id].title)}` : esc(agendaTitle(id)));
 
 function roundText(): string {
   const { pub } = eng();
-  if (isPractice()) return `🎲 연습 항해 ${pub.round}일차/${PRACTICE_DAYS}일차 · ${STAGE_LABEL[pub.stage]}`;
+  if (isPractice()) return `${glyph('rolling-dices')} 연습 항해 ${pub.round}일차/${PRACTICE_DAYS}일차 · ${STAGE_LABEL[pub.stage]}`;
   return pub.stage === 'final' ? '최종 결과' : `${pub.round}일차/${ROUNDS}일차 · ${STAGE_LABEL[pub.stage]}`;
 }
 
@@ -175,12 +175,12 @@ function topbar(): string {
   const tools = showDock()
     ? `<div class="tools">
         <button class="small secondary" data-action="undo" ${game.history.length ? '' : 'disabled'} title="Ctrl+Z">↶ 되돌리기</button>
-        ${isConsole ? '' : '<button class="small secondary" data-action="open-console" title="노트북 화면에 비공개 입력 창을 띄워요">🖥 진행자 창</button>'}
+        ${isConsole ? '' : `<button class="small secondary" data-action="open-console" title="노트북 화면에 비공개 입력 창을 띄워요">${glyph('laptop')} 진행자 창</button>`}
         ${isConsole ? '' : '<button class="small secondary" data-action="home">처음 화면</button>'}
       </div>`
     : '';
   return `<header class="topbar">
-    <div class="brand">${isConsole ? '🖥 진행자 창' : '⛵ 오디세이아'}</div>
+    <div class="brand">${isConsole ? `${glyph('laptop')} 진행자 창` : `${glyph('trireme')} 오디세이아`}</div>
     <div class="round-pill">${roundText()}</div>
     <div class="timer" data-timer></div>
     ${tools}
@@ -230,8 +230,7 @@ function quizScores(): Partial<Record<TeamId, number>> {
 }
 
 const quizReward = (level: QuizLevel) => `${QUIZ_LABEL[level]} +${QUIZ_REWARD[level]}해리`;
-/** 진행자 조작 버튼용 색 점 (프로젝터 배너는 금빛 눈금 QUIZ_PIPS) */
-const QUIZ_DOT: Record<QuizLevel, string> = { low: '🟢', mid: '🟡', high: '🔴' };
+/** 난도 표시: 금빛 마름모 1·2·3개 (배너·진행자 조작 버튼 공통) */
 const QUIZ_PIPS = (l: QuizLevel) => `<span class="lv-pips" aria-hidden="true">${'<i></i>'.repeat(QUIZ_LEVELS.indexOf(l) + 1)}</span>`;
 const THINK = QUIZ_THINK_SECONDS % 60 === 0 ? `${QUIZ_THINK_SECONDS / 60}분` : `${QUIZ_THINK_SECONDS}초`;
 
@@ -291,15 +290,15 @@ function rescueControls(): string {
       const ok = r.correct?.[t];
       const timing = r.timer?.team === t;
       return `<div class="in-group"><span class="in-label">${allPicked ? `${i + 1}. ` : ''}${esc(teamName(t))}</span>
-        ${QUIZ_LEVELS.map((l) => pill('quiz-level', t, l, `${QUIZ_DOT[l]} ${quizReward(l)}`, level === l)).join('')}
+        ${QUIZ_LEVELS.map((l) => pill('quiz-level', t, l, `${QUIZ_PIPS(l)} ${quizReward(l)}`, level === l)).join('')}
         <span class="quiz-sep"></span>
-        ${pill('quiz-timer', t, timing ? 'stop' : 'start', timing ? '⏹ 시간 멈춤' : `⏱ 생각 시간 ${THINK}`, timing)}
-        ${pill('quiz-correct', t, 'yes', '✅ 정답', ok === true)}${pill('quiz-correct', t, 'no', '❌ 오답', ok === false)}</div>`;
+        ${pill('quiz-timer', t, timing ? 'stop' : 'start', timing ? `${glyph('stopwatch')} 시간 멈춤` : `${glyph('sands-of-time')} 생각 시간 ${THINK}`, timing)}
+        ${pill('quiz-correct', t, 'yes', `${glyph('check-mark')} 정답`, ok === true)}${pill('quiz-correct', t, 'no', `${glyph('cross-mark')} 오답`, ok === false)}</div>`;
     })
     .join('');
   const ready = r.candidates.every((t) => r.level?.[t] && r.correct?.[t] !== undefined);
   return `<div class="rescue-ctl">${rows}
-    <div class="row"><button class="wide" data-action="quiz-settle" ${ready ? '' : 'disabled'}>🗿 결과 발표 · 맞힌 함대 전진</button>
+    <div class="row"><button class="wide" data-action="quiz-settle" ${ready ? '' : 'disabled'}>${glyph('greek-sphinx')} 결과 발표 · 맞힌 함대 전진</button>
       <button class="secondary narrow" data-action="rescue-skip">이벤트 건너뛰기</button></div></div>`;
 }
 
@@ -354,10 +353,10 @@ function banner(): string {
         `<tr class="${need ? 'need' : 'opt'}"><th>${label}</th><td>${value}</td><td><em>${need ? '필수' : '선택'}</em></td></tr>`;
       return `<div class="banner calm submit-guide">
         <div class="guide-main">
-          <h2 class="guide-title"><span class="when-open">📜 항해 명령서 작성 가이드</span><span class="when-over">⏰ 제출 시간 종료! 밀서를 제출하세요</span></h2>
+          <h2 class="guide-title"><span class="when-open">${glyph('scroll-unfurled')} 항해 명령서 작성 가이드</span><span class="when-over">${glyph('hourglass')} 제출 시간 종료! 밀서를 제출하세요</span></h2>
           <div class="big-timer" data-timer></div>
           <div class="oracle">
-            <span class="oracle-eye" aria-hidden="true">👁️</span>
+            <span class="oracle-eye" aria-hidden="true">${glyph('all-seeing-eye')}</span>
             <div><b>${SCOUT_NAME}</b>를 쓰려면 <b>지금</b> 진행자에게 오세요!<small>해역 1곳의 남은 생명력을 우리 함대만 확인</small></div>
             <span class="oracle-cost">${SCOUT_COST}해리 후퇴</span>
           </div>
@@ -416,7 +415,7 @@ function glyphText(text: string): string {
 function seatLook() {
   const { pub } = eng();
   const status: Partial<Record<TeamId, string>> = {};
-  if (pub.stage === 'submit') for (const t of pub.order) status[t] = game.subs[t]?.table ? '✅ 입력 완료' : '⌛ 대기';
+  if (pub.stage === 'submit') for (const t of pub.order) status[t] = game.subs[t]?.table ? `${glyph('check-mark')} 입력 완료` : `${glyph('hourglass')} 대기`;
   const e = latestEvent();
   const prevScores = pub.stage === 'reveal' ? pub.events[pub.revealed - 2]?.scores : undefined;
   // 스핑크스 퀴즈 중·뒤에는 퀴즈 보상을 전진으로 표시
@@ -463,13 +462,13 @@ function dock(): string {
   switch (pub.stage) {
     case 'order':
       main = finalPending()
-        ? '<button class="wide" data-action="final-open">🌊 해역 공개 ▶</button>'
-        : `<button class="wide" data-action="submit">📝 제출 받기 시작 (${SUBMIT_SECONDS / 60}분) ▶</button>`;
+        ? `<button class="wide" data-action="final-open">${glyph('big-wave')} 해역 공개 ▶</button>`
+        : `<button class="wide" data-action="submit">${glyph('quill-ink')} 제출 받기 시작 (${SUBMIT_SECONDS / 60}분) ▶</button>`;
       break;
     case 'submit': {
       const done = pub.order.filter((t) => game.subs[t]?.table).length;
       main = `${inputPanel()}
-        <button class="wide" data-action="resolve">⚔️ 공격 공개 ▶${done < pub.order.length ? ` <span class="small">(미입력 ${pub.order.length - done}함대는 쉼)</span>` : ''}</button>`;
+        <button class="wide" data-action="resolve">${glyph('crossed-swords')} 공격 공개 ▶${done < pub.order.length ? ` <span class="small">(미입력 ${pub.order.length - done}함대는 쉼)</span>` : ''}</button>`;
       break;
     }
     case 'reveal': {
@@ -480,11 +479,11 @@ function dock(): string {
           ? `<div class="row"><button class="wide" data-action="reveal">다음 공개 ▶ <span class="small">(${left})</span></button>
              <button class="secondary narrow" data-action="reveal-all">모두 공개</button></div>`
           : isPractice() && pub.round >= PRACTICE_DAYS
-            ? '<button class="wide" data-action="practice-end">🏁 연습 끝 · 실제 항해 준비하기</button>'
+            ? `<button class="wide" data-action="practice-end">${glyph('checkered-flag')} 연습 끝 · 실제 항해 준비하기</button>`
             : isPractice()
-            ? `<button class="wide" data-action="next-round">🎲 연습 ${next}일차 출항 ▶</button>`
+            ? `<button class="wide" data-action="next-round">${glyph('rolling-dices')} 연습 ${next}일차 출항 ▶</button>`
             : canOpenRescue(eng())
-            ? '<button class="wide" data-action="rescue-open">🗿 특별 이벤트: 스핑크스 등장 ▶</button>'
+            ? `<button class="wide" data-action="rescue-open">${glyph('greek-sphinx')} 특별 이벤트: 스핑크스 등장 ▶</button>`
             : pub.rescue?.phase === 'offer'
             ? rescueControls()
             : pub.round < ROUNDS
@@ -493,20 +492,20 @@ function dock(): string {
       break;
     }
   }
-  return `<section class="dock card">${main}<p class="muted small keys">⌨ Space·→ : 다음 진행 · Ctrl+Z : 되돌리기</p>${scoutModal()}</section>`;
+  return `<section class="dock card">${main}<p class="muted small keys">Space·→ : 다음 진행 · Ctrl+Z : 되돌리기</p>${scoutModal()}</section>`;
 }
 
 function inputPanel(): string {
   const { pub } = eng();
   if (!isConsole && !inputOpen) {
     return `<div class="input-closed">
-      <span>🙈 제출 내용은 가려져 있어요.</span>
+      <span>${glyph('invisible')} 제출 내용은 가려져 있어요.</span>
       <button class="secondary narrow" data-action="input-toggle">입력 패널 열기</button>
-      <span class="muted small">노트북을 따로 보고 싶으면 위의 '🖥 진행자 창'을 쓰세요.</span>
+      <span class="muted small">노트북을 따로 보고 싶으면 위의 '진행자 창'을 쓰세요.</span>
     </div>`;
   }
   const rows = pub.order.map((t, pos) => inputRow(t, pos)).join('');
-  const close = isConsole ? '' : '<button class="secondary narrow" data-action="input-toggle">🙈 입력 패널 닫기</button>';
+  const close = isConsole ? '' : `<button class="secondary narrow" data-action="input-toggle">${glyph('invisible')} 입력 패널 닫기</button>`;
   return `<div class="input-panel"><div class="input-head"><h3>포스트잇 입력</h3>${close}</div>${rows}</div>`;
 }
 
@@ -519,13 +518,13 @@ function inputRow(t: TeamId, pos: number): string {
     `<button class="pill${on ? ' on' : ''}" data-action="${action}" data-team="${t}" data-value="${value}" ${enabled ? '' : 'disabled'}>${label}</button>`;
   const shown = visibleTables();
   const tableBtns = shown
-    .map((i) => btn('sub-table', i + 1, `${i + 1}번 <small>${esc(shortTitle(pub.tables[i].agenda))}</small>`, sub?.table === i + 1, pub.tables[i].agenda > 0))
+    .map((i) => btn('sub-table', i + 1, `${i + 1}번 <small>${shortTitle(pub.tables[i].agenda)}</small>`, sub?.table === i + 1, pub.tables[i].agenda > 0))
     .join('');
   const mainCards: CardId[] = ['basic', 'blitz', 'practice'];
   const cards = mainCards
     .map((c) => {
       const n = c === 'basic' ? Infinity : (hand?.[c] ?? 0);
-      const label = `${CARDS[c].short}${c === 'basic' ? '' : ` ×${n}`}`;
+      const label = `${cardGlyph(c)} ${CARDS[c].short}${c === 'basic' ? '' : ` ×${n}`}`;
       return btn('sub-card', c, label, (sub?.card ?? 'basic') === c && !!sub?.table, n > 0);
     })
     .join('');
@@ -533,11 +532,11 @@ function inputRow(t: TeamId, pos: number): string {
   const extra = sub?.extra;
   const extras = [
     btn('sub-extra', '', '안 함', !extra),
-    ...EXTRA_CARDS.map((c) => btn('sub-extra', c, `${CARDS[c].short} ×${hand?.[c] ?? 0}`, extra?.card === c, (hand?.[c] ?? 0) > 0)),
+    ...EXTRA_CARDS.map((c) => btn('sub-extra', c, `${cardGlyph(c)} ${CARDS[c].short} ×${hand?.[c] ?? 0}`, extra?.card === c, (hand?.[c] ?? 0) > 0)),
   ].join('');
   const extraTables = extra
     ? `<div class="in-group"><span class="in-label">추가 카드 해역</span>${shown
-        .map((i) => btn('sub-extra-table', i + 1, `${i + 1}번 <small>${esc(shortTitle(pub.tables[i].agenda))}</small>`, extra.table === i + 1, pub.tables[i].agenda > 0))
+        .map((i) => btn('sub-extra-table', i + 1, `${i + 1}번 <small>${shortTitle(pub.tables[i].agenda)}</small>`, extra.table === i + 1, pub.tables[i].agenda > 0))
         .join('')}</div>`
     : '';
   const cuts = [
@@ -546,16 +545,16 @@ function inputRow(t: TeamId, pos: number): string {
   ].join('');
   const scouts = shown.map((i) => btn('scout', i + 1, `${i + 1}번`, false, pub.tables[i].agenda > 0 && score >= SCOUT_COST)).join('');
   const extraText = extra ? ` · + ${CARDS[extra.card].short} ${extra.table ? `${extra.table}번` : '(해역 선택!)'}` : '';
-  const state = sub?.table ? `✅ ${sub.table}번 · ${CARDS[sub.card].short}${extraText}${sub.cutIn ? ` · 순풍 ${sub.cutIn}번째` : ''}` : '⌛ 미입력 (쉼)';
+  const state = sub?.table ? `${glyph('check-mark')} ${sub.table}번 · ${CARDS[sub.card].short}${extraText}${sub.cutIn ? ` · 순풍 ${sub.cutIn}번째` : ''}` : `${glyph('hourglass')} 미입력 (쉼)`;
   return `<div class="in-row${sub?.table ? ' done' : ''}">
-    <div class="in-team"><b>${pos + 1}. ${esc(teamName(t))}</b><span>🧭 ${distanceOf(score)}해리</span><span class="in-state">${state}</span>
+    <div class="in-team"><b>${pos + 1}. ${esc(teamName(t))}</b><span>${glyph('compass')} ${distanceOf(score)}해리</span><span class="in-state">${state}</span>
       ${sub ? `<button class="pill ghost" data-action="sub-clear" data-team="${t}">지우기</button>` : ''}</div>
     <div class="in-group"><span class="in-label">해역</span>${tableBtns}</div>
     <div class="in-group"><span class="in-label">무기</span>${cards}</div>
     <div class="in-group"><span class="in-label">추가 카드</span>${extras}</div>
     ${extraTables || '<div></div>'}
-    <div class="in-group"><span class="in-label">🌬️ 순풍 +${CUT_IN_COST}해리</span>${cuts}</div>
-    <div class="in-group"><span class="in-label">👁️ 예지 +${SCOUT_COST}해리</span>${scouts}</div>
+    <div class="in-group"><span class="in-label">${glyph('wind-slap')} 순풍 +${CUT_IN_COST}해리</span>${cuts}</div>
+    <div class="in-group"><span class="in-label">${glyph('all-seeing-eye')} 예지 +${SCOUT_COST}해리</span>${scouts}</div>
   </div>`;
 }
 
@@ -563,11 +562,11 @@ function scoutModal(): string {
   if (!scoutShown) return '';
   const s = scoutShown;
   return `<div class="modal-back"><div class="modal" data-peek-box>
-    <h2>👁️ ${esc(teamName(s.team))} ${SCOUT_NAME}</h2>
+    <h2>${glyph('all-seeing-eye')} ${esc(teamName(s.team))} ${SCOUT_NAME}</h2>
     <p>${s.table}번 해역 · ${esc(agendaTitle(s.agenda))} · 남은 생명력</p>
     <div class="scout-num"><span class="masked">?</span><strong>${s.remaining}</strong></div>
-    <p class="muted">📢 함대 대표가 직접 <b>누르고 있는 동안</b>만 숫자가 보여요. 손을 떼면 다시 가려져요.</p>
-    <button class="secondary peek-btn" data-peek>👁 누르고 있기</button>
+    <p class="muted">${glyph('megaphone')} 함대 대표가 직접 <b>누르고 있는 동안</b>만 숫자가 보여요. 손을 떼면 다시 가려져요.</p>
+    <button class="secondary peek-btn" data-peek>${glyph('all-seeing-eye')} 누르고 있기</button>
     <button data-action="scout-close">닫기</button>
   </div></div>`;
 }
@@ -594,7 +593,7 @@ function secretPanel(): string {
   const log = game.log
     .slice(-30)
     .reverse()
-    .map((l) => `<li><span class="muted">R${l.round}</span> <b>${esc(teamName(l.team))}</b> ${esc(l.text)}</li>`)
+    .map((l) => `<li><span class="muted">R${l.round}</span> <b>${esc(teamName(l.team))}</b> ${glyphText(l.text)}</li>`)
     .join('');
   return `<section class="secret card">
     <div><h3>남은 / 처음 생명력</h3><ul class="plain">${tables}</ul>${practice ? `<p class="muted small">내일 날아갈 투척 창: ${practice}</p>` : ''}</div>
@@ -736,7 +735,7 @@ function credits(): string {
       <div class="credits-mark">ENDING CREDITS</div>
       <h1>&lt; 오디세이아 : 귀환의 항해 &gt;</h1>
       ${groups}
-      <div class="credits-end">⛵</div>
+      <div class="credits-end">${glyph('trireme')}</div>
     </div>
     ${showDock() ? '<div class="row center-row credits-nav"><button class="secondary narrow" data-action="credits">◀ 항해 일지</button><button class="secondary narrow" data-action="credits-replay">↻ 다시 재생</button>' + (isConsole ? '' : '<button class="secondary narrow" data-action="home">처음 화면</button>') + '</div>' : ''}
   </section>`;
@@ -750,7 +749,7 @@ function draw() {
   useSetup(game.engine?.setup);
   if (mode === 'tutorial') return render(app, tutorialView());
   if (mode === 'home' || !game.engine) {
-    if (isConsole) return render(app, '<section class="card center"><h2>🖥 진행자 창</h2><p>프로젝터 화면에서 출항하면 여기에 입력 패널이 나와요.</p></section>');
+    if (isConsole) return render(app, `<section class="card center"><h2>${glyph('laptop')} 진행자 창</h2><p>프로젝터 화면에서 출항하면 여기에 입력 패널이 나와요.</p></section>`);
     return render(app, homeView());
   }
   render(app, gameView());
@@ -765,7 +764,7 @@ function tickTimer() {
       continue;
     }
     const left = pub.deadline - Date.now();
-    el.textContent = left > 0 ? `⏱ ${formatTimer(left)}` : '⏱ 시간 종료';
+    el.innerHTML = left > 0 ? `${glyph('sands-of-time')} ${formatTimer(left)}` : `${glyph('hourglass')} 시간 종료`;
     el.classList.toggle('over', left <= 0);
     el.closest('.submit-guide')?.classList.toggle('over', left <= 0);
   }
@@ -913,7 +912,7 @@ function act(action: string, el: HTMLElement) {
       const { state, result } = scout(eng(), team, table);
       if (result.error) return toast(result.error);
       scoutShown = { ...result, team };
-      const entry = { round: state.pub.round, team, text: `👁️ ${SCOUT_NAME}: ${table}번 ${agendaTitle(result.agenda)} 남은 생명력 ${result.remaining}` };
+      const entry = { round: state.pub.round, team, text: `${SCOUT_NAME}: ${table}번 ${agendaTitle(result.agenda)} 남은 생명력 ${result.remaining}` };
       return save(commit(game, { engine: state, log: [...game.log, entry] }));
     }
     case 'scout-close':
