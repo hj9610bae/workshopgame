@@ -190,8 +190,8 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
       lastX.set(id, px);
       const sail = prev !== undefined && Math.abs(prev - px) > 0.05;
       // 이타카 내륙(음수)에 들어가면 배 대신 말
-      const art = d < 0 || home ? '<span class="ship-horse">🐎</span>' : SHIP_SVG;
-      const badge = home ? '👑' : look.docked?.includes(t) ? '⚓' : i + 1;
+      const art = d < 0 || home ? glyph('horse-head', 'ship-horse') : SHIP_SVG;
+      const badge = home ? glyph('crown') : look.docked?.includes(t) ? glyph('anchor') : i + 1;
       // delta 는 전진 거리 변화: 전진하면 고국과의 거리가 줄어듦
       const dd = look.deltas?.[t] ?? 0;
       const delta = dd ? `<span class="delta ${dd > 0 ? 'up' : 'down'}">${dd > 0 ? '−' : '+'}${Math.abs(dd)}</span>` : '';
@@ -208,17 +208,17 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
   // 결승선: 이타카 왕궁과 기다리는 페넬로페
   const goal = look.goal
     ? `<div class="sea-goal${look.arrive?.length ? ' reached' : ''}" style="--goal:${GOAL_X}%">
-        <div class="goal-art" aria-hidden="true"><span>🏛️</span><span>👸</span></div>
-        <b>이타카 왕궁</b><small>🏁 결승선</small>
+        <div class="goal-art" aria-hidden="true">${glyph('greek-temple')}${glyph('queen-crown')}</div>
+        <b>이타카 왕궁</b><small>${glyph('checkered-flag', 'inline')}결승선</small>
       </div>`
     : '';
   return `<section class="sea${look.goal ? ' has-goal' : ''}" style="--rows:${order.length};--port:${port.toFixed(2)}%">
     <div class="sea-waves" aria-hidden="true"></div>
-    <div class="sea-land"><span>🏛️ 이타카</span></div>
+    <div class="sea-land"><span>${glyph('greek-temple', 'inline')}이타카</span></div>
     ${goal}
     <div class="sea-ticks">${ticks.join('')}</div>
-    <div class="sea-port"><span>⚓ 이타카 항구 0</span></div>
-    <div class="sea-troy"><span>⚔️ 트로이 전장</span></div>
+    <div class="sea-port"><span>${glyph('anchor', 'inline')}이타카 항구 0</span></div>
+    <div class="sea-troy"><span>${glyph('crossed-swords', 'inline')}트로이 전장</span></div>
     <ol class="sea-ships">${ships}</ol>
   </section>`;
 }
