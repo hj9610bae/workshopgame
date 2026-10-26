@@ -5,7 +5,7 @@
 import './style.css';
 import './board.css';
 import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, QUIZ_FROM_RANK, QUIZ_LABEL, QUIZ_LEVELS, QUIZ_REWARD, QUIZ_THINK_SECONDS, RESCUE_ROUND, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, distanceOf, type CardId, type ExtraCardId, type QuizLevel, type TeamId } from './deal/data';
-import { cardGlyph, glyph } from './deal/icons';
+import { agendaGlyph, cardGlyph, glyph } from './deal/icons';
 import { agendaTitle, beginSubmit, canOpenRescue, createGame, finish, markQuiz, openRescue, quizQueue, ranking, resolveRound, revealNext, scout, settleRescue, startQuizTimer, startRound, type EngineState } from './deal/engine';
 import { deck, distanceLabel, feltTable, seaMap, type TableLook } from './deal/felt';
 import {
@@ -114,7 +114,7 @@ function laurel(): string {
 
 function tutorialView(): string {
   const step = steps[tutorialIndex];
-  const body = `<section class="slide"><h1>${esc(step.title)}</h1>${step.html}${step.sea ? exampleSea(step.sea) : ''}</section>`;
+  const body = `<section class="slide"><h1>${glyph(step.icon, 'title-glyph')}${esc(step.title)}</h1>${step.html}${step.sea ? exampleSea(step.sea) : ''}</section>`;
   const dots = steps
     .map((_, i) => `<button class="dot-btn${i === tutorialIndex ? ' on' : ''}" data-action="tut-go" data-index="${i}" aria-label="${i + 1}번째 장면"></button>`)
     .join('');
@@ -230,7 +230,9 @@ function quizScores(): Partial<Record<TeamId, number>> {
 }
 
 const quizReward = (level: QuizLevel) => `${QUIZ_LABEL[level]} +${QUIZ_REWARD[level]}해리`;
+/** 진행자 조작 버튼용 색 점 (프로젝터 배너는 금빛 눈금 QUIZ_PIPS) */
 const QUIZ_DOT: Record<QuizLevel, string> = { low: '🟢', mid: '🟡', high: '🔴' };
+const QUIZ_PIPS = (l: QuizLevel) => `<span class="lv-pips" aria-hidden="true">${'<i></i>'.repeat(QUIZ_LEVELS.indexOf(l) + 1)}</span>`;
 const THINK = QUIZ_THINK_SECONDS % 60 === 0 ? `${QUIZ_THINK_SECONDS / 60}분` : `${QUIZ_THINK_SECONDS}초`;
 
 /** 배너는 처음 나타날 때(단계가 바뀔 때)만 튀어나오게. 진행자가 입력할 때마다 다시 튀지 않도록 */
@@ -248,26 +250,28 @@ function rescueBanner(): string {
   // 도전 순서는 5위 → 4위 → 3위
   const challengers = [...r.candidates].reverse();
   const place = (t: TeamId) => r.candidates.indexOf(t) + QUIZ_FROM_RANK;
-  const mark = (t: TeamId) => (r.phase === 'done' ? (r.rewards?.[t] ? ' ✅' : r.correct?.[t] === false ? ' ❌' : '') : r.correct?.[t] === true ? ' ✅' : r.correct?.[t] === false ? ' ❌' : '');
+  const yes = glyph('check-mark', 'quiz-ok');
+  const no = glyph('cross-mark', 'quiz-no');
+  const mark = (t: TeamId) => (r.phase === 'done' ? (r.rewards?.[t] ? yes : r.correct?.[t] === false ? no : '') : r.correct?.[t] === true ? yes : r.correct?.[t] === false ? no : '');
   const levels = QUIZ_LEVELS.map((l) => {
     const picks = challengers.filter((t) => r.level?.[t] === l).map((t) => `<span class="quiz-chip">${name(t)}${mark(t)}</span>`).join('');
-    return `<div class="quiz-level ${l}"><b>${QUIZ_DOT[l]} 난이도 [${QUIZ_LABEL[l]}]</b><span>성공: <em>+${QUIZ_REWARD[l]}해리</em></span><span class="muted">실패: 무보상</span>
+    return `<div class="quiz-level ${l}"><b>${QUIZ_PIPS(l)}난이도 [${QUIZ_LABEL[l]}]</b><span>성공: <em>+${QUIZ_REWARD[l]}해리</em></span><span class="muted">실패: 무보상</span>
       <div class="quiz-picks">${picks}</div></div>`;
   }).join('');
   const team = (t: TeamId) => `<span class="quiz-team${r.timer?.team === t ? ' on' : ''}">${place(t)}위 ${name(t)}${mark(t)}</span>`;
-  const head = `<div class="sphinx-head"><div class="banner-icon">🗿</div><h2>[${RESCUE_ROUND}일차 특별 이벤트] 올림포스의 스핑크스 등장!</h2></div>
+  const head = `<div class="sphinx-head"><div class="banner-icon">${glyph('greek-sphinx')}</div><h2>[${RESCUE_ROUND}일차 특별 이벤트] 올림포스의 스핑크스 등장!</h2></div>
     <p class="sphinx-quote">"지친 탐험대여, 나의 수수께끼를 풀어 구원선에 올라타라!"</p>
     <div class="quiz-levels">${levels}</div>`;
   if (r.phase === 'offer') {
     const timer = r.timer ? `<div class="quiz-timer"><span>${name(r.timer.team)} 생각 시간</span><b data-quiz-timer></b></div>` : '';
     return `<div class="banner rescue sphinx${popOnce('offer')}">${head}
-      <p class="quiz-line">🎯 도전팀 : ${challengers.map(team).join(' ➔ ')}</p>
-      <p class="quiz-line">⏱️ 제한시간 : 난이도 선택 후 생각시간 <b>${THINK}</b> · 문제는 난이도 [하]부터</p>
+      <p class="quiz-line">${glyph('archery-target', 'inline')} 도전팀 : ${challengers.map(team).join(' ➔ ')}</p>
+      <p class="quiz-line">${glyph('sands-of-time', 'inline')} 제한시간 : 난이도 선택 후 생각시간 <b>${THINK}</b> · 문제는 난이도 [하]부터</p>
       ${timer}</div>`;
   }
   const won = challengers.filter((t) => r.rewards?.[t]);
   const result = won.length
-    ? won.map((t) => `<li><b>${name(t)}</b> 정답! 고국으로 <b>${r.rewards![t]}해리</b> 전진</li>`).join('')
+    ? won.map((t) => `<li><b class="team-name">${name(t)}</b> 정답! 고국으로 <b>${r.rewards![t]}해리</b> 전진</li>`).join('')
     : '<li>스핑크스의 수수께끼를 푼 함대가 없어요</li>';
   return `<div class="banner rescue sphinx${won.length ? ' deal' : ''}${popOnce('done')}">${head}
     <ul class="quiz-rows">${result}</ul>
@@ -339,7 +343,7 @@ function banner(): string {
         return `<div class="banner deal final-open pop"><div class="banner-icon">${bannerIcon(d.icon)}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}
           <p class="muted small">${pub.round}일차 순서: ${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p></div>`;
       }
-      const news = pub.events.filter((e) => e.kind !== 'finalOpen').map((e) => describeEvent(e)).map((d) => `<li>${d.icon} ${esc(d.title)}${d.detail ? ` <span class="muted">${esc(d.detail)}</span>` : ''}</li>`);
+      const news = pub.events.filter((e) => e.kind !== 'finalOpen').map((e) => describeEvent(e)).map((d) => `<li>${bannerIcon(d.icon)} ${glyphText(d.title)}${d.detail ? ` <span class="muted">${glyphText(d.detail)}</span>` : ''}</li>`);
       const tie = pub.round === 1 ? '1일차 순서는 추첨!' : '고국에 가까운 함대부터. 같으면 지난 날 뒤 순번이 먼저.';
       return `<div class="banner calm"><h2>${pub.round}일차 순서 발표</h2><p>${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p>
         ${news.length ? `<ul class="news">${news.join('')}</ul>` : ''}<p class="muted small">${tie}</p></div>`;
@@ -698,11 +702,11 @@ function agendaReveal(): string {
     const team = dealtBy.get(id);
     const trail = slainTrail.get(id) ?? aliveTrail.get(id);
     const hits = (trail ?? [])
-      .map((h, k, all) => `<li class="${team && k === all.length - 1 ? 'last' : ''}">${esc(teamName(h.team))} ${CARDS[h.card].icon}<b>−${h.amount}</b></li>`)
+      .map((h, k, all) => `<li class="${team && k === all.length - 1 ? 'last' : ''}">${esc(teamName(h.team))} ${cardGlyph(h.card, 'inline')}<b>−${h.amount}</b></li>`)
       .join('');
-    const result = team ? `⚔️ <b>${esc(teamName(team))}</b> 돌파` : trail ? '살아남음' : '등장하지 않음';
+    const result = team ? `${glyph('crossed-swords', 'inline')} <b>${esc(teamName(team))}</b> 돌파` : trail ? '살아남음' : '등장하지 않음';
     return `<li class="reveal-card${team ? '' : ' alive'}" style="--i:${i}">
-      <div class="reveal-head"><span class="pictogram">${a.icon}</span><b>${esc(a.title)}</b><span class="reveal-hp">❤️${hpOf(id)}</span></div>
+      <div class="reveal-head"><span class="pictogram">${agendaGlyph(id)}</span><b>${esc(a.title)}</b><span class="reveal-hp">생명력 ${hpOf(id)}</span></div>
       ${hits ? `<ol class="reveal-trail">${hits}</ol>` : '<p class="reveal-trail none">공격 없음</p>'}
       <div class="reveal-result">${result}</div>
     </li>`;
