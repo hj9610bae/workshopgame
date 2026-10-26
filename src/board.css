@@ -269,7 +269,7 @@ body.live:has(.home-board) {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: 26px 26px 22px;
+  padding: 16px 26px 16px;
   border-radius: 18px;
   background:
     /* 물결 */
@@ -374,7 +374,7 @@ body.live:has(.home-board) {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding-top: calc(var(--n, 0) * 20px);
+  padding-top: calc(var(--n, 0) * 15px);
 }
 
 .stack > .agenda-card,
@@ -384,7 +384,7 @@ body.live:has(.home-board) {
 
 .past {
   position: absolute;
-  top: calc((var(--n) - var(--k)) * 20px);
+  top: calc((var(--n) - var(--k)) * 15px);
   bottom: calc(var(--k) * 6px);
   left: calc(var(--k) * 7px);
   right: calc(var(--k) * 7px);
@@ -1230,6 +1230,7 @@ body.live:has(.home-board) {
 }
 
 .ship-dist {
+  font-size: 1.15em;
   font-weight: 800;
   color: var(--mint);
 }
