@@ -113,6 +113,8 @@ body.live button.small {
 .home-board .setup {
   position: relative;
   z-index: 1;
+  background: rgba(14, 22, 48, 0.72);
+  border: 1px solid var(--line-gold);
 }
 
 .hero h1 {
@@ -217,9 +219,25 @@ body.live:has(.home-board) {
   color: var(--text);
 }
 
+.pick .pick-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .pick.on .pick-toggle {
-  background: var(--success);
-  color: var(--navy);
+  background: transparent;
+  color: var(--line-gold);
+  box-shadow: inset 0 0 0 1px var(--line-gold);
+}
+
+/* 고르지 않은 함대: 빈 네모 */
+.pick-box {
+  width: 0.9em;
+  height: 0.9em;
+  border: 1px solid var(--muted);
+  border-radius: 3px;
 }
 
 .pick input {
@@ -1444,6 +1462,10 @@ body.console #app {
 }
 
 .final-board h1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
   font-size: 3rem;
 }
 
@@ -1458,12 +1480,13 @@ body.console #app {
 
 .podium li {
   display: grid;
-  grid-template-columns: 4em 1fr auto auto;
+  grid-template-columns: 5em 1fr auto auto;
   gap: 16px;
   align-items: center;
   padding: 14px 22px;
   border-radius: var(--radius);
-  background: var(--surface);
+  background: rgba(14, 22, 48, 0.72);
+  border: 1px solid var(--line-gray);
   font-size: 1.3rem;
   animation: pop 0.6s both;
 }
@@ -1484,14 +1507,32 @@ body.console #app {
   animation-delay: 0.7s;
 }
 
-.podium .rank-1 {
-  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
-  color: var(--accent-text);
+.podium .rank {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-title);
+  font-weight: 900;
+  color: var(--muted);
+}
+
+/* 1위: 채운 금색 대신 골드 선 + 금색 글자 (style.css 의 같은 규칙보다 우선하도록 body.live) */
+body.live .podium .rank-1 {
+  background: rgba(14, 22, 48, 0.72);
+  color: var(--text);
+  border-color: var(--line-gold);
+  box-shadow: 0 0 24px rgba(197, 160, 89, 0.3);
   font-size: 1.7rem;
 }
 
-.podium .rank-1 .muted {
-  color: var(--navy);
+body.live .podium .rank-1 .rank,
+body.live .podium .rank-1 .name,
+body.live .podium .rank-1 .score {
+  color: var(--line-gold);
+}
+
+body.live .podium .rank-1 .muted {
+  color: var(--muted);
 }
 
 .podium .name {
@@ -1520,7 +1561,11 @@ body.console #app {
   left: calc(var(--i) * 4.2%);
   width: 10px;
   height: 18px;
-  background: hsl(calc(var(--i) * 47deg) 90% 60%);
+  /* 금빛 조각만 (밝기만 조금씩 다르게) */
+  width: 8px;
+  height: 14px;
+  background: hsl(40deg 55% calc(48% + var(--i) * 1.4%));
+  opacity: 0.75;
   animation: fall 3.5s linear infinite;
   animation-delay: calc(var(--i) * -0.37s);
   pointer-events: none;
@@ -1893,6 +1938,10 @@ button.dot-btn.on {
 }
 
 .agenda-reveal h1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
   margin: 8px 0 16px;
 }
 
@@ -1919,9 +1968,10 @@ button.dot-btn.on {
   gap: 12px;
   padding: 9px 16px;
   border-radius: 12px;
-  background: var(--paper);
+  background: rgba(14, 22, 48, 0.72);
+  border: 1px solid var(--line-gray);
   color: var(--ink);
-  box-shadow: 0 3px 0 var(--navy), 0 6px 12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
   animation: deal-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   animation-delay: calc(var(--i) * 0.08s);
 }
@@ -1972,12 +2022,11 @@ button.dot-btn.on {
 
 .reveal-trail li b {
   margin-left: 2px;
-  color: var(--red);
+  color: #c2495b;
 }
 
 .reveal-trail li.last {
-  border-color: var(--gold);
-  box-shadow: 0 0 8px rgba(244, 196, 48, 0.45);
+  border-color: var(--line-gold);
 }
 
 .reveal-trail.none {
@@ -1997,7 +2046,7 @@ button.dot-btn.on {
 }
 
 .reveal-result b {
-  color: var(--gold);
+  color: var(--line-gold);
 }
 
 .closing.lesson {
@@ -2709,8 +2758,8 @@ button.dot-btn.on {
   width: min(1100px, 92%);
   padding: 22px 40px 26px;
   border-radius: 22px;
-  background: linear-gradient(160deg, rgba(11, 19, 43, 0.92), rgba(40, 30, 8, 0.92));
-  border: 2px solid var(--gold);
+  background: rgba(11, 19, 43, 0.92);
+  border: 1px solid var(--line-gold);
   box-shadow:
     0 0 60px rgba(244, 196, 48, 0.55),
     inset 0 0 0 6px rgba(212, 175, 55, 0.18);
@@ -2789,7 +2838,7 @@ button.dot-btn.on {
 }
 
 .finale-stats b {
-  color: var(--mint);
+  color: #fff;
 }
 
 .finale-stats .finale-who {

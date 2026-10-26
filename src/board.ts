@@ -63,7 +63,7 @@ function homeView(): string {
   const rows = TEAM_IDS.map((t) => {
     const on = picked.has(t);
     return `<li class="pick${on ? ' on' : ''}">
-      <button class="pick-toggle" data-action="toggle-team" data-team="${t}">${on ? '✅' : '⬜'} ${t}</button>
+      <button class="pick-toggle" data-action="toggle-team" data-team="${t}">${on ? glyph('check-mark') : '<span class="pick-box"></span>'} ${t}</button>
       <input data-name="${t}" value="${esc(game.names[t] ?? '')}" placeholder="${t}함대" maxlength="12" ${on ? '' : 'disabled'} />
     </li>`;
   }).join('');
@@ -76,8 +76,8 @@ function homeView(): string {
       ${laurel()}
       <h1>오디세이아 : 귀환의 항해</h1>
       <p class="cover-sub">${ROUNDS}일간의 해상 개척과 고국으로의 무사 귀환 작전</p>
-      <button class="tutorial-btn" data-action="tutorial">📖 항해 설명 보기</button>
-      <button class="secondary practice-home" data-action="practice">🎲 바로 연습 항해 (${PRACTICE_DAYS}일, 무작위 역경)</button>
+      <button class="tutorial-btn" data-action="tutorial">${glyph('open-book')} 항해 설명 보기</button>
+      <button class="secondary practice-home" data-action="practice">${glyph('rolling-dices')} 바로 연습 항해 (${PRACTICE_DAYS}일, 무작위 역경)</button>
     </div>
     <div class="card setup">
       <h2>참가 함대</h2>
@@ -489,7 +489,7 @@ function dock(): string {
             ? rescueControls()
             : pub.round < ROUNDS
             ? `<button class="wide" data-action="next-round">${next}일차 출항 ▶</button>`
-            : '<button class="wide" data-action="finish">🏆 최종 결과 발표</button>';
+            : `<button class="wide" data-action="finish">${glyph('laurels-trophy')} 최종 결과 발표</button>`;
       break;
     }
   }
@@ -623,8 +623,8 @@ function finale(): string {
       const titles = slain.slice(0, 3).map((id) => esc(AGENDAS[id].title)).join(', ');
       const gates = slain.length ? `${titles}${slain.length > 3 ? ' 등' : ''} 총 <b>${slain.length}개</b> 관문 돌파` : '돌파한 관문 없이 끝까지 항해';
       return `${winners.length > 1 ? `<li class="finale-who">${esc(teamName(w.team))}</li>` : ''}
-        <li>🏛️ 최종 도달 거리 : <b>[ ${distanceOf(w.score)}해리 (${where}) ]</b></li>
-        <li>⚔️ 극복한 관문 : ${gates}</li>`;
+        <li>${glyph('greek-temple', 'inline')} 최종 도달 거리 : <b>[ ${distanceOf(w.score)}해리 (${where}) ]</b></li>
+        <li>${glyph('crossed-swords', 'inline')} 극복한 관문 : ${gates}</li>`;
     })
     .join('');
   const dust = Array.from({ length: 40 }, (_, i) => `<i style="--i:${i}"></i>`).join('');
@@ -636,15 +636,15 @@ function finale(): string {
     <div class="finale-bursts" aria-hidden="true">${bursts}</div>
     <div class="finale-card">
       ${laurel()}
-      <p class="finale-kicker">👑 [ ${home ? '고국 이타카 귀환 성공' : '고국 이타카를 눈앞에'} ]</p>
+      <p class="finale-kicker">${glyph('crown', 'inline')} [ ${home ? '고국 이타카 귀환 성공' : '고국 이타카를 눈앞에'} ]</p>
       <h1>"20년의 거친 바다를 헤치고 마침내 왕이 돌아왔다!"</h1>
       <div class="finale-winner">
-        <p class="finale-title">🏆 최종 우승 : <b>[ ${names} ]</b></p>
+        <p class="finale-title">${glyph('laurels-trophy', 'inline')} 최종 우승 : <b>[ ${names} ]</b></p>
         <p class="finale-quote">"왕좌를 위협하던 구혼자들을 물리치고,<br />사랑하는 가족의 품으로 돌아가 이타카의 왕좌를 되찾았습니다!"</p>
       </div>
       <ul class="finale-stats">${stats}</ul>
     </div>
-    ${showDock() ? '<div class="row center-row finale-nav"><button class="narrow" data-action="rank">🏆 전체 순위 보기 ▶</button></div>' : ''}
+    ${showDock() ? '<div class="row center-row finale-nav"><button class="narrow" data-action="rank">전체 순위 보기 ▶</button></div>' : ''}
   </section>`;
 }
 
@@ -668,15 +668,14 @@ function templeArt(): string {
 function rankView(): string {
   const rows = ranking(eng().pub);
   const winners = rows.filter((r) => r.rank === 1);
-  const medal = ['🥇', '🥈', '🥉'];
   const list = rows
-    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${medal[r.rank - 1] ?? `${r.rank}위`}</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">돌파 ${r.deals}회${eng().pub.rescue?.rewards?.[r.team] ? ` · 🗿 스핑크스 +${eng().pub.rescue!.rewards![r.team]}해리` : ''}</span></li>`)
+    .map((r) => `<li class="rank-${r.rank}"><span class="rank">${r.rank === 1 ? glyph('laurel-crown') : ''}${r.rank}위</span><span class="name">${esc(teamName(r.team))}</span><span class="score">${distanceLabel(distanceOf(r.score))}</span><span class="muted">돌파 ${r.deals}회${eng().pub.rescue?.rewards?.[r.team] ? ` · ${glyph('greek-sphinx', 'inline')}스핑크스 +${eng().pub.rescue!.rewards![r.team]}해리` : ''}</span></li>`)
     .join('');
   const best = winners[0] ? distanceOf(winners[0].score) : START_DISTANCE;
   const where = best <= 0 ? `고국 이타카에 도착해 내륙 ${-best}해리까지 들어간` : `고국까지 ${best}해리를 남긴`;
   return `<section class="final-board">
     <div class="confetti">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
-    <h1>🏆 최종 결과 · 고국과의 거리</h1>
+    <h1>${glyph('laurels-trophy', 'title-glyph')}최종 결과 · 고국과의 거리</h1>
     ${seaMap(rows.map((r) => r.team), Object.fromEntries(rows.map((r) => [r.team, r.score])), { key: 'final', goal: true, arrive: arrivedTeams() })}
     <ol class="podium">${list}</ol>
     <blockquote class="closing">
@@ -685,7 +684,7 @@ function rankView(): string {
       이번 항해에서는 역경의 남은 생명력을 가늠하고 마지막 일격을 넣는 타이밍이 핵심이었습니다.
       실제 교섭에서도 큰 역경을 함께 깎아 내는 끈기와, 제시안을 내는 '타이밍 전략'이 성공적인 타결을 만든다는 점을 기억해 주시기 바랍니다!"
     </blockquote>
-    ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="rank">◀ 왕좌 복위식</button><button class="narrow" data-action="final-tab">🗺️ 항해 일지 보기 ▶</button></div>' : ''}
+    ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="rank">◀ 왕좌 복위식</button><button class="narrow" data-action="final-tab">항해 일지 보기 ▶</button></div>' : ''}
   </section>`;
 }
 
@@ -712,13 +711,13 @@ function agendaReveal(): string {
     </li>`;
   }).join('');
   return `<section class="agenda-reveal">
-    <h1>🗺️ 항해 일지 · 역경별 공격 기록</h1>
+    <h1>${glyph('treasure-map', 'title-glyph')}항해 일지 · 역경별 공격 기록</h1>
     <ol class="reveal-grid" style="--rows:${Math.ceil((tables.length + queue.length + 1) / 2)}">${cards}</ol>
     <blockquote class="closing lesson">
       혼자서는 쓰러뜨릴 수 없는 <b>거대한 역경</b>도, 여러 함대가 조금씩 깎아 두면 결국 쓰러집니다.<br />
       남은 힘을 읽고 <b>마지막 일격의 타이밍</b>을 잡는 것, 그것이 교섭의 기술입니다.
     </blockquote>
-    ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="final-tab">◀ 순위 보기</button><button class="narrow" data-action="credits">🎬 엔딩 크레딧 ▶</button></div>' : ''}
+    ${showDock() ? '<div class="row center-row"><button class="secondary narrow" data-action="final-tab">◀ 순위 보기</button><button class="narrow" data-action="credits">엔딩 크레딧 ▶</button></div>' : ''}
   </section>`;
 }
 
@@ -734,7 +733,7 @@ function credits(): string {
   const groups = CREDITS.map(([head, lines]) => `<div class="credit-group"><h3>[ ${head} ]</h3>${lines.map((l) => `<p>${l}</p>`).join('')}</div>`).join('');
   return `<section class="credits">
     <div class="credits-roll">
-      <div class="credits-mark">🎬 ENDING CREDITS</div>
+      <div class="credits-mark">ENDING CREDITS</div>
       <h1>&lt; 오디세이아 : 귀환의 항해 &gt;</h1>
       ${groups}
       <div class="credits-end">⛵</div>
