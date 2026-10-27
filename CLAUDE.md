@@ -14,6 +14,7 @@
 - 최종 결전은 `FINAL_OPEN_ROUND`(8일차) 순서 발표 때 4번 해역. 그 전엔 4번 해역을 화면·입력 패널에 그리지 않음(`board.ts` `visibleTables`)
 - 스핑크스(구조선 퀴즈) hidden event: `RESCUE_ROUND`(7일차) 공개 뒤 `openRescue`(3·4·5등, 동점은 computeOrder 규칙) → `markQuiz`(함대가 고른 난도·정답) · `startQuizTimer`(`QUIZ_THINK_SECONDS`) → `settleRescue`(`pub.rescue.rewards`, `QUIZ_REWARD` 하2·중3·상6, 오답 벌칙 없음). 모두 계속 항해. 문제 순서 `quizQueue`(하부터). 1~7일차 화면·버튼에 4번 해역 예고 금지
 - 점수: 엔진 `score`는 v2.4 주도권 그대로(시작 10, 높을수록 좋음). 화면은 `distanceOf(score)` = 고국과의 거리(시작 `START_DISTANCE` 30해리, 낮을수록 좋음. 2026-10-23 시뮬레이션으로 15 → 30). 돌파 보상 = `Setup.demand`(처음 생명력)
+- 발표 흐름: 하루 끝은 '오늘의 항해 끝'(`end`) 뒤에 전갈 화살 돌파. 다음 날은 투척 창 돌파(`LocalGame.dawn`, 하나씩) → 순서 발표. 돌파 발표 `REFILL_DELAY_MS`(9초) 뒤 빈 해역 자동 채움. 레이스 전진은 배 뒤 항적(`.wake`)에 표시
 - 처음 생명력은 공개, 남은 생명력은 비공개. 공격 이력도 비공개: `secret.trail`에만 쌓이고 진행자 창에만 표시. 돌파된 역경의 이력은 `secret.history`로 옮겨 두었다가 최종 결과 뒤 항해 일지에서만 공개. 돌파 사건에는 마지막 일격 함대와 그 무기(`GameEvent.weapon`)만. 특수 무기면 `CARDS.effect` 짧은 설명을 붙임(`view.ts` `describeEvent`)
 - 역경 카드 `adversaryCard()`(`felt.ts`) = 픽토그램 + 역경 이름 + 생명력 + 전리품 특수 무기 이름 (구분선 없음, 전진 거리 = 생명력이라 생략). 실제 게임·연습·설명 모두 이 양식. 무기 카드 `weaponCard()`도 같은 양식(픽토그램 + 이름 + `CARDS.powerText`). 구간·교섭 안건은 항해 일지에만. 안건 번호는 화면에 쓰지 않음
 - 특수 무기 이름: `CARDS.name` = 풀네임(항해 설명에만), `CARDS.short` = 짧은 이름(연습·실제 게임 화면, 엔진 메시지). 2026-10-22에 이름을 돌려 바꿈: −6 = 🔱 포세이돈의 삼지창(`blitz`), 매일 −1 = 🏹 아폴론의 전갈 화살(`promo`), 동결 = ⛓️ 아테나의 쇠사슬(`hold`)

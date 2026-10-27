@@ -302,31 +302,88 @@ function rescueControls(): string {
       <button class="secondary narrow" data-action="rescue-skip">이벤트 건너뛰기</button></div></div>`;
 }
 
-/** 공개 중인 마지막 사건 (공개 단계에서만) */
-function latestEvent(): GameEvent | undefined {
-  const { pub } = eng();
-  return pub.stage === 'reveal' ? pub.events[pub.revealed - 1] : undefined;
-}
-
 /** 돌파 사건 (해역에 새 역경이 올라옴). 투척 창 가로채기(steal)는 전진만 옮기는 사건이라 제외 */
 const isDeal = (e: GameEvent): boolean => e.kind !== 'steal' && !!(e.agenda && e.reward && e.team);
+
+/** 아침(순서 발표 전)에 하나씩 띄우는 사건: 어제 던진 투척 창의 돌파. pub.events 안의 번호 */
+const dawnEvents = (): number[] => eng().pub.events.flatMap((e, i) => (e.kind === 'practiceDeal' ? [i] : []));
+
+/** 지금 팝업으로 보여 주는 사건(cur)과 바로 앞 사건(prev)의 번호: 공개 단계, 그리고 순서 발표 전 아침 사건 */
+function cursor(): { cur?: number; prev?: number } {
+  const { pub } = eng();
+  if (pub.stage === 'reveal') return { cur: pub.revealed - 1, prev: pub.revealed - 2 };
+  if (pub.stage !== 'order') return {};
+  const dawn = dawnEvents();
+  if (game.dawn) return { cur: dawn[game.dawn - 1], prev: dawn[game.dawn - 2] };
+  return game.finalShown ? {} : { prev: dawn.at(-1) };
+}
+
+/** 공개 중인 사건 (공개 단계·아침 사건) */
+function latestEvent(): GameEvent | undefined {
+  const { cur } = cursor();
+  return cur === undefined ? undefined : eng().pub.events[cur];
+}
+
+/**
+ * 돌파 발표 뒤 빈 해역에 대기열 역경이 들어오기까지 기다리는 시간.
+ * 진행자 멘트 'E함대가 2번 해역에 있는 키클롭스 역경을 돌파했습니다. 보상으로 5해리 전진합니다.'(약 36음절)를
+ * 발표 속도(초당 5음절 안팎)로 읽으면 7초쯤 + 도장이 찍히고 카드를 보는 1~2초
+ */
+const REFILL_DELAY_MS = 9000;
+/** 새 역경이 이미 들어온 돌파 사건 (`${일차}:${단계}:${사건 번호}`) */
+const refilled = new Set<string>();
+const eventKey = (i: number) => `${eng().pub.round}:${eng().pub.stage}:${i}`;
+let refillKey = '';
+let refillTimer: number | undefined;
+
+/** 돌파 사건이 새로 공개되면 REFILL_DELAY_MS 뒤에 그 해역에 새 역경을 들여보냄 (다음 공개를 먼저 누르면 그때 들어옴) */
+function syncRefill() {
+  const { cur } = cursor();
+  const e = cur === undefined ? undefined : eng().pub.events[cur];
+  const key = e?.table && isDeal(e) ? eventKey(cur!) : '';
+  if (key === refillKey) return;
+  clearTimeout(refillTimer);
+  refillKey = key;
+  if (!key) return;
+  // 되돌리기로 다시 온 돌파도 처음처럼 도장부터
+  refilled.delete(key);
+  refillTimer = window.setTimeout(() => {
+    refilled.add(key);
+    patchRefill(e!.table!);
+  }, REFILL_DELAY_MS);
+}
+
+/** 화면 전체를 다시 그리면 배너·배가 다시 튀므로 그 해역 카드와 대기열만 바꿔 끼움 */
+function patchRefill(tableNo: number) {
+  const card = app.querySelector(`.felt-tables .ftable.t${tableNo}`);
+  if (card) card.outerHTML = feltTable(boardSnap().tables[tableNo - 1], tableNo - 1, { fresh: true });
+  const rail = app.querySelector('.rail');
+  if (rail) rail.innerHTML = deck(eventQueue());
+}
+
+/** 공개 중인 사건 시점의 해역·점수 */
+function boardSnap() {
+  const e = latestEvent();
+  return e ? { tables: e.tables, scores: e.scores } : snapshot(eng().pub);
+}
 
 function tableLooks(): TableLook[] {
   const { pub } = eng();
   const looks: TableLook[] = pub.tables.map(() => ({}));
-  const reveal = pub.stage === 'reveal';
-  // 공개 단계: 돌파 발표 동안은 돌파된 역경을 그대로 두고, 다음 사건에서 새 역경이 들어옴
-  const before = reveal ? pub.events[pub.revealed - 2] : undefined;
-  if (before?.table && isDeal(before)) looks[before.table - 1] = { fresh: true };
-  const shown = reveal ? [pub.events[pub.revealed - 1]] : pub.stage === 'order' ? pub.events : [];
-  for (const e of shown) {
-    if (!e?.table) continue;
+  const { cur, prev } = cursor();
+  // 돌파 발표 동안은 돌파된 역경을 그대로 두고, REFILL_DELAY_MS 뒤(또는 다음 사건)에 새 역경이 들어옴
+  const before = prev === undefined ? undefined : pub.events[prev];
+  if (before?.table && isDeal(before) && !refilled.has(eventKey(prev!))) looks[before.table - 1] = { fresh: true };
+  const e = cur === undefined ? undefined : pub.events[cur];
+  if (e?.table) {
     const i = e.table - 1;
-    if (e.kind === 'finalOpen') looks[i] = { fresh: true };
-    else if (isDeal(e)) looks[i] = { deal: { team: e.team!, agenda: e.agenda!, reward: e.reward! }, fresh: true, slain: reveal };
+    if (isDeal(e)) looks[i] = refilled.has(eventKey(cur!)) ? {} : { deal: { team: e.team!, agenda: e.agenda!, reward: e.reward! }, slain: true };
     else if (e.kind === 'proposal' && e.result === 'promo') looks[i] = { promo: true };
     else if (e.kind === 'hold') looks[i] = { freeze: true };
   }
+  // 최종 결전 등장: '해역 공개'를 누른 뒤
+  const open = pub.stage === 'order' && game.finalShown ? pub.events.find((x) => x.kind === 'finalOpen') : undefined;
+  if (open?.table) looks[open.table - 1] = { fresh: true };
   return looks;
 }
 
@@ -335,6 +392,9 @@ function banner(): string {
   const done = pub.order.filter((t) => game.subs[t]?.table).length;
   switch (pub.stage) {
     case 'order': {
+      // 아침 사건(투척 창 돌파)은 순서 발표 전에 하나씩
+      const dawn = latestEvent();
+      if (dawn) return eventBanner(dawn, `dawn-${game.dawn}`);
       // 최종 결전 등장은 순서 발표와 따로, '해역 공개' 뒤에 띄움
       const open = pub.events.find((e) => e.kind === 'finalOpen');
       if (open && game.finalShown) {
@@ -342,10 +402,9 @@ function banner(): string {
         return `<div class="banner deal final-open pop"><div class="banner-icon">${bannerIcon(d.icon)}</div><h2>${esc(d.title)}</h2>${d.detail ? `<p>${esc(d.detail)}</p>` : ''}
           <p class="muted small">${pub.round}일차 순서: ${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p></div>`;
       }
-      const news = pub.events.filter((e) => e.kind !== 'finalOpen').map((e) => describeEvent(e)).map((d) => `<li>${bannerIcon(d.icon)} ${glyphText(d.title)}${d.detail ? ` <span class="muted">${glyphText(d.detail)}</span>` : ''}</li>`);
       const tie = pub.round === 1 ? '1일차 순서는 추첨!' : '고국에 가까운 함대부터. 같으면 지난 날 뒤 순번이 먼저.';
       return `<div class="banner calm"><h2>${pub.round}일차 순서 발표</h2><p>${pub.order.map((t) => esc(teamName(t))).join(' → ')}</p>
-        ${news.length ? `<ul class="news">${news.join('')}</ul>` : ''}<p class="muted small">${tie}</p></div>`;
+        <p class="muted small">${tie}</p></div>`;
     }
     case 'submit': {
       // 양피지 명령서 예시: 필수(함대·해역·무기)와 선택(순풍·추가 무기)을 나눠 보여 줌
@@ -381,21 +440,25 @@ function banner(): string {
       // 구조선 배너는 이벤트가 열린 그날 공개 단계에만 (8일차부터는 평소 사건 배너)
       if (pub.rescue && pub.round === RESCUE_ROUND) return rescueBanner();
       const e = latestEvent();
-      if (!e) return '';
-      const d = describeEvent(e);
-      if (!isDeal(e) && e.kind !== 'steal') return `<div class="banner pop ${d.tone ?? ''}" data-key="${pub.revealed}"><div class="banner-icon">${bannerIcon(d.icon)}</div><h2>${glyphText(d.title)}</h2>${d.detail ? `<p>${glyphText(d.detail)}</p>` : ''}</div>`;
-      // 돌파: 알약·배지 없이 글자 굵기·색으로만 위계 (함대 금색 굵게 | 문장 흰색 | 보상 연회색)
-      const team = e.team ? teamName(e.team) : '';
-      const head = team && d.title.startsWith(`${team}, `) ? d.title.slice(team.length + 2) : d.title;
-      const detail = [d.detail, e.loot && !d.detail?.includes(`${CARDS[e.loot].short} 획득`) ? `${CARDS[e.loot].short} 획득` : ''].filter(Boolean).join(' · ');
-      return `<div class="banner pop deal${e.kind === 'steal' ? ' steal' : ''}" data-key="${pub.revealed}">
-        <div class="banner-icon">${glyph('laurel-crown')}</div>
-        <h2>${team ? `<b class="team-name">${esc(team)}</b><span class="sep">|</span>` : ''}${glyphText(head)}</h2>
-        ${detail ? `<p class="deal-detail">${glyphText(detail)}</p>` : ''}</div>`;
+      return e ? eventBanner(e, String(pub.revealed)) : '';
     }
     default:
       return '';
   }
+}
+
+/** 사건 하나의 팝업 배너 (공개 단계·아침 사건 공통) */
+function eventBanner(e: GameEvent, key: string): string {
+  const d = describeEvent(e);
+  if (!isDeal(e) && e.kind !== 'steal') return `<div class="banner pop ${d.tone ?? ''}" data-key="${key}"><div class="banner-icon">${bannerIcon(d.icon)}</div><h2>${glyphText(d.title)}</h2>${d.detail ? `<p>${glyphText(d.detail)}</p>` : ''}</div>`;
+  // 돌파: 알약·배지 없이 글자 굵기·색으로만 위계 (함대 금색 굵게 | 문장 흰색 | 보상 연회색)
+  const team = e.team ? teamName(e.team) : '';
+  const head = team && d.title.startsWith(`${team}, `) ? d.title.slice(team.length + 2) : d.title;
+  const detail = [d.detail, e.loot && !d.detail?.includes(`${CARDS[e.loot].short} 획득`) ? `${CARDS[e.loot].short} 획득` : ''].filter(Boolean).join(' · ');
+  return `<div class="banner pop deal${e.kind === 'steal' ? ' steal' : ''}" data-key="${key}">
+    <div class="banner-icon">${glyph('laurel-crown')}</div>
+    <h2>${team ? `<b class="team-name">${esc(team)}</b><span class="sep">|</span>` : ''}${glyphText(head)}</h2>
+    ${detail ? `<p class="deal-detail">${glyphText(detail)}</p>` : ''}</div>`;
 }
 
 /** 사건 배너 아이콘: OS 이모지 대신 단색 아이콘 (없는 것은 그대로) */
@@ -417,7 +480,9 @@ function seatLook() {
   const status: Partial<Record<TeamId, string>> = {};
   if (pub.stage === 'submit') for (const t of pub.order) status[t] = game.subs[t]?.table ? `${glyph('check-mark')} 입력 완료` : `${glyph('hourglass')} 대기`;
   const e = latestEvent();
-  const prevScores = pub.stage === 'reveal' ? pub.events[pub.revealed - 2]?.scores : undefined;
+  const { prev } = cursor();
+  // 그날 첫 아침 사건(투척 창 돌파)은 앞 사건이 없으니 그 돌파 보상만큼
+  const prevScores = prev !== undefined && prev >= 0 ? pub.events[prev].scores : e?.team && e.reward ? { ...e.scores, [e.team]: (e.scores[e.team] ?? 0) - e.reward } : undefined;
   // 스핑크스 퀴즈 중·뒤에는 퀴즈 보상을 전진으로 표시
   if (quizToday()) return { status, deltas: quizRewards(), goal: showGoal() };
   const deltas = e && prevScores ? Object.fromEntries(pub.teamIds.map((t) => [t, (e.scores[t] ?? 0) - (prevScores[t] ?? 0)])) : {};
@@ -427,7 +492,8 @@ function seatLook() {
 function gameView(): string {
   const { pub } = eng();
   if (pub.stage === 'final') return topbar() + finalView();
-  const snap = snapshot(pub);
+  syncRefill();
+  const snap = boardSnap();
   const looks = tableLooks();
   const shown = visibleTables();
   const tables = shown.map((i) => feltTable(snap.tables[i], i, looks[i])).join('');
@@ -448,8 +514,9 @@ function gameView(): string {
 function eventQueue(): number {
   const { pub } = eng();
   let q = pub.queue;
-  // 아직 공개되지 않은 사건 중 1~3번 해역 돌파 수만큼 되돌림. 돌파 발표 중인 사건도 새 역경이 아직 안 들어왔으니 포함
-  const from = pub.stage === 'reveal' ? Math.max(0, pub.revealed - 1) : pub.revealed;
+  // 아직 공개되지 않은 사건 중 1~3번 해역 돌파 수만큼 되돌림. 돌파 발표 중인 사건도 새 역경이 아직 안 들어왔으면 포함
+  const { cur } = cursor();
+  const from = cur === undefined ? pub.revealed : Math.max(0, cur + (refilled.has(eventKey(cur)) ? 1 : 0));
   for (const e of pub.events.slice(from)) if (isDeal(e) && e.table && e.table <= 3) q -= 1;
   return Math.max(0, q);
 }
@@ -460,11 +527,17 @@ function dock(): string {
   const { pub } = eng();
   let main = '';
   switch (pub.stage) {
-    case 'order':
-      main = finalPending()
+    case 'order': {
+      const left = dawnEvents().length - (game.dawn ?? 0);
+      main = game.dawn
+        ? left > 0
+          ? `<button class="wide" data-action="dawn-next">다음 공개 ▶ <span class="small">(${left})</span></button>`
+          : `<button class="wide" data-action="order-show">${pub.round}일차 순서 발표 ▶</button>`
+        : finalPending()
         ? `<button class="wide" data-action="final-open">${glyph('big-wave')} 해역 공개 ▶</button>`
         : `<button class="wide" data-action="submit">${glyph('quill-ink')} 제출 받기 시작 (${SUBMIT_SECONDS / 60}분) ▶</button>`;
       break;
+    }
     case 'submit': {
       const done = pub.order.filter((t) => game.subs[t]?.table).length;
       main = `${inputPanel()}
@@ -783,6 +856,8 @@ function tickTimer() {
 const ALLOWED: Record<string, Stage[]> = {
   submit: ['order'],
   'final-open': ['order'],
+  'dawn-next': ['order'],
+  'order-show': ['order'],
   resolve: ['submit'],
   'sub-table': ['submit'],
   'sub-card': ['submit'],
@@ -884,6 +959,11 @@ function act(action: string, el: HTMLElement) {
       return draw();
     case 'final-open':
       return save(commit(game, { finalShown: true }));
+    case 'dawn-next':
+      if (!game.dawn) return;
+      return save(commit(game, { dawn: Math.min(game.dawn + 1, dawnEvents().length) }));
+    case 'order-show':
+      return save(commit(game, { dawn: undefined }));
     case 'submit':
       inputOpen = false;
       return save(commit(game, { engine: beginSubmit(eng(), Date.now()), subs: {} }));
@@ -938,7 +1018,9 @@ function act(action: string, el: HTMLElement) {
       // 구조선 이벤트를 마쳐야 다음 날로
       if (canOpenRescue(eng()) || eng().pub.rescue?.phase === 'offer') return;
       const step = startRound(eng());
-      return save(commit(game, { engine: step.state, log: [...game.log, ...logNotes(step)] }));
+      // 어제 던진 투척 창이 돌파했으면 순서 발표 전에 하나씩 띄움
+      const dawn = step.state.pub.events.some((e) => e.kind === 'practiceDeal') ? 1 : undefined;
+      return save(commit(game, { engine: step.state, log: [...game.log, ...logNotes(step)], dawn }));
     }
     case 'finish':
       return save(commit(game, { engine: finish(eng()), rankShown: false, agendasShown: false, creditsShown: false }));
@@ -987,7 +1069,7 @@ function primaryAction(): string | null {
   if (mode === 'tutorial') return 'tut-next';
   if (mode !== 'game' || !game.engine || !showDock()) return null;
   const { pub } = eng();
-  if (pub.stage === 'order') return finalPending() ? 'final-open' : 'submit';
+  if (pub.stage === 'order') return game.dawn ? (game.dawn < dawnEvents().length ? 'dawn-next' : 'order-show') : finalPending() ? 'final-open' : 'submit';
   if (pub.stage === 'final') return !game.rankShown ? 'rank' : !game.agendasShown ? 'final-tab' : !game.creditsShown ? 'credits' : null;
   if (pub.stage === 'reveal') {
     if (pub.revealed < pub.events.length) return 'reveal';

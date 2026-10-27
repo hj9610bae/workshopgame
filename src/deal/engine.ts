@@ -518,9 +518,12 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     }
   }
 
-  // 하루 끝: 전갈 화살 효과 (동결된 해역은 쉼)
+  // 하루 끝: '오늘의 항해 끝'을 먼저 발표하고, 전갈 화살 효과(동결된 해역은 쉼)로 돌파되면 그 뒤에 이어서 발표
+  const frozen = pub.tables.map((table) => table.frozen);
+  for (const table of pub.tables) table.frozen = false;
+  turn.event({ kind: 'end' });
   pub.tables.forEach((table, i) => {
-    if (table.frozen) return;
+    if (frozen[i]) return;
     for (const owner of table.promos) {
       if (!table.agenda) break;
       const deal = turn.damage(i + 1, 'promo', owner);
@@ -541,8 +544,6 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   }
   turn.steals.clear();
 
-  for (const table of pub.tables) table.frozen = false;
-  turn.event({ kind: 'end' });
   pub.stage = 'reveal';
   pub.revealed = 1;
   return turn.result();

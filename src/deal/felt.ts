@@ -192,16 +192,21 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
       // 이타카 내륙(음수)에 들어가면 배 대신 말
       const art = d < 0 || home ? glyph('horse-head', 'ship-horse') : SHIP_SVG;
       const badge = home ? glyph('crown') : look.docked?.includes(t) ? glyph('anchor') : i + 1;
-      // delta 는 전진 거리 변화: 전진하면 고국과의 거리가 줄어듦
-      const dd = look.deltas?.[t] ?? 0;
-      const delta = dd ? `<span class="delta ${dd > 0 ? 'up' : 'down'}">${dd > 0 ? '−' : '+'}${Math.abs(dd)}</span>` : '';
+      // delta 는 전진 거리 변화: 전진하면 고국과의 거리가 줄어듦.
+      // 배가 지나온 물길(원래 자리 ~ 지금 자리)에 항적을 긋고 그 위에 −2 처럼 표시 (전진이면 배 뒤 오른쪽, 후퇴면 왼쪽)
+      const dd = home ? 0 : (look.deltas?.[t] ?? 0);
+      const from = x(d + dd);
+      const delta = dd
+        ? `<span class="wake ${dd > 0 ? 'up' : 'down'}" style="--w:${Math.abs(from - px).toFixed(2)}"><span class="delta">${dd > 0 ? '−' : '+'}${Math.abs(dd)}</span></span>`
+        : '';
       const status = look.status?.[t];
       const style = `--i:${i};--x:${px.toFixed(2)}%${sail ? `;--from:${prev!.toFixed(2)}%` : ''}`;
       // 금빛 돛 핀이 정확히 거리 자리에 뜨고, 아래 말풍선에 함대 이름 (거리). 왕좌 복위는 말(진행 방향) 앞에 따로
       return `<li class="ship${look.active === t ? ' active' : ''}${sail ? ' sail' : ''}${home ? ' home' : ''}" style="${style}">
         ${home ? '<span class="ship-crown">왕좌 복위</span>' : ''}
+        ${delta}
         <span class="ship-pin">${art}<span class="ship-pos">${badge}</span></span>
-        <span class="ship-tag"><b class="ship-name">${esc(teamName(t))}</b> <span class="ship-dist">(${distanceLabel(d)})</span>${delta}${status ? `<span class="ship-status">${status}</span>` : ''}</span>
+        <span class="ship-tag"><b class="ship-name">${esc(teamName(t))}</b> <span class="ship-dist">(${distanceLabel(d)})</span>${status ? `<span class="ship-status">${status}</span>` : ''}</span>
       </li>`;
     })
     .join('');

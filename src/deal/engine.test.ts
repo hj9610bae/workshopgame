@@ -232,6 +232,8 @@ describe('특수 무기', () => {
     expect(state.pub.teams.B!.score).toBe(13);
     expect(state.pub.tables[1]).toMatchObject({ agenda: 4, promos: ['B'] });
     expect(state.pub.events.find((e) => e.kind === 'promoDeal')).toMatchObject({ team: 'B', agenda: 2, reward: 3, weapon: 'promo' });
+    // '오늘의 항해 끝'을 먼저 발표하고 전갈 화살 돌파는 그 뒤에
+    expect(state.pub.events.slice(-2).map((e) => e.kind)).toEqual(['end', 'promoDeal']);
   });
 
   it('예전에 저장된 게임(이력 없음)도 이어서 진행', () => {

@@ -31,6 +31,8 @@ export interface LocalGame {
   agendasShown?: boolean;
   /** FINAL_OPEN_ROUND 순서 발표 뒤 '해역 공개'를 눌러 4번 해역(최종 결전)을 보여 줌 */
   finalShown?: boolean;
+  /** 순서 발표 전에 하나씩 띄우는 아침 사건(어제 던진 투척 창의 돌파) 중 지금 보여 주는 번호(1부터). 없으면 순서 발표 중 */
+  dawn?: number;
   /** 최종 결과: 피날레(왕좌 복위식)를 넘기고 순위를 보여 주는 중 */
   rankShown?: boolean;
   /** 항해 일지 다음 마지막 페이지: 엔딩 크레딧 */
