@@ -24,7 +24,7 @@ export interface LocalGame {
   names: Partial<Record<TeamId, string>>;
   /** 게임 시작 전이면 null */
   engine: EngineState | null;
-  /** 이번 라운드에 보조자가 입력한 제출 */
+  /** 이번 라운드에 진행자가 입력한 제출 */
   subs: Partial<Record<TeamId, Submission>>;
   log: LogEntry[];
   /** 최종 결과에서 안건별 요구 수치 공개 화면을 보여 주는 중 (진행자 창과 같이 바뀜) */
