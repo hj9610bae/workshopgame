@@ -1263,6 +1263,12 @@ body.live:has(.home-board) {
   height: 0;
 }
 
+/* 항해하는 동안 항적 너비를 배의 항해와 같은 곡선으로 0 → 전진 거리만큼 늘림.
+   항적은 배에 붙어 함께 움직이므로, 이렇게 해야 반대쪽 끝이 출발선(직전 자리)에 머묾 */
+.ship.sail .wake {
+  animation: wake 1.4s ease-in-out both;
+}
+
 .wake.up {
   left: 0;
 }
@@ -1271,7 +1277,7 @@ body.live:has(.home-board) {
   right: 0;
 }
 
-/* 점선은 배가 항해하는 동안(1.4초) 원래 자리에서 배를 따라 늘어남 */
+/* 점선은 배가 항해하는 동안(1.4초) 출발선에서 배를 따라 늘어남 */
 .wake::before {
   content: '';
   position: absolute;
@@ -1279,22 +1285,16 @@ body.live:has(.home-board) {
   border-top: 4px dashed var(--mint);
   opacity: 0.75;
   filter: drop-shadow(0 0 4px rgba(72, 202, 228, 0.6));
-  animation: wake 1.4s ease-in-out both;
-}
-
-.wake.up::before {
-  transform-origin: right;
 }
 
 .wake.down::before {
-  transform-origin: left;
   border-top-color: var(--danger);
   filter: none;
 }
 
 @keyframes wake {
   from {
-    transform: scaleX(0);
+    width: 0;
   }
 }
 
@@ -1524,7 +1524,7 @@ body.console #app {
   position: relative;
   text-align: center;
   overflow: hidden;
-  padding: 24px 0;
+  padding: 8px 0 0;
 }
 
 .final-board h1 {
@@ -1532,7 +1532,8 @@ body.console #app {
   align-items: center;
   justify-content: center;
   gap: 0.35em;
-  font-size: 3rem;
+  margin: 0 0 14px;
+  font-size: 2.6rem;
 }
 
 .podium {
@@ -1541,7 +1542,7 @@ body.console #app {
   padding: 0;
   max-width: 760px;
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 
 .podium li {
@@ -1549,7 +1550,7 @@ body.console #app {
   grid-template-columns: 5em 1fr auto auto;
   gap: 16px;
   align-items: center;
-  padding: 14px 22px;
+  padding: 9px 22px;
   border-radius: var(--radius);
   background: rgba(14, 22, 48, 0.72);
   border: 1px solid var(--line-gray);
@@ -1588,7 +1589,7 @@ body.live .podium .rank-1 {
   color: var(--text);
   border-color: var(--line-gold);
   box-shadow: 0 0 24px rgba(197, 160, 89, 0.3);
-  font-size: 1.7rem;
+  font-size: 1.55rem;
 }
 
 body.live .podium .rank-1 .rank,
@@ -1612,8 +1613,8 @@ body.live .podium .rank-1 .muted {
 
 .closing {
   max-width: 900px;
-  margin: 24px auto;
-  line-height: 1.7;
+  margin: 14px auto;
+  line-height: 1.55;
   color: var(--muted);
 }
 
@@ -2135,7 +2136,9 @@ button.dot-btn.on {
 
 .final-board .sea {
   width: min(1200px, 100%);
-  margin: 0 auto 16px;
+  margin: 0 auto 12px;
+  /* 지도·순위·마무리 멘트가 1920×1080 한 화면에 들어가게 지도를 조금 작게 */
+  font-size: 0.8em;
 }
 
 .slide-sea .sea {
@@ -2597,6 +2600,11 @@ button.dot-btn.on {
   color: #fff;
 }
 
+/* 8일차부터 해역이 4개면 카드가 좁아져 긴 이름('헤파이스토스의 거대 용암')이 두 줄로 바뀌고 화면이 넘침 → 한 줄에 들어가게 */
+.felt-tables.cols-4 .agenda-card h3 {
+  font-size: 1.65rem;
+}
+
 /* 4번(최종 결전): 같은 카드에 골드 선만 두껍게 */
 .ftable.final .agenda-card {
   border-width: 2px;
@@ -2746,7 +2754,8 @@ button.dot-btn.on {
 }
 
 .banner.final-open .banner-icon {
-  font-size: 2.8rem;
+  /* 2.8rem이면 세 줄 배너가 1920×1080 한 화면을 넘침 */
+  font-size: 2rem;
   animation: bob 2.4s ease-in-out infinite;
 }
 

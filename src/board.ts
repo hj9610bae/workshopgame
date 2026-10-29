@@ -501,7 +501,7 @@ function gameView(): string {
   return `${topbar()}
     <div class="arena">
       <section class="felt">
-        <div class="felt-tables" style="--cols:${shown.length}">${tables}</div>
+        <div class="felt-tables cols-${shown.length}" style="--cols:${shown.length}">${tables}</div>
         ${banner()}
       </section>
       <aside class="rail">${deck(eventQueue())}</aside>
