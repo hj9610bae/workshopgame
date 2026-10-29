@@ -144,7 +144,7 @@ const SHIP_SVG = `<svg class="ship-art" viewBox="0 0 32 32" aria-hidden="true">
   <path d="M3.5 22.5 H28.5 L27.6 24 H4.4Z" fill="#d4af37"/>
 </svg>`;
 
-/** 지난번에 그린 배의 가로 위치(%). 거리가 바뀌면 그 자리에서 새 자리로 항해해 오게 */
+/** 지난번에 그린 배의 가로 위치(%). 위치가 바뀐 그림에서만 항해 연출을 한 번 보여주려고 */
 const lastX = new Map<string, number>();
 
 /** 눈금 간격: 지도에 6칸 안팎이 되도록 1·2·5·10… 중에서 */
@@ -185,22 +185,24 @@ export function seaMap(order: TeamId[], scores: Partial<Record<TeamId, number>>,
       const home = !!look.goal && !!look.arrive?.includes(t);
       const px = home ? GOAL_X : x(d);
       const id = `${key}:${t}`;
+      const dd = home ? 0 : (look.deltas?.[t] ?? 0);
+      const from = x(d + dd);
       // 처음 그리는 도착 함대도 제자리에서 결승선까지 항해해 오게
       const prev = lastX.get(id) ?? (home ? x(d) : undefined);
       lastX.set(id, px);
-      const sail = prev !== undefined && Math.abs(prev - px) > 0.05;
+      // 전진·후퇴는 지난 그림의 자리(축척이 바뀌었을 수 있음)가 아니라 이번 지도에서 직전 자리(항적 시작)부터 항해
+      const start = home ? prev : dd ? from : undefined;
+      const sail = prev !== undefined && start !== undefined && Math.abs(prev - px) > 0.05;
       // 이타카 내륙(음수)에 들어가면 배 대신 말
       const art = d < 0 || home ? glyph('horse-head', 'ship-horse') : SHIP_SVG;
       const badge = home ? glyph('crown') : look.docked?.includes(t) ? glyph('anchor') : i + 1;
       // delta 는 전진 거리 변화: 전진하면 고국과의 거리가 줄어듦.
       // 배가 지나온 물길(원래 자리 ~ 지금 자리)에 항적을 긋고 그 위에 −2 처럼 표시 (전진이면 배 뒤 오른쪽, 후퇴면 왼쪽)
-      const dd = home ? 0 : (look.deltas?.[t] ?? 0);
-      const from = x(d + dd);
       const delta = dd
         ? `<span class="wake ${dd > 0 ? 'up' : 'down'}" style="--w:${Math.abs(from - px).toFixed(2)}"><span class="delta">${dd > 0 ? '−' : '+'}${Math.abs(dd)}</span></span>`
         : '';
       const status = look.status?.[t];
-      const style = `--i:${i};--x:${px.toFixed(2)}%${sail ? `;--from:${prev!.toFixed(2)}%` : ''}`;
+      const style = `--i:${i};--x:${px.toFixed(2)}%${sail ? `;--from:${start!.toFixed(2)}%` : ''}`;
       // 금빛 돛 핀이 정확히 거리 자리에 뜨고, 아래 말풍선에 함대 이름 (거리). 왕좌 복위는 말(진행 방향) 앞에 따로
       return `<li class="ship${look.active === t ? ' active' : ''}${sail ? ' sail' : ''}${home ? ' home' : ''}" style="${style}">
         ${home ? '<span class="ship-crown">왕좌 복위</span>' : ''}

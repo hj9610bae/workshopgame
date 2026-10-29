@@ -327,9 +327,9 @@ function latestEvent(): GameEvent | undefined {
 /**
  * 돌파 발표 뒤 빈 해역에 대기열 역경이 들어오기까지 기다리는 시간.
  * 진행자 멘트 'E함대가 2번 해역에 있는 키클롭스 역경을 돌파했습니다. 보상으로 5해리 전진합니다.'(약 36음절)를
- * 발표 속도(초당 5음절 안팎)로 읽으면 7초쯤 + 도장이 찍히고 카드를 보는 1~2초
+ * 발표 속도(초당 5음절 안팎)로 읽으면 7초쯤 + 도장이 찍히고 카드를 보는 1~2초 → 9초로 잡았다가 길어서 70%로 줄임
  */
-const REFILL_DELAY_MS = 9000;
+const REFILL_DELAY_MS = 6300;
 /** 새 역경이 이미 들어온 돌파 사건 (`${일차}:${단계}:${사건 번호}`) */
 const refilled = new Set<string>();
 const eventKey = (i: number) => `${eng().pub.round}:${eng().pub.stage}:${i}`;
