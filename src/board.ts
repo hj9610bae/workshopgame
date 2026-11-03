@@ -21,8 +21,6 @@ import {
   undo,
   type LocalGame,
 } from './deal/local';
-import { bgmOn, duckBgm, setBgm, setBgmOn, type Mood } from './deal/bgm';
-import { isMuted, playCue, setMuted, soundReady, unlockSound, type Cue } from './deal/sound';
 import { practiceSetup, tutorialSteps } from './deal/tutorial';
 import type { GameEvent, ScoutResult, Stage, Submission } from './deal/types';
 import { STAGE_LABEL, activeSetup, describeEvent, formatTimer, hpOf, setTeamNames, snapshot, teamName, useSetup } from './deal/view';
@@ -178,7 +176,6 @@ function topbar(): string {
     ? `<div class="tools">
         <button class="small secondary" data-action="undo" ${game.history.length ? '' : 'disabled'} title="Ctrl+Z">↶ 되돌리기</button>
         ${isConsole ? '' : `<button class="small secondary" data-action="open-console" title="노트북 화면에 비공개 입력 창을 띄워요">${glyph('laptop')} 진행자 창</button>`}
-        ${soundButton()}
         ${isConsole ? '' : '<button class="small secondary" data-action="home">처음 화면</button>'}
       </div>`
     : '';
@@ -823,124 +820,13 @@ function draw() {
   // 튜토리얼 설명문은 A~E 함대 기준이라 이름 바꾸기를 적용하지 않음
   setTeamNames(mode === 'tutorial' ? {} : game.names);
   useSetup(game.engine?.setup);
-  if (mode === 'tutorial') render(app, tutorialView());
-  else if (mode === 'home' || !game.engine) {
-    if (isConsole) render(app, `<section class="card center"><h2>${glyph('laptop')} 진행자 창</h2><p>프로젝터 화면에서 출항하면 여기에 입력 패널이 나와요.</p></section>`);
-    else render(app, homeView());
-  } else {
-    render(app, gameView());
-    tickTimer();
+  if (mode === 'tutorial') return render(app, tutorialView());
+  if (mode === 'home' || !game.engine) {
+    if (isConsole) return render(app, `<section class="card center"><h2>${glyph('laptop')} 진행자 창</h2><p>프로젝터 화면에서 출항하면 여기에 입력 패널이 나와요.</p></section>`);
+    return render(app, homeView());
   }
-  syncSound();
-}
-
-/* ───────── 효과음 ───────── */
-
-/** 소리 켜기/끄기 버튼 (M). 이 창에서 아직 클릭이 없어 소리를 못 내면 '소리 켜기'로 알려 줌 */
-function soundButton(): string {
-  const label = isMuted() ? '🔇 소리 꺼짐' : soundReady() ? '🔊 소리' : '🔈 소리 켜기';
-  const music = `<button class="small secondary" data-action="bgm" title="B: 배경음악 켜기/끄기">${bgmOn() ? '🎵 BGM' : '🎵 BGM 꺼짐'}</button>`;
-  return `<button class="small secondary" data-action="sound" title="M: 효과음·배경음악 모두 켜기/끄기">${label}</button>${music}`;
-}
-
-/** 지금 단계의 배경음악 분위기 */
-function bgmMood(): Mood {
-  if (mode !== 'game' || !game.engine) return 'intro';
-  const { pub } = eng();
-  if (pub.stage === 'final') return 'finale';
-  if (pub.stage === 'submit') return 'tension';
-  if (quizToday() && pub.rescue?.phase === 'offer') return 'sphinx';
-  const finalOn = pub.round > FINAL_OPEN_ROUND || (pub.round === FINAL_OPEN_ROUND && (pub.stage !== 'order' || game.finalShown));
-  return !isPractice() && finalOn ? 'final' : 'voyage';
-}
-
-/** 배경음악은 소리 내는 창에서만 */
-const syncBgm = () => setBgm(playsSound() ? bgmMood() : null);
-
-/** 소리를 내는 창: 진행자 창이 열려 있으면 진행자 창(클릭이 거기서 일어나서 브라우저가 소리를 허락함), 아니면 프로젝터 화면 */
-const playsSound = () => isConsole || !consoleAlive();
-
-/** 사건 하나의 효과음. 동결된 해역에 낸 공격도 평소 공격과 같은 소리 (화면처럼 드러나지 않게) */
-function eventCue(e: GameEvent): Cue {
-  // 배가 항해(1.4초)를 마치고 도착할 즈음 닻 내리는 소리
-  const sail: Cue = [['waves', 0.3], ['chain', 1.6]];
-  const weapon = (id?: CardId): Cue => (id === 'promo' || id === 'practice' ? [['arrow', 0]] : [['slash', 0]]);
-  if (isDeal(e) || e.kind === 'steal') {
-    const w = e.kind === 'practiceDeal' ? 'practice' : e.kind === 'promoDeal' ? 'promo' : e.kind === 'steal' ? 'practice' : e.weapon;
-    const hitAt = w === 'promo' || w === 'practice' ? 0.36 : 0.15;
-    return [...weapon(w), ['impact', hitAt], ['chain', hitAt + 1.3]];
-  }
-  switch (e.kind) {
-    case 'start':
-      return e.cutIn ? [['magic', 0]] : [['drum', 0]];
-    case 'hold':
-      return [['chain', 0], ['impact', 0.55]];
-    case 'end':
-      return [['waves', 0], ['horn', 0.4]];
-    case 'proposal':
-      if (e.result === 'promo') return [['arrow', 0]];
-      if (e.result === 'pass') return [];
-      if (e.result === 'void' && e.reason !== 'hold') return [['fail', 0]];
-      return [['slash', 0], ['impact', 0.15]];
-    default:
-      return sail;
-  }
-}
-
-/** 지금 화면의 효과음 자리(key)와 소리. key 가 처음 나타날 때 한 번만 울림 */
-function soundCue(): { key: string; cue: Cue } {
-  if (mode !== 'game' || !game.engine) return { key: mode, cue: [] };
-  const { pub } = eng();
-  const r = `${isPractice() ? 'p' : ''}${pub.round}`;
-  switch (pub.stage) {
-    case 'order': {
-      const e = latestEvent();
-      if (e) return { key: `dawn:${r}:${game.dawn}`, cue: eventCue(e) };
-      if (game.finalShown) return { key: `final-open:${r}`, cue: [['drumroll', 0], ['horn', 1.2]] };
-      return { key: `order:${r}`, cue: [['horn', 0], ['waves', 0.2]] };
-    }
-    case 'submit': {
-      // 예지를 쓰면 그 함대가 물러나므로 점수 합이 바뀜
-      const sum = Object.values(pub.teams).reduce((a, t) => a + (t?.score ?? 0), 0);
-      return { key: `submit:${r}:${sum}`, cue: lastSoundKey.startsWith(`submit:${r}:`) ? [['magic', 0]] : [] };
-    }
-    case 'reveal': {
-      const q = pub.rescue;
-      if (q && pub.round === RESCUE_ROUND && pub.revealed >= pub.events.length) {
-        const right = Object.values(q.correct ?? {}).filter(Boolean).length;
-        const key = `rescue:${q.phase}:${right}`;
-        if (q.phase === 'done') return { key, cue: [['magic', 0], ['chain', 1.3]] };
-        const more = lastSoundKey.startsWith('rescue:offer:') && right > Number(lastSoundKey.split(':')[2]);
-        return { key, cue: lastSoundKey.startsWith('rescue:') ? (more ? [['magic', 0]] : []) : [['magic', 0], ['drum', 0.8]] };
-      }
-      const e = latestEvent();
-      return e ? { key: `reveal:${r}:${pub.revealed}`, cue: eventCue(e) } : { key: `reveal:${r}:0`, cue: [] };
-    }
-    case 'final':
-      return { key: `final:${game.rankShown ? 1 : 0}`, cue: game.rankShown ? [['drum', 0]] : [['drumroll', 0]] };
-    default:
-      return { key: pub.stage, cue: [] };
-  }
-}
-
-/** 이미 울린 자리 (되돌리기 뒤 다시 앞으로 가도 한 번만). 처음 그릴 때는 지금 자리를 울리지 않음 */
-const soundPlayed = new Set<string>();
-let lastSoundKey = '';
-let soundStarted = false;
-function syncSound() {
-  // 새 항해(되돌리기 기록이 없음)면 지난 항해에서 울린 자리를 잊음
-  if (!game.engine || !game.history.length) soundPlayed.clear();
-  const { key, cue } = soundCue();
-  if (key === lastSoundKey) return;
-  const fresh = soundStarted && !soundPlayed.has(key);
-  soundPlayed.add(key);
-  lastSoundKey = key;
-  soundStarted = true;
-  if (fresh && playsSound() && cue.length) {
-    playCue(cue);
-    duckBgm(Math.max(...cue.map(([, at]) => at)) + 1);
-  }
-  syncBgm();
+  render(app, gameView());
+  tickTimer();
 }
 
 function tickTimer() {
@@ -1165,13 +1051,6 @@ function act(action: string, el: HTMLElement) {
       return save({ ...game, agendasShown: !game.agendasShown, creditsShown: false });
     case 'credits':
       return save({ ...game, agendasShown: true, creditsShown: !game.creditsShown });
-    case 'sound':
-      // 이번 클릭·키로 막 소리가 켜졌으면 끄지 않음
-      if (!justUnlocked) setMuted(!isMuted());
-      return draw();
-    case 'bgm':
-      setBgmOn(!bgmOn());
-      return draw();
     case 'credits-replay': {
       // 애니메이션을 처음부터 다시: 크레딧 요소를 새로 그림
       const roll = app.querySelector<HTMLElement>('.credits-roll');
@@ -1204,23 +1083,6 @@ function primaryAction(): string | null {
 
 onAction(app, act);
 
-let justUnlocked = false;
-// 브라우저는 클릭·키 입력이 있어야 소리를 허락함: 첫 입력 때 깨워 둠
-for (const ev of ['pointerdown', 'keydown'] as const)
-  window.addEventListener(ev, () => {
-    justUnlocked = !soundReady() && !isMuted();
-    unlockSound();
-    // 화면 전체를 다시 그리면 연출이 다시 튀므로 버튼 글자만 바꿈
-    if (justUnlocked)
-      setTimeout(() => {
-        syncBgm();
-        const btn = app.querySelector('[data-action="sound"]');
-        if (!btn) return;
-        app.querySelector('[data-action="bgm"]')?.remove();
-        btn.outerHTML = soundButton();
-      }, 80);
-  }, true);
-
 app.addEventListener('input', (e) => {
   const input = e.target as HTMLInputElement;
   const t = input.dataset.name as TeamId | undefined;
@@ -1240,8 +1102,6 @@ window.addEventListener('keydown', (e) => {
   if (mode === 'tutorial' && (e.key === 'ArrowLeft' || e.key === 'PageUp')) return goTutorial(tutorialIndex - 1);
   if (mode === 'tutorial' && e.key === 'Escape') return act('tut-exit', app);
   if (scoutShown && e.key === 'Escape') return act('scout-close', app);
-  if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) return act('sound', app);
-  if (e.key.toLowerCase() === 'b' && !e.ctrlKey && !e.metaKey) return act('bgm', app);
   if (![' ', 'ArrowRight', 'PageDown'].includes(e.key)) return;
   if (scoutShown) return;
   const action = primaryAction();
@@ -1268,8 +1128,6 @@ onGameChange(() => {
 
 let dockShown = showDock();
 setInterval(() => {
-  // 진행자 창을 열고 닫으면 배경음악이 그 창으로 옮겨 감
-  syncBgm();
   if (isConsole) beatConsole();
   else if (showDock() !== dockShown) {
     dockShown = showDock();
