@@ -1,16 +1,17 @@
 /*
  * 현장 진행 효과음. 음원 파일 없이 Web Audio로 합성해서 바로 씀.
- * 진짜 음원으로 바꾸고 싶으면 public/sfx/<이름>.mp3 (예: fanfare.mp3)를 넣으면 그 파일을 우선 재생.
- * 이름: slash, arrow, impact, magic, fanfare, drum, waves, horn, chain, fail, drumroll
+ * 진짜 음원으로 바꾸고 싶으면 public/sfx/<이름>.mp3 (예: slash.mp3)를 넣으면 그 파일을 우선 재생.
+ * 이름: slash, arrow, impact, magic, drum, waves, horn, chain, fail, drumroll
+ * 배경음악은 bgm.ts (같은 AudioContext, 효과음이 나는 동안 살짝 줄어듦)
  * 브라우저는 그 창에서 한 번 클릭·키 입력이 있어야 소리를 낼 수 있음 (unlockSound).
  */
 
-export type Sfx = 'slash' | 'arrow' | 'impact' | 'magic' | 'fanfare' | 'drum' | 'waves' | 'horn' | 'chain' | 'fail' | 'drumroll';
+export type Sfx = 'slash' | 'arrow' | 'impact' | 'magic' | 'drum' | 'waves' | 'horn' | 'chain' | 'fail' | 'drumroll';
 /** [효과음, 시작까지 기다릴 초] */
 export type Cue = [Sfx, number][];
 
 const MUTE_KEY = 'odyssey-sound-muted';
-/** 전체 음량 (팡파르는 이 안에서 80%로 크게) */
+/** 전체 음량 (효과음·배경음악 모두) */
 const MASTER = 0.9;
 
 let ctx: AudioContext | undefined;
@@ -23,6 +24,8 @@ export function setMuted(on: boolean) {
   localStorage.setItem(MUTE_KEY, on ? '1' : '0');
   if (master) master.gain.value = on ? 0 : MASTER;
 }
+/** 배경음악(bgm.ts)이 같은 오디오·전체 음량을 쓰도록 */
+export const audioOut = (): { ctx: AudioContext; out: AudioNode } | undefined => (ctx && master ? { ctx, out: master } : undefined);
 /** 이 창에서 소리를 낼 수 있는지 (클릭 전이면 false) */
 export const soundReady = (): boolean => ctx?.state === 'running';
 
@@ -42,7 +45,7 @@ export function unlockSound() {
   if (ctx.state === 'suspended') void ctx.resume();
 }
 
-const NAMES: Sfx[] = ['slash', 'arrow', 'impact', 'magic', 'fanfare', 'drum', 'waves', 'horn', 'chain', 'fail', 'drumroll'];
+const NAMES: Sfx[] = ['slash', 'arrow', 'impact', 'magic', 'drum', 'waves', 'horn', 'chain', 'fail', 'drumroll'];
 async function loadSamples() {
   for (const name of NAMES) {
     try {
@@ -77,7 +80,7 @@ function schedule(cue: Cue) {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       const g = ctx.createGain();
-      g.gain.value = name === 'fanfare' ? 0.8 : 0.7;
+      g.gain.value = 0.7;
       src.connect(g).connect(master);
       src.start(at);
     } else SYNTH[name](ctx, master, at);
@@ -181,46 +184,6 @@ const drum: Synth = (c, out, t) => {
   noise(c, t, 0.15).connect(filter(c, env(c, out, t, 0.4, 0.002, 0.12), 'lowpass', 600));
 };
 
-/** 금관 한 음: 톱니파 여러 개 + 필터가 열리며 '빠-' */
-function brass(c: AudioContext, out: AudioNode, freq: number, t: number, dur: number, vol: number) {
-  const g = c.createGain();
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + 0.04);
-  g.gain.setValueAtTime(vol * 0.8, t + dur * 0.7);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  g.connect(out);
-  const lp = filter(c, g, 'lowpass', 900, 2);
-  lp.frequency.setValueAtTime(700, t);
-  lp.frequency.exponentialRampToValueAtTime(3200, t + 0.08);
-  lp.frequency.exponentialRampToValueAtTime(1600, t + dur);
-  for (const d of [-6, 0, 6]) tone(c, lp, 'sawtooth', freq, t, dur).detune.value = d;
-}
-
-/** 승리의 팡파르 + 대형 북 (약 3초, 80%로 크게 시작해 은은하게 줄어듦) */
-const fanfare: Synth = (c, out, t) => {
-  const bus = c.createGain();
-  bus.gain.setValueAtTime(0.8, t);
-  bus.gain.setValueAtTime(0.8, t + 1.6);
-  bus.gain.exponentialRampToValueAtTime(0.25, t + 2.8);
-  bus.connect(out);
-  const v = 0.16;
-  // 빠바바밤~ (솔 솔 솔 도~) → 미 솔 도 화음
-  brass(c, bus, 392, t, 0.13, v);
-  brass(c, bus, 392, t + 0.15, 0.13, v);
-  brass(c, bus, 392, t + 0.3, 0.13, v);
-  brass(c, bus, 523.3, t + 0.45, 0.5, v);
-  brass(c, bus, 392, t + 0.95, 0.15, v);
-  for (const f of [523.3, 659.3, 784, 1046.5]) brass(c, bus, f, t + 1.12, 1.7, v * 0.8);
-  for (const at of [0, 0.45, 1.12, 1.4]) drum(c, bus, t + at);
-  // 환호: 크게 부풀었다 줄어드는 넓은 소음
-  const crowd = c.createGain();
-  crowd.gain.setValueAtTime(0.0001, t + 0.4);
-  crowd.gain.exponentialRampToValueAtTime(0.12, t + 1.2);
-  crowd.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
-  crowd.connect(bus);
-  noise(c, t + 0.4, 2.9).connect(filter(c, crowd, 'bandpass', 1400, 0.6));
-};
-
 /** 파도 소리: 두 번 밀려왔다 빠지는 물결 */
 const waves: Synth = (c, out, t) => {
   for (const [at, dur] of [
@@ -282,4 +245,4 @@ const drumroll: Synth = (c, out, t) => {
   drum(c, out, t + 1.1);
 };
 
-const SYNTH: Record<Sfx, Synth> = { slash, arrow, impact, magic, fanfare, drum, waves, horn, chain, fail, drumroll };
+const SYNTH: Record<Sfx, Synth> = { slash, arrow, impact, magic, drum, waves, horn, chain, fail, drumroll };
