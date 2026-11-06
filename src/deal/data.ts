@@ -26,8 +26,8 @@ export const RESCUE_ROUND = 7;
 export type QuizLevel = 'low' | 'mid' | 'high';
 export const QUIZ_LEVELS: QuizLevel[] = ['low', 'mid', 'high'];
 export const QUIZ_LABEL: Record<QuizLevel, string> = { low: '하', mid: '중', high: '상' };
-/** 맞히면 전진하는 거리. 정답률 하 90% · 중 60% · 상 30% 가정에서 기대값이 같도록 (scripts/balance-sim.ts quiz, 2026-10-22). 오답 벌칙 없음 */
-export const QUIZ_REWARD: Record<QuizLevel, number> = { low: 2, mid: 3, high: 6 };
+/** 맞히면 전진하는 거리. 2026-11-06 역전 기회를 늘리려 2·3·6 → 3·6·12 (정답률 하 90% · 중 60% · 상 30% 가정 기대값 2.7·3.6·3.6, scripts/balance-sim.ts loot). 오답 벌칙 없음 */
+export const QUIZ_REWARD: Record<QuizLevel, number> = { low: 3, mid: 6, high: 12 };
 /** 퀴즈 기회: 7일차 순위표에서 이 등수부터 (3·4·5등) */
 export const QUIZ_FROM_RANK = 3;
 /** 문제를 공개한 뒤 생각 시간 (진행자가 함대마다 시작) */
@@ -137,8 +137,12 @@ export const QUEUE = [4, 5, 6, 19, 7, 8, 20, 9, 21, 10, 11, 12, 13, 22, 14, 15, 
 /** FINAL_OPEN_ROUND 일차에 4번 해역으로 열리는 최종 결전 */
 export const FINAL_AGENDA = 18;
 
-/** 전리품(특수 무기)은 역경과 따로 정하고, 해역에 오르는 순서대로 앞쪽 역경에 하나씩 붙임. 역경 카드에 무기 이름까지 공개 */
-export const LOOT_ORDER: SpecialCardId[] = ['promo', 'hold', 'blitz', 'blitz', 'practice'];
+/**
+ * 전리품(특수 무기)은 역경과 따로 정하고, 해역에 오르는 순서대로 앞쪽 역경에 하나씩 붙임. 역경 카드에 무기 이름까지 공개.
+ * 2026-11-06 5장 → 10장([하] 5개 + [중] 처음 5개): 5~6일차까지 계속 나오게. 전갈 화살 3 · 쇠사슬 2 · 삼지창 2 · 투척 창 3
+ * (10장 구성 중 역전이 가장 잘 일어난 조합, scripts/balance-sim.ts loot ... mix)
+ */
+export const LOOT_ORDER: SpecialCardId[] = ['promo', 'hold', 'blitz', 'practice', 'promo', 'blitz', 'practice', 'hold', 'promo', 'practice'];
 export const LOOT: Partial<Record<number, SpecialCardId>> = Object.fromEntries(
   [...INITIAL_TABLES, ...QUEUE].slice(0, LOOT_ORDER.length).map((id, i) => [id, LOOT_ORDER[i]]),
 );

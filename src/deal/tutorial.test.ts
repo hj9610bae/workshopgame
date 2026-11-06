@@ -4,7 +4,7 @@ import { createGame, resolveRound, beginSubmit, startRound } from './engine';
 import { practiceSetup, tutorialSteps } from './tutorial';
 
 describe('연습 게임 배치', () => {
-  it('최종 결전을 뺀 역경 21개를 섞어 해역 3 + 대기열 18, 전리품 5장은 무작위 역경에', () => {
+  it('최종 결전을 뺀 역경 21개를 섞어 해역 3 + 대기열 18, 전리품(LOOT_ORDER)은 무작위 역경에', () => {
     for (let k = 0; k < 30; k++) {
       const s = practiceSetup();
       const ids = [...s.tables, ...s.queue];
@@ -55,7 +55,7 @@ describe('돌파 발표 문구', () => {
 });
 
 describe('실제 게임 배치 (구간 안에서만 섞기)', () => {
-  it('하 → 중 → 상 구간 순서는 지키고, 전리품은 처음 나오는 5개 역경에 순서대로', () => {
+  it('하 → 중 → 상 구간 순서는 지키고, 전리품은 처음 나오는 역경(LOOT_ORDER 장수)에 순서대로', () => {
     const rank = { low: 0, mid: 1, high: 2 };
     for (let k = 0; k < 30; k++) {
       const s = shuffledSetup();
@@ -64,8 +64,8 @@ describe('실제 게임 배치 (구간 안에서만 섞기)', () => {
       expect([...ids].sort((a, b) => a - b)).toEqual([...SETUP.tables, ...SETUP.queue].sort((a, b) => a - b));
       const tiers = ids.map((id) => rank[AGENDAS[id].tier]);
       expect(tiers).toEqual([...tiers].sort((a, b) => a - b));
-      expect(ids.slice(0, 5).map((id) => s.loot[id])).toEqual(LOOT_ORDER);
-      expect(Object.keys(s.loot)).toHaveLength(5);
+      expect(ids.slice(0, LOOT_ORDER.length).map((id) => s.loot[id])).toEqual(LOOT_ORDER);
+      expect(Object.keys(s.loot)).toHaveLength(LOOT_ORDER.length);
       expect(s.practice).toBeUndefined();
     }
   });

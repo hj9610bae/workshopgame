@@ -446,7 +446,88 @@ function startSim(n: number) {
   }
 }
 
+/* ───── 전리품 개수·구성 + 스핑크스 보상 (2026-11-06): 특수 무기가 5일차까지 나오게, 역전 가능성 ───── */
+interface LootPlan {
+  name: string;
+  order: SpecialCardId[];
+  /** 스핑크스 보상 하·중·상 */
+  quiz: [number, number, number];
+}
+function lootSim(n: number, plans: LootPlan[]) {
+  const levels = [0.9, 0.6, 0.3];
+  console.log(`\n■ 전리품·스핑크스 보상 (${n}판, 실제 배치 = 구간 안 무작위, 처음 나오는 역경부터 전리품)`);
+  for (const plan of plans) {
+    const lootDays: number[] = [], lastDay: number[] = [], by5: number[] = [], unused: number[] = [], empty10: number[] = [], emptyFrom: number[] = [];
+    const lead5: boolean[] = [], lead7: boolean[] = [], low7: boolean[] = [], gap: number[] = [], spread: number[] = [], finalSlain: boolean[] = [], changes: number[] = [];
+    for (let g = 0; g < n; g++) {
+      const base = shuffledSetup(rnd);
+      const ids = [...base.tables, ...base.queue];
+      const setup: Setup = { ...base, loot: Object.fromEntries(ids.slice(0, plan.order.length).map((id, i) => [id, plan.order[i]])) };
+      let s: EngineState = createGame(TEAM_IDS, setup);
+      let l5: TeamId | undefined, o7: TeamId[] = [], firstEmpty = 0, prevLead: TeamId | undefined, ch = 0;
+      const got = new Map<number, number>();
+      for (let d = 1; d <= DAYS; d++) {
+        s = beginSubmit(startRound(s, rnd).state, 0);
+        if (!firstEmpty && s.pub.tables.slice(0, 3).some((t) => !t.agenda)) firstEmpty = d;
+        if (d === DAYS) empty10.push(s.pub.tables.slice(0, 3).filter((t) => !t.agenda).length);
+        s = resolveRound(s, decide(s, setup, d)).state;
+        for (const t of s.pub.tables) for (const x of t.done ?? []) if (setup.loot[x.agenda] && !got.has(x.agenda)) got.set(x.agenda, d);
+        if (d === 5) l5 = ranking(s.pub)[0].team;
+        if (d === RESCUE_DAY) {
+          o7 = ranking(s.pub).map((r) => r.team);
+          for (const t of o7.slice(2)) {
+            const k = Math.floor(rnd() * 3);
+            if (rnd() < levels[k]) s.pub.teams[t]!.score += plan.quiz[k];
+          }
+        }
+        const lead = ranking(s.pub)[0].team;
+        if (d > 1 && lead !== prevLead) ch++;
+        prevLead = lead;
+      }
+      // 아침에 처리되는 투척 창 등은 무시 (10일차 끝 기준)
+      const r = ranking(s.pub);
+      const win = r[0].team;
+      lootDays.push(...got.values());
+      lastDay.push(Math.max(0, ...got.values()));
+      by5.push([...got.values()].filter((d) => d <= 5).length);
+      unused.push(TEAM_IDS.reduce((a, t) => a + Object.values(s.hands[t]!).reduce((x, y) => x + y, 0), 0));
+      emptyFrom.push(firstEmpty || 11);
+      lead5.push(win === l5);
+      lead7.push(win === o7[0]);
+      low7.push(o7.slice(2).includes(win));
+      gap.push(r[0].score - r[1].score);
+      spread.push(r[0].score - r[4].score);
+      finalSlain.push(!!s.pub.tables[3]?.done?.some((x) => x.agenda === FINAL_AGENDA));
+      changes.push(ch);
+    }
+    const q = (a: number[], x: number) => [...a].sort((u, v) => u - v)[Math.floor((a.length - 1) * x)];
+    console.log(`  ${plan.name.padEnd(30)} 전리품 ${plan.order.length}장: 5일차까지 ${f(mean(by5))}장 · 마지막 획득 중앙 ${q(lastDay, 0.5)}일차 · 안 나온 ${f(plan.order.length - mean(lootDays.length ? [lootDays.length / n] : [0]))}장 · 못 쓴 ${f(mean(unused))}장`);
+    console.log(`  ${''.padEnd(30)} 해역 빈칸 시작 중앙 ${q(emptyFrom, 0.5)}일차 · 10일차 빈 해역 ${f(mean(empty10))}개 · 최종 결전 ${pct(finalSlain)} | 우승: 5일차 선두 ${pct(lead5)} · 7일차 1등 ${pct(lead7)} · 7일차 3~5등 ${pct(low7)} · 선두 교체 ${f(mean(changes))}회 · 1·2등 차 ${f(mean(gap))} · 1·5등 차 ${f(mean(spread))}`);
+  }
+}
+
 const mode = process.argv[2] ?? 'order';
+if (mode === 'loot') {
+  const cur: SpecialCardId[] = ['promo', 'hold', 'blitz', 'blitz', 'practice'];
+  const P = (...a: SpecialCardId[]) => a;
+  const plans: LootPlan[] = process.argv[4] === 'mix' ? [
+    { name: '10장 화살3 사슬2 삼지창3 창2', order: P('promo', 'hold', 'blitz', 'practice', 'blitz', 'promo', 'hold', 'practice', 'blitz', 'promo'), quiz: [3, 6, 12] },
+    { name: '10장 화살3 사슬2 삼지창2 창3', order: P('promo', 'hold', 'blitz', 'practice', 'promo', 'blitz', 'practice', 'hold', 'promo', 'practice'), quiz: [3, 6, 12] },
+    { name: '10장 화살3 사슬3 삼지창2 창2', order: P('promo', 'hold', 'blitz', 'practice', 'promo', 'hold', 'blitz', 'practice', 'promo', 'hold'), quiz: [3, 6, 12] },
+    { name: '10장 화살2 사슬2 삼지창4 창2', order: P('promo', 'hold', 'blitz', 'practice', 'blitz', 'blitz', 'promo', 'practice', 'hold', 'blitz'), quiz: [3, 6, 12] },
+    { name: '9장 화살2 사슬2 삼지창3 창2', order: P('promo', 'hold', 'blitz', 'practice', 'blitz', 'promo', 'hold', 'practice', 'blitz'), quiz: [3, 6, 12] },
+  ] : [
+    { name: '지금 (5장, 퀴즈 2·3·6)', order: cur, quiz: [2, 3, 6] },
+    { name: '지금 5장 + 퀴즈 3·6·12', order: cur, quiz: [3, 6, 12] },
+    { name: '8장', order: P('promo', 'hold', 'blitz', 'practice', 'blitz', 'promo', 'practice', 'hold'), quiz: [3, 6, 12] },
+    { name: '10장', order: P('promo', 'hold', 'blitz', 'practice', 'blitz', 'promo', 'practice', 'hold', 'blitz', 'promo'), quiz: [3, 6, 12] },
+    { name: '12장', order: P('promo', 'hold', 'blitz', 'practice', 'blitz', 'promo', 'practice', 'hold', 'blitz', 'promo', 'practice', 'blitz'), quiz: [3, 6, 12] },
+    { name: '12장 (삼지창 적게)', order: P('promo', 'hold', 'blitz', 'practice', 'promo', 'hold', 'practice', 'blitz', 'promo', 'practice', 'hold', 'promo'), quiz: [3, 6, 12] },
+    { name: '14장', order: P('promo', 'hold', 'blitz', 'practice', 'blitz', 'promo', 'practice', 'hold', 'blitz', 'promo', 'practice', 'blitz', 'hold', 'promo'), quiz: [3, 6, 12] },
+  ];
+  lootSim(Number(process.argv[3] ?? 3000), plans);
+  process.exit(0);
+}
 if (mode === 'start') {
   startSim(Number(process.argv[3] ?? 3000));
   process.exit(0);

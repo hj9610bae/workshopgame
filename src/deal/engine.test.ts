@@ -383,7 +383,7 @@ describe('7일차 특별 이벤트: 스핑크스 (구조선 퀴즈)', () => {
     expect(markQuiz(o, 'A', { level: 'low' })).toBe(o);
   });
 
-  it('맞힌 함대만 난도별 보상(하 2 · 중 3 · 상 6) 전진, 오답은 벌칙 없음, 모두 계속 항해', () => {
+  it('맞힌 함대만 난도별 보상(하 3 · 중 6 · 상 12) 전진, 오답은 벌칙 없음, 모두 계속 항해', () => {
     const base = day7();
     let s = openRescue(base);
     const [c3, c4, c5] = s.pub.rescue!.candidates;
@@ -394,12 +394,13 @@ describe('7일차 특별 이벤트: 스핑크스 (구조선 퀴즈)', () => {
     expect(quizQueue(s.pub.rescue!)).toEqual([c4, c5, c3]);
     const done = settleRescue(s);
     expect(done.pub.rescue!.rewards).toEqual({ [c3]: QUIZ_REWARD.high, [c5]: QUIZ_REWARD.mid });
-    expect(done.pub.teams[c3]!.score - base.pub.teams[c3]!.score).toBe(6);
+    expect(done.pub.teams[c3]!.score - base.pub.teams[c3]!.score).toBe(12);
     expect(done.pub.teams[c4]!.score).toBe(base.pub.teams[c4]!.score);
-    expect(done.pub.teams[c5]!.score - base.pub.teams[c5]!.score).toBe(3);
+    expect(done.pub.teams[c5]!.score - base.pub.teams[c5]!.score).toBe(6);
     const d8 = startRound(done).state;
     expect(d8.pub.order).toHaveLength(5);
-    expect(d8.pub.order[0]).toBe('A');
+    // 상 12해리를 맞힌 3등이 1등(A)을 앞질러 8일차 첫 순번 (역전 기회)
+    expect(d8.pub.order[0]).toBe(c3);
   });
 
   it('생각 시간 타이머, 건너뛰면 아무도 전진하지 않음', () => {
