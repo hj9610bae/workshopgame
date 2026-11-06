@@ -368,11 +368,11 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
   pub.events = [];
   const n = pub.order.length;
 
-  // 순풍(새치기): 고국에 가까운 함대 우선(동점이면 원래 순번), 겹치면 가장 가까운 다음 빈자리
+  // 순풍(새치기): 고국에서 먼 함대 우선(동점이면 원래 순번, 2026-11-06 가까운 함대 우선에서 바꿈), 겹치면 가장 가까운 다음 빈자리
   const wantsCutIn = pub.order.filter((t) => (subs[t]?.cutIn ?? 0) > 0);
   const cutters = wantsCutIn
     .filter((t) => turn.team(t).score >= CUT_IN_COST)
-    .sort((a, b) => turn.team(b).score - turn.team(a).score);
+    .sort((a, b) => turn.team(a).score - turn.team(b).score);
   const slots: (TeamId | undefined)[] = new Array(n).fill(undefined);
   const cutInPos = new Map<TeamId, number>();
   for (const t of cutters) {

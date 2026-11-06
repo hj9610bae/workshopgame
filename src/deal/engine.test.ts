@@ -266,18 +266,23 @@ describe('제피로스의 순풍 (새치기)', () => {
     expect(state.pub.events[0]).toMatchObject({ kind: 'start', cutIn: true, order: ['E', 'A', 'B', 'C', 'D'] });
   });
 
-  it('겹치면 고국에 가까운 함대 우선, 밀린 함대는 다음 빈자리', () => {
+  it('겹치면 고국에서 먼 함대 우선, 밀린 함대는 다음 빈자리', () => {
     const s = round1();
     s.pub.teams.D!.score = 15;
     const { state } = resolveRound(s, { C: { ...basic(1), cutIn: 1 }, D: { ...basic(1), cutIn: 1 } });
-    expect(state.pub.order).toEqual(['D', 'C', 'A', 'B', 'E']);
+    expect(state.pub.order).toEqual(['C', 'D', 'A', 'B', 'E']);
   });
 
-  it('설명 슬라이드 예시: D·E가 모두 1번째 → D → E → A → B → C, 둘 다 −2', () => {
+  it('거리가 같으면 원래 순번이 앞인 함대 우선', () => {
+    const { state } = resolveRound(round1(), { C: { ...basic(1), cutIn: 1 }, D: { ...basic(1), cutIn: 1 } });
+    expect(state.pub.order).toEqual(['C', 'D', 'A', 'B', 'E']);
+  });
+
+  it('설명 슬라이드 예시: D·E가 모두 1번째 → E → D → A → B → C, 둘 다 −2', () => {
     const s = round1();
     Object.assign(s.pub.teams, { A: { score: 14, deals: 0 }, B: { score: 12, deals: 0 }, D: { score: 9, deals: 0 }, E: { score: 8, deals: 0 } });
     const { state } = resolveRound(s, { D: { ...basic(4), cutIn: 1 }, E: { ...basic(4), cutIn: 1 } });
-    expect(state.pub.order).toEqual(['D', 'E', 'A', 'B', 'C']);
+    expect(state.pub.order).toEqual(['E', 'D', 'A', 'B', 'C']);
     expect(state.pub.teams.E!.score).toBe(6);
   });
 

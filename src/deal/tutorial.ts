@@ -175,9 +175,9 @@ export const INTRO_SLIDES: Slide[] = [
         <div class="item-card"><span class="pictogram">${glyph('wind-slap')}</span><b>${CUT_IN_NAME}</b><span>자신의 순서를 원하는 순서로 바꾼다.</span><em>${CUT_IN_COST}해리 후퇴</em></div>
       </div>
       <div class="cut-example">
-        <p><b>2함대 이상 같은 자리를 원하면?</b> 고국에 가까운 함대가 그 자리, 밀린 함대는 <b>바로 다음 빈자리</b>. (같으면 원래 순번이 앞인 함대) 순풍을 쓰지 않은 함대는 남은 자리를 원래 순서대로 채운다. 밀려도 ${CUT_IN_COST}해리 후퇴는 그대로!</p>
+        <p><b>2함대 이상 같은 자리를 원하면?</b> <b>고국에서 먼 함대</b>가 그 자리, 밀린 함대는 <b>바로 다음 빈자리</b>. (같으면 원래 순번이 앞인 함대) 순풍을 쓰지 않은 함대는 남은 자리를 원래 순서대로 채운다. 밀려도 ${CUT_IN_COST}해리 후퇴는 그대로!</p>
         <p class="muted">예) 원래 순서 A(11해리) · B(13) · C(15) · D(16) · E(17)에서 D·E가 모두 "1번째" 신청<br>
-          → D가 1번째, E는 2번째 → <b>D → E → A → B → C</b></p>
+          → 더 먼 E가 1번째, D는 2번째 → <b>E → D → A → B → C</b></p>
       </div>`,
   },
   {
