@@ -828,7 +828,25 @@ function draw() {
   }
   render(app, gameView());
   tickTimer();
+  fitSea();
 }
+
+/**
+ * 프로젝터 한 화면(1920×1080 등)에 바다 지도까지 들어가게: 넘치면 지도의 글자 크기(줄 높이가 em)를 그만큼 줄임 (최소 70%).
+ * 제출 안내·사건 배너·해역 4개 등 위쪽 높이가 그때그때 달라서 화면마다 맞춤. 진행자 창 없이 쓸 때 아래 조작 패널(dock)은 계산에서 뺌(스크롤).
+ * 지도의 배 위치(top)는 em 이라 같이 줄고, 전환 애니메이션이 없어 깜빡이지 않음
+ */
+function fitSea() {
+  const sea = app.querySelector<HTMLElement>('.arena ~ .sea');
+  if (!sea) return;
+  sea.style.fontSize = '';
+  const over = sea.getBoundingClientRect().bottom + window.scrollY + 8 - window.innerHeight;
+  if (over <= 0) return;
+  const h = sea.offsetHeight;
+  const size = parseFloat(getComputedStyle(sea).fontSize);
+  sea.style.fontSize = `${(size * Math.max(0.7, (h - over) / h)).toFixed(2)}px`;
+}
+window.addEventListener('resize', fitSea);
 
 function tickTimer() {
   const pub = game.engine?.pub;
@@ -840,7 +858,12 @@ function tickTimer() {
     const left = pub.deadline - Date.now();
     el.innerHTML = left > 0 ? `${glyph('sands-of-time')} ${formatTimer(left)}` : `${glyph('hourglass')} 시간 종료`;
     el.classList.toggle('over', left <= 0);
-    el.closest('.submit-guide')?.classList.toggle('over', left <= 0);
+    const guide = el.closest('.submit-guide');
+    // 시간 종료로 제목이 바뀌면 높이가 달라지므로 지도를 다시 맞춤
+    if (guide && guide.classList.contains('over') !== left <= 0) {
+      guide.classList.toggle('over', left <= 0);
+      fitSea();
+    }
   }
   // 스핑크스 생각 시간
   const quiz = pub?.rescue?.timer;

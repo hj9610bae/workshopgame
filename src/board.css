@@ -1763,21 +1763,54 @@ button.dot-btn.on {
   }
 }
 
-/* 제출 시간: 양피지 항해 명령서 예시 + 아폴론의 예지 안내 */
+/* 제출 시간: 양피지 항해 명령서 예시 + 아폴론의 예지 안내.
+   2026-11-07 1920×1080에서 바다 지도까지 한 화면에 들어가게 높이를 줄임 (제목·타이머 한 줄, 명령서 촘촘하게) */
 .banner.submit-guide {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 28px;
+  padding: 12px 24px;
   text-align: left;
 }
 
 .guide-main {
   flex: 1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 16px;
+}
+
+.guide-main > .guide-title,
+.guide-main > .oracle,
+.guide-main > p {
+  grid-column: 1 / -1;
+}
+
+.guide-main > .guide-title {
+  grid-column: 1;
+}
+
+.submit-guide .big-timer {
+  grid-column: 2;
+  grid-row: 1;
+  margin-top: 0;
+  font-size: 2.4rem;
+  white-space: nowrap;
+}
+
+.submit-guide .oracle {
+  margin: 8px 0 4px;
+  padding: 8px 14px;
+}
+
+.submit-guide .guide-main > p {
+  margin: 0;
 }
 
 .guide-title {
   font-family: var(--font-title);
-  font-size: 1.55rem;
+  font-size: 1.4rem;
   color: var(--gold);
   word-break: keep-all;
 }
@@ -1877,14 +1910,14 @@ button.dot-btn.on {
 }
 
 .guide-example > p {
-  margin-top: 16px;
+  margin: 10px 0 0;
 }
 
 /* 양피지 두루마리: 빛바랜 종이 + 위아래 말린 끝 */
 .scroll {
   position: relative;
   width: 17em;
-  padding: 18px 18px 16px;
+  padding: 12px 16px 10px;
   color: #3b2a14;
   font-family: 'Noto Serif KR', serif;
   text-align: left;
@@ -1920,11 +1953,11 @@ button.dot-btn.on {
 }
 
 .scroll-head {
-  margin-bottom: 8px;
-  padding-bottom: 6px;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
   border-bottom: 2px double #8c6a32;
   font-family: var(--font-title);
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 900;
   letter-spacing: 0.2em;
   text-align: center;
@@ -1939,7 +1972,7 @@ button.dot-btn.on {
 
 .scroll-form th,
 .scroll-form td {
-  padding: 5px 4px;
+  padding: 3px 4px;
   border-bottom: 1px solid rgba(107, 63, 18, 0.3);
   text-align: left;
 }
