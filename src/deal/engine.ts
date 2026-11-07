@@ -55,6 +55,8 @@ interface Deal {
   agenda: number;
   reward: number;
   card?: SpecialCardId;
+  /** 전리품을 받을 함대(가로챈 함대 포함)가 이미 전리품을 받은 적이 있어 대신 받은 함대 */
+  lootTo?: TeamId;
   /** 마지막 일격에 쓴 무기 (공개) */
   weapon: CardId;
 }
@@ -103,7 +105,11 @@ class Turn {
     const trail = this.s.secret.trail ?? [];
     this.s.secret.trail = this.s.pub.tables.map((_, i) => trail[i] ?? []);
     this.s.secret.history ??= [];
+    this.dayOrder = [...this.s.pub.order];
   }
+
+  /** 이 단계를 시작할 때의 공격 순서 (공개 단계면 아침 발표 순서, 순풍 전). 전리품 꼴찌 판정용 */
+  readonly dayOrder: TeamId[];
 
   get setup(): Setup {
     return this.s.setup ?? SETUP;
@@ -155,7 +161,11 @@ class Turn {
     const reward = this.setup.demand[agenda.id];
     this.team(team).score += reward;
     this.team(team).deals += 1;
-    if (loot) this.hand(thief ?? team)[loot] += 1;
+    const lootTo = loot ? this.lootReceiver(thief ?? team) : undefined;
+    if (loot && lootTo) {
+      this.hand(lootTo)[loot] += 1;
+      this.team(lootTo).loot = (this.team(lootTo).loot ?? 0) + 1;
+    }
     (pub.tables[i].done ??= []).push({ agenda: agenda.id, team });
     // 항해 일지용 공격 이력 (게임이 끝난 뒤에만 공개)
     secret.history!.push({ agenda: agenda.id, trail: [...secret.trail[i]] });
@@ -166,8 +176,23 @@ class Turn {
       agenda: agenda.id,
       reward,
       card: loot,
+      ...(lootTo && lootTo !== (thief ?? team) ? { lootTo } : {}),
       weapon: card,
     };
+  }
+
+  /**
+   * 전리품 받을 함대 (v3.6): 이미 전리품을 받은 적이 있으면 그날 공격 순서(아침 발표, 순풍 전)의 꼴찌 함대가 대신 받음.
+   * 꼴찌가 자신이면 그 앞 순번. 아침 투척 창 돌파는 그날 순서 발표 전이라 직전 공격 순서 기준
+   */
+  lootReceiver(keeper: TeamId): TeamId {
+    if (!this.team(keeper).loot) return keeper;
+    return [...this.dayOrder].reverse().find((t) => t !== keeper) ?? keeper;
+  }
+
+  /** 전리품이 다른 함대로 갔으면 그 함대에게 알림 (방금 기록한 사건과 함께) */
+  lootNote(deal: Deal) {
+    if (deal.lootTo && deal.card) this.note(deal.lootTo, `🎁 ${agendaTitle(deal.agenda)}의 전리품 [${CARDS[deal.card].short}]을 받았어요 (돌파 함대가 이미 전리품을 받은 적이 있어 오늘 공격 순서 꼴찌에게) · ${CARDS[deal.card].desc}`);
   }
 
   /** 투척 창 가로채기: 돌파 함대의 전진·돌파 수를 창 주인에게 옮기고 사건 기록 */
@@ -179,7 +204,8 @@ class Turn {
     this.team(thief).deals += 1;
     const done = this.s.pub.tables[tableNo - 1].done?.find((d) => d.agenda === deal.agenda && d.team === deal.winner);
     if (done) done.team = thief;
-    this.event({ kind: 'steal', team: thief, victim: deal.winner, table: tableNo, agenda: deal.agenda, reward: deal.reward, ...(deal.card ? { loot: deal.card } : {}) });
+    this.event({ kind: 'steal', team: thief, victim: deal.winner, table: tableNo, agenda: deal.agenda, reward: deal.reward, ...(deal.card ? { loot: deal.card } : {}), ...(deal.lootTo ? { lootTo: deal.lootTo } : {}) });
+    this.lootNote(deal);
     this.note(thief, `⚡ 투척 창으로 가로채기 성공! ${dealText(deal)}`);
     this.note(deal.winner, `${agendaTitle(deal.agenda)}에 마지막 일격을 넣었지만 투척 창에 보상을 빼앗겼어요 (${deal.reward}해리 후퇴)`);
   }
@@ -205,10 +231,17 @@ class Turn {
 }
 
 /** 공개 화면용 돌파 사건: 돌파한 함대·전리품 이름은 공개, 공격 이력(secret.trail)은 비공개 */
-const shown = ({ card, winner: _w, thief: _t, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: card } : {}) });
+/** 가로채일 돌파면 전리품이 누구에게 가는지(lootTo)는 가로채기 사건에서 공개 */
+const shown = ({ card, winner: _w, thief, lootTo, ...deal }: Deal) => ({ ...deal, ...(card ? { loot: card } : {}), ...(lootTo && !thief ? { lootTo } : {}) });
 
 const dealText = (deal: Deal) =>
-  `${agendaTitle(deal.agenda)} 돌파! ${deal.reward}해리 전진${deal.card ? ` · 특수 무기 [${CARDS[deal.card].short}] 획득 (${CARDS[deal.card].desc})` : ''}`;
+  `${agendaTitle(deal.agenda)} 돌파! ${deal.reward}해리 전진${
+    deal.card
+      ? deal.lootTo
+        ? ` · 이미 전리품을 받은 적이 있어 특수 무기 [${CARDS[deal.card].short}]은 ${deal.lootTo}함대(오늘 공격 순서 꼴찌)에게`
+        : ` · 특수 무기 [${CARDS[deal.card].short}] 획득 (${CARDS[deal.card].desc})`
+      : ''
+  }`;
 
 function shuffle<T>(items: T[], rng: Rng): T[] {
   for (let i = items.length - 1; i > 0; i--) {
@@ -324,6 +357,7 @@ export function startRound(state: EngineState, rng: Rng = Math.random): Step {
     if (deal) {
       turn.event({ kind: 'practiceDeal', team, table, ...shown(deal) });
       turn.note(team, `⚡ 투척 창 발동! ${dealText(deal)}`);
+      turn.lootNote(deal);
     } else if (before) {
       turn.note(team, `⚡ 투척 창(못 가로챈 창) 발동: ${table}번 해역 ${agendaTitle(before)}에 −${CARDS.practice.power}`, -1);
     } else {
@@ -446,7 +480,7 @@ export function resolveRound(state: EngineState, subs: Partial<Record<TeamId, Su
     const how = kind === 'promoDeal' ? `${CARDS.promo.icon} ${CARDS.promo.short} 효과로 ` : '🎉 ';
     // 가로채일 돌파는 전리품 없이 전진만 (전리품은 창 주인에게)
     turn.note(t, deal.thief ? `${how}${agendaTitle(deal.agenda)} 돌파! ${deal.reward}해리 전진` : `${how}${dealText(deal)}`);
-    if (!deal.thief) return;
+    if (!deal.thief) return turn.lootNote(deal);
     if (acted.has(deal.thief) || kind === 'promoDeal') turn.steal(tableNo, deal);
     else pendingSteals.set(deal.thief, [...(pendingSteals.get(deal.thief) ?? []), { tableNo, deal }]);
   };

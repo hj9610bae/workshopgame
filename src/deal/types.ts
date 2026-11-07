@@ -23,6 +23,8 @@ export interface TableState {
 export interface TeamState {
   score: number;
   deals: number;
+  /** 전리품(특수 무기)을 받은 횟수. 1 이상이면 다음 전리품은 그날 공격 순서 꼴찌 함대에게 (v3.6) */
+  loot?: number;
 }
 
 export type EventKind = 'finalOpen' | 'practiceDeal' | 'start' | 'hold' | 'proposal' | 'promoDeal' | 'steal' | 'end';
@@ -38,6 +40,8 @@ export interface GameEvent {
   reward?: number;
   /** 돌파로 받은 전리품 (역경 카드에 이름이 공개돼 있음) */
   loot?: SpecialCardId;
+  /** 전리품을 받을 함대가 이미 전리품을 받은 적이 있어 대신 받은 함대 (그날 공격 순서 꼴찌) */
+  lootTo?: TeamId;
   /** 돌파 사건: 마지막 일격에 쓴 무기 (공격 이력은 비공개지만 마지막 일격의 무기는 공개) */
   weapon?: CardId;
   result?: ProposalResult;

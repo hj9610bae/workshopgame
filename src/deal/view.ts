@@ -102,6 +102,10 @@ export function weaponPhrase(card: CardId): string {
 const effectNote = (card: CardId | undefined): string =>
   card && card !== 'basic' && card !== 'promo' ? `${CARDS[card].icon} ${CARDS[card].short}: ${CARDS[card].effect} · ` : '';
 
+/** 돌파 보상 줄의 전리품: 보통은 '획득', 이미 전리품을 받은 적 있는 함대면 오늘 공격 순서 꼴찌 함대에게 (v3.6) */
+const lootText = (e: GameEvent): string =>
+  !e.loot ? '' : e.lootTo ? ` · 전리품 ${CARDS[e.loot].icon} ${CARDS[e.loot].short}은 꼴찌 ${teamName(e.lootTo)}에게` : ` · ${CARDS[e.loot].icon} ${CARDS[e.loot].short} 획득`;
+
 /** 공개 화면에 띄울 사건 문장 */
 export function describeEvent(e: GameEvent): {
   icon: string;
@@ -111,7 +115,7 @@ export function describeEvent(e: GameEvent): {
 } {
   const team = e.team ? teamName(e.team) : '';
   const agenda = e.agenda ? `${agendaTitle(e.agenda)}` : '';
-  const reward = e.reward ? `고국으로 ${e.reward}해리 전진${e.loot ? ` · ${CARDS[e.loot].icon} ${CARDS[e.loot].short} 획득` : ''}` : '';
+  const reward = e.reward ? `고국으로 ${e.reward}해리 전진${lootText(e)}` : '';
   const firstMark = e.first ? ' (쇠사슬 우선권으로 먼저)' : '';
   switch (e.kind) {
     case 'finalOpen':
@@ -134,7 +138,7 @@ export function describeEvent(e: GameEvent): {
       return {
         icon: CARDS.practice.icon,
         title: `${team}, ${CARDS.practice.short}으로 ${victim}의 ${agenda} 돌파를 가로챘다!`,
-        detail: `${CARDS.practice.icon} ${CARDS.practice.short}: 그날 그 해역의 돌파 보상을 가로챔 · ${victim} ${e.reward}해리 후퇴, ${team} ${e.reward}해리 전진${e.loot ? ` · ${CARDS[e.loot].icon} ${CARDS[e.loot].short} 획득` : ''}`,
+        detail: `${CARDS.practice.icon} ${CARDS.practice.short}: 그날 그 해역의 돌파 보상을 가로챔 · ${victim} ${e.reward}해리 후퇴, ${team} ${e.reward}해리 전진${lootText(e)}`,
         tone: 'deal',
       };
     }

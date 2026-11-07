@@ -455,7 +455,7 @@ function eventBanner(e: GameEvent, key: string): string {
   // 돌파: 알약·배지 없이 글자 굵기·색으로만 위계 (함대 금색 굵게 | 문장 흰색 | 보상 연회색)
   const team = e.team ? teamName(e.team) : '';
   const head = team && d.title.startsWith(`${team}, `) ? d.title.slice(team.length + 2) : d.title;
-  const detail = [d.detail, e.loot && !d.detail?.includes(`${CARDS[e.loot].short} 획득`) ? `${CARDS[e.loot].short} 획득` : ''].filter(Boolean).join(' · ');
+  const detail = [d.detail, e.loot && !d.detail?.includes(CARDS[e.loot].short) ? `${CARDS[e.loot].short} 획득` : ''].filter(Boolean).join(' · ');
   return `<div class="banner pop deal${e.kind === 'steal' ? ' steal' : ''}" data-key="${key}">
     <div class="banner-icon">${glyph('laurel-crown')}</div>
     <h2>${team ? `<b class="team-name">${esc(team)}</b><span class="sep">|</span>` : ''}${glyphText(head)}</h2>

@@ -365,6 +365,41 @@ describe('고국과의 거리', () => {
   });
 });
 
+describe('전리품 독점 방지 (v3.6)', () => {
+  it('전리품을 받은 적 있는 함대가 또 돌파하면 전진만, 전리품은 그날 공격 순서 꼴찌에게', () => {
+    const s = round1();
+    s.pub.teams.A!.loot = 1;
+    const { state, notes } = resolveRound(s, { A: basic(1) });
+    // 로투스 섬(2, 전갈 화살) 돌파
+    expect(state.pub.teams.A!.score).toBe(12);
+    expect(state.hands.A!.promo).toBe(0);
+    expect(state.hands.E!.promo).toBe(1);
+    expect(state.pub.teams.E!.loot).toBe(1);
+    const deal = state.pub.events.find((e) => e.result === 'deal')!;
+    expect(deal).toMatchObject({ team: 'A', loot: 'promo', lootTo: 'E' });
+    expect(notes.A?.[0].text).toContain('E함대');
+    expect(notes.E?.[0].text).toContain('전리품');
+  });
+
+  it('처음 받는 전리품은 그대로 돌파 함대에게, 그 뒤로는 꼴찌에게 (같은 날도)', () => {
+    // A: 로투스 섬(전갈 화살) 돌파 → 받음. 1번 해역에 키르케(3, 삼지창) → B 3→1 → A는 이미 공격, C가 돌파 → C 받음
+    const { state } = resolveRound(round1(), { A: basic(1), B: basic(1), C: basic(1) });
+    expect(state.hands.A!.promo).toBe(1);
+    expect(state.hands.C!.blitz).toBe(1);
+    expect(state.pub.events.filter((e) => e.lootTo)).toEqual([]);
+  });
+
+  it('꼴찌가 돌파 함대 자신이면 그 앞 순번이 받음, 순풍으로 순서를 바꿔도 아침 순서 기준', () => {
+    const s = round1();
+    s.pub.teams.E!.loot = 1;
+    // D가 순풍으로 맨 뒤로 가도 꼴찌 판정은 아침 순서(A~E): E가 꼴찌이자 돌파 함대 → D
+    const { state } = resolveRound(s, { D: { ...basic(3), cutIn: 5 }, E: basic(1) });
+    expect(state.pub.order[4]).toBe('D');
+    expect(state.pub.events.find((e) => e.result === 'deal')).toMatchObject({ team: 'E', lootTo: 'D' });
+    expect(state.hands.D!.promo).toBe(1);
+  });
+});
+
 const QUIZ_LEVELS_OF = (r: RescueState, t: TeamId) => (['low', 'mid', 'high'] as const).map((l) => rescueReward(r, t, l));
 
 describe('7일차 특별 이벤트: 스핑크스 (구조선 퀴즈)', () => {
