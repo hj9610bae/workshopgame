@@ -82,6 +82,8 @@ export interface RescueState {
   candidates: TeamId[];
   level?: Partial<Record<TeamId, QuizLevel>>;
   correct?: Partial<Record<TeamId, boolean>>;
+  /** 스핑크스 등장 때 도전팀마다 1등과의 거리 차이 (보상 = 차이 × 난도 비율) */
+  gap?: Partial<Record<TeamId, number>>;
   /** 정산 뒤 받은 전진 거리 */
   rewards?: Partial<Record<TeamId, number>>;
   /** 지금 생각 시간을 재는 함대와 끝나는 시각 (ms) */

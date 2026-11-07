@@ -26,8 +26,16 @@ export const RESCUE_ROUND = 7;
 export type QuizLevel = 'low' | 'mid' | 'high';
 export const QUIZ_LEVELS: QuizLevel[] = ['low', 'mid', 'high'];
 export const QUIZ_LABEL: Record<QuizLevel, string> = { low: '하', mid: '중', high: '상' };
-/** 맞히면 전진하는 거리. 2026-11-06 역전 기회를 늘리려 2·3·6 → 3·6·12 (정답률 하 90% · 중 60% · 상 30% 가정 기대값 2.7·3.6·3.6, scripts/balance-sim.ts loot). 오답 벌칙 없음 */
-export const QUIZ_REWARD: Record<QuizLevel, number> = { low: 3, mid: 6, high: 12 };
+/**
+ * 맞히면 전진하는 거리 = 스핑크스 등장 때 1등과의 거리 차이 × 비율 (반올림, 최소 1해리). 상은 1등과 같은 거리까지. 오답 벌칙 없음.
+ * 2026-11-07 고정 3·6·12 → 차이 비례 (앞선 함대가 멀리 달아날수록 보상도 커짐. scripts/balance-sim.ts comeback:
+ * 3일차 1·2등 우승 70% → 63%, 7일차 3~5등 우승 20% → 27%)
+ */
+export const QUIZ_SHARE: Record<QuizLevel, number> = { low: 1 / 3, mid: 2 / 3, high: 1 };
+/** 화면 문구: 1등과의 차이 중 얼마만큼 */
+export const QUIZ_SHARE_LABEL: Record<QuizLevel, string> = { low: '⅓', mid: '⅔', high: '전부' };
+/** 1등과의 거리 차이(gap 해리)에서 난도별 보상 */
+export const quizReward = (gap: number, level: QuizLevel): number => Math.max(1, Math.round(gap * QUIZ_SHARE[level]));
 /** 퀴즈 기회: 7일차 순위표에서 이 등수부터 (3·4·5등) */
 export const QUIZ_FROM_RANK = 3;
 /** 문제를 공개한 뒤 생각 시간 (진행자가 함대마다 시작) */
@@ -139,10 +147,10 @@ export const FINAL_AGENDA = 18;
 
 /**
  * 전리품(특수 무기)은 역경과 따로 정하고, 해역에 오르는 순서대로 앞쪽 역경에 하나씩 붙임. 역경 카드에 무기 이름까지 공개.
- * 2026-11-06 5장 → 10장([하] 5개 + [중] 처음 5개): 5~6일차까지 계속 나오게. 전갈 화살 3 · 쇠사슬 2 · 삼지창 2 · 투척 창 3
- * (10장 구성 중 역전이 가장 잘 일어난 조합, scripts/balance-sim.ts loot ... mix)
+ * 5장 = [하] 구간 5개. (2026-11-06 10장으로 늘렸다가 2026-11-07 사용자 요청으로 5장으로 되돌림:
+ * 시뮬레이션에서 10장은 앞선 함대가 더 많이 가져가 역전이 오히려 줄었음, scripts/balance-sim.ts comeback)
  */
-export const LOOT_ORDER: SpecialCardId[] = ['promo', 'hold', 'blitz', 'practice', 'promo', 'blitz', 'practice', 'hold', 'promo', 'practice'];
+export const LOOT_ORDER: SpecialCardId[] = ['promo', 'hold', 'blitz', 'blitz', 'practice'];
 export const LOOT: Partial<Record<number, SpecialCardId>> = Object.fromEntries(
   [...INITIAL_TABLES, ...QUEUE].slice(0, LOOT_ORDER.length).map((id, i) => [id, LOOT_ORDER[i]]),
 );

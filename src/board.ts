@@ -4,9 +4,9 @@
  */
 import './style.css';
 import './board.css';
-import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, QUIZ_FROM_RANK, QUIZ_LABEL, QUIZ_LEVELS, QUIZ_REWARD, QUIZ_THINK_SECONDS, RESCUE_ROUND, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, distanceOf, type CardId, type ExtraCardId, type QuizLevel, type TeamId } from './deal/data';
+import { AGENDAS, CARDS, FINAL_AGENDA, PRACTICE_DAYS, QUIZ_FROM_RANK, QUIZ_LABEL, QUIZ_LEVELS, QUIZ_SHARE_LABEL, QUIZ_THINK_SECONDS, RESCUE_ROUND, shuffledSetup, CUT_IN_COST, EXTRA_CARDS, FINAL_OPEN_ROUND, INITIAL_TABLES, ROUNDS, SCOUT_COST, SCOUT_NAME, START_DISTANCE, START_SCORE, SUBMIT_SECONDS, TEAM_IDS, distanceOf, type CardId, type ExtraCardId, type QuizLevel, type TeamId } from './deal/data';
 import { agendaGlyph, cardGlyph, glyph } from './deal/icons';
-import { agendaTitle, beginSubmit, canOpenRescue, createGame, finish, markQuiz, openRescue, quizQueue, ranking, resolveRound, revealNext, scout, settleRescue, startQuizTimer, startRound, type EngineState } from './deal/engine';
+import { agendaTitle, beginSubmit, canOpenRescue, createGame, finish, markQuiz, openRescue, quizQueue, ranking, rescueReward, resolveRound, revealNext, scout, settleRescue, startQuizTimer, startRound, type EngineState } from './deal/engine';
 import { deck, distanceLabel, feltTable, seaMap, type TableLook } from './deal/felt';
 import {
   beatConsole,
@@ -219,7 +219,7 @@ function quizToday(): boolean {
 function quizRewards(): Partial<Record<TeamId, number>> {
   const r = eng().pub.rescue!;
   if (r.phase === 'done') return r.rewards ?? {};
-  return Object.fromEntries(r.candidates.filter((t) => r.level?.[t] && r.correct?.[t]).map((t) => [t, QUIZ_REWARD[r.level![t]!]]));
+  return Object.fromEntries(r.candidates.filter((t) => r.level?.[t] && r.correct?.[t]).map((t) => [t, rescueReward(r, t, r.level![t]!)]));
 }
 
 /** 퀴즈 중·뒤의 바다 지도 점수 (정산 전 보상은 엔진 점수에 아직 없으므로 더해서 보여 줌) */
@@ -229,7 +229,8 @@ function quizScores(): Partial<Record<TeamId, number>> {
   return Object.fromEntries(pub.teamIds.map((t) => [t, (pub.teams[t]?.score ?? 0) + (pending[t] ?? 0)]));
 }
 
-const quizReward = (level: QuizLevel) => `${QUIZ_LABEL[level]} +${QUIZ_REWARD[level]}해리`;
+/** 난도별 보상 문구: 1등과의 거리 차이 중 얼마만큼 (상은 1등과 같은 거리까지) */
+const shareText = (l: QuizLevel) => (l === 'high' ? '1등과 같은 거리까지' : `1등과 차이의 ${QUIZ_SHARE_LABEL[l]}`);
 /** 난도 표시: 금빛 마름모 1·2·3개 (배너·진행자 조작 버튼 공통) */
 const QUIZ_PIPS = (l: QuizLevel) => `<span class="lv-pips" aria-hidden="true">${'<i></i>'.repeat(QUIZ_LEVELS.indexOf(l) + 1)}</span>`;
 const THINK = QUIZ_THINK_SECONDS % 60 === 0 ? `${QUIZ_THINK_SECONDS / 60}분` : `${QUIZ_THINK_SECONDS}초`;
@@ -253,11 +254,11 @@ function rescueBanner(): string {
   const no = glyph('cross-mark', 'quiz-no');
   const mark = (t: TeamId) => (r.phase === 'done' ? (r.rewards?.[t] ? yes : r.correct?.[t] === false ? no : '') : r.correct?.[t] === true ? yes : r.correct?.[t] === false ? no : '');
   const levels = QUIZ_LEVELS.map((l) => {
-    const picks = challengers.filter((t) => r.level?.[t] === l).map((t) => `<span class="quiz-chip">${name(t)}${mark(t)}</span>`).join('');
-    return `<div class="quiz-level ${l}"><b>${QUIZ_PIPS(l)}난이도 [${QUIZ_LABEL[l]}]</b><span>성공: <em>+${QUIZ_REWARD[l]}해리</em></span><span class="muted">실패: 무보상</span>
+    const picks = challengers.filter((t) => r.level?.[t] === l).map((t) => `<span class="quiz-chip">${name(t)} +${rescueReward(r, t, l)}${mark(t)}</span>`).join('');
+    return `<div class="quiz-level ${l}"><b>${QUIZ_PIPS(l)}난이도 [${QUIZ_LABEL[l]}]</b><span>성공: <em>${shareText(l)}</em> 전진</span><span class="muted">실패: 무보상</span>
       <div class="quiz-picks">${picks}</div></div>`;
   }).join('');
-  const team = (t: TeamId) => `<span class="quiz-team${r.timer?.team === t ? ' on' : ''}">${place(t)}위 ${name(t)}${mark(t)}</span>`;
+  const team = (t: TeamId) => `<span class="quiz-team${r.timer?.team === t ? ' on' : ''}">${place(t)}위 ${name(t)}<small> (1등과 ${r.gap?.[t] ?? 0}해리 차)</small>${mark(t)}</span>`;
   const head = `<div class="sphinx-head"><div class="banner-icon">${glyph('greek-sphinx')}</div><h2>[${RESCUE_ROUND}일차 특별 이벤트] 올림포스의 스핑크스 등장!</h2></div>
     <p class="sphinx-quote">"지친 탐험대여, 나의 수수께끼를 풀어 구원선에 올라타라!"</p>
     <div class="quiz-levels">${levels}</div>`;
@@ -290,7 +291,7 @@ function rescueControls(): string {
       const ok = r.correct?.[t];
       const timing = r.timer?.team === t;
       return `<div class="in-group"><span class="in-label">${allPicked ? `${i + 1}. ` : ''}${esc(teamName(t))}</span>
-        ${QUIZ_LEVELS.map((l) => pill('quiz-level', t, l, `${QUIZ_PIPS(l)} ${quizReward(l)}`, level === l)).join('')}
+        ${QUIZ_LEVELS.map((l) => pill('quiz-level', t, l, `${QUIZ_PIPS(l)} ${QUIZ_LABEL[l]} +${rescueReward(r, t, l)}해리`, level === l)).join('')}
         <span class="quiz-sep"></span>
         ${pill('quiz-timer', t, timing ? 'stop' : 'start', timing ? `${glyph('stopwatch')} 시간 멈춤` : `${glyph('sands-of-time')} 생각 시간 ${THINK}`, timing)}
         ${pill('quiz-correct', t, 'yes', `${glyph('check-mark')} 정답`, ok === true)}${pill('quiz-correct', t, 'no', `${glyph('cross-mark')} 오답`, ok === false)}</div>`;

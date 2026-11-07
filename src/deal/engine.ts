@@ -13,7 +13,7 @@ import {
   INITIAL_TABLES,
   QUIZ_FROM_RANK,
   QUIZ_LEVELS,
-  QUIZ_REWARD,
+  quizReward,
   QUIZ_THINK_SECONDS,
   RESCUE_ROUND,
   ROUNDS,
@@ -237,8 +237,11 @@ export const canOpenRescue = (s: EngineState): boolean =>
 export function openRescue(state: EngineState): EngineState {
   if (!canOpenRescue(state)) return state;
   const next = structuredClone(state);
-  const candidates = computeOrder({ ...next.pub, prevOrder: next.pub.order }, Math.random).slice(QUIZ_FROM_RANK - 1);
-  next.pub.rescue = { phase: 'offer', candidates, level: {}, correct: {} };
+  const order = computeOrder({ ...next.pub, prevOrder: next.pub.order }, Math.random);
+  const candidates = order.slice(QUIZ_FROM_RANK - 1);
+  const top = next.pub.teams[order[0]]!.score;
+  const gap = Object.fromEntries(candidates.map((t) => [t, top - next.pub.teams[t]!.score]));
+  next.pub.rescue = { phase: 'offer', candidates, level: {}, correct: {}, gap };
   return next;
 }
 
@@ -278,7 +281,10 @@ export function quizQueue(r: RescueState): TeamId[] {
   return challengers.sort((a, b) => rank(a) - rank(b));
 }
 
-/** 정산: 난도를 고르고 맞힌 함대만 QUIZ_REWARD 만큼 전진 (오답 벌칙 없음). skip 이면 아무도 받지 않고 이벤트 끝 */
+/** 맞히면 받을 거리: 1등과의 차이 × 난도 비율 (rescueReward) */
+export const rescueReward = (r: RescueState, t: TeamId, level: QuizLevel): number => quizReward(r.gap?.[t] ?? 0, level);
+
+/** 정산: 난도를 고르고 맞힌 함대만 1등과의 차이에 비례해 전진 (오답 벌칙 없음). skip 이면 아무도 받지 않고 이벤트 끝 */
 export function settleRescue(state: EngineState, skip = false): EngineState {
   const r = state.pub.rescue;
   if (r?.phase !== 'offer') return state;
@@ -288,8 +294,8 @@ export function settleRescue(state: EngineState, skip = false): EngineState {
     for (const t of r.candidates) {
       const level = r.level?.[t];
       if (!level || !r.correct?.[t]) continue;
-      rewards[t] = QUIZ_REWARD[level];
-      next.pub.teams[t]!.score += QUIZ_REWARD[level];
+      rewards[t] = rescueReward(r, t, level);
+      next.pub.teams[t]!.score += rewards[t]!;
     }
   }
   next.pub.rescue = { ...r, phase: 'done', rewards } satisfies RescueState;

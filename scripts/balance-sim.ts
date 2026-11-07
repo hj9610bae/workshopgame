@@ -109,7 +109,7 @@ function decide(s: EngineState, setup: Setup, d: number, skip: ReadonlySet<TeamI
     const e = (i: number) => Math.max(1, Math.round(est[i]));
     const last = d === DAYS;
     let card: Submission['card'] = 'basic';
-    let killable = open.filter((i) => e(i) <= (weak.has(t) ? WEAK_POWER : 2)).sort((a, b) => reward(b) - reward(a));
+    let killable = open.filter((i) => e(i) <= (weak.has(t) ? WEAK_POWER : strongTeams.has(t) ? STRONG_POWER : 2)).sort((a, b) => reward(b) - reward(a));
     if (!killable.length && h.blitz > 0) {
       const k = open.filter((i) => e(i) <= 6 && (reward(i) >= 5 || last)).sort((a, b) => reward(b) - reward(a));
       if (k.length) {
@@ -304,9 +304,12 @@ function rescueSim(n: number, dests: Dest[]) {
 const WEAK_POWER = 1;
 let attacker: TeamId | undefined;
 let weakTeams: ReadonlySet<TeamId> = new Set();
+/** 뒤처진 함대 단검 강화안 (comeback) */
+const STRONG_POWER = 3;
+let strongTeams: ReadonlySet<TeamId> = new Set();
 // 엔진은 그대로 두고 시뮬레이션 안에서만 함대별 단검 공격력을 바꿈:
 // resolveRound 는 각 함대 차례에 subs[t] 를 읽은 직후 그 함대의 공격을 적용하므로, 마지막으로 읽힌 함대를 공격 함대로 봄
-Object.defineProperty(CARDS.basic, 'power', { get: () => (attacker && weakTeams.has(attacker) ? WEAK_POWER : 2) });
+Object.defineProperty(CARDS.basic, 'power', { get: () => (attacker && weakTeams.has(attacker) ? WEAK_POWER : attacker && strongTeams.has(attacker) ? STRONG_POWER : 2) });
 const tracked = (subs: Partial<Record<TeamId, Submission>>) =>
   new Proxy(subs, { get: (o, k) => ((attacker = k as TeamId), o[k as TeamId]) });
 
@@ -506,7 +509,156 @@ function lootSim(n: number, plans: LootPlan[]) {
   }
 }
 
+/* ───── 역전 장치 (2026-11-07): 초반 전리품을 가져간 함대가 끝까지 앞서는 문제. 특수 무기·스핑크스 변형 비교 ───── */
+interface ComebackPlan {
+  name: string;
+  /** 전리품 받는 함대: break = 돌파 함대(지금) · last = 그 순간 꼴찌 · top2last = 돌파 함대가 1·2등이면 꼴찌에게 */
+  loot?: 'break' | 'last' | 'top2last' | 'everLast' | 'holdLast';
+  /** everLast·holdLast 때 받는 꼴찌: today = 그날 공격 순서 꼴찌(기본) · now = 돌파 순간 거리 꼴찌 */
+  lastBy?: 'today' | 'now';
+  /** 이 일차들 아침 순서 발표 뒤 꼴찌 함대(동점이면 순서 뒤)에게 특수 무기 1장 (보급선) */
+  supply?: number[];
+  /** 4·5등(아침 기준)의 단검 공격력 3 */
+  strong?: boolean;
+  /** 스핑크스: 언제(일차들), 대상 시작 등수, 보상 방식 */
+  quizDays?: number[];
+  quizFrom?: number;
+  /** fixed: 하·중·상 고정 해리 / gap: 1등과의 거리 차이 × 비율 (반올림) */
+  quiz?: { kind: 'fixed'; r: [number, number, number] } | { kind: 'gap'; r: [number, number, number] };
+  /** 전리품 구성 (기본 data.ts LOOT_ORDER) */
+  lootOrder?: SpecialCardId[];
+}
+function comebackSim(n: number, plans: ComebackPlan[]) {
+  const levels = [0.9, 0.6, 0.3];
+  const supplyDeck: SpecialCardId[] = ['blitz', 'practice', 'promo', 'hold'];
+  console.log(`\n■ 역전 장치 비교 (${n}판, 실제 배치, AI는 전리품을 일부러 노리지 않음)`);
+  console.log('  지표: 3일차 1·2등 우승 / 3일차 1·2등이 최종 1·2등 그대로 / 5일차 선두 우승 / 7일차 3~5등 우승 / 3일차까지 전리품 얻은 함대의 최종 2등 이내 / 선두 교체 / 1·2등 차 / 1·5등 차');
+  for (const plan of plans) {
+    const top3win: boolean[] = [], keep2: boolean[] = [], lead5: boolean[] = [], low7: boolean[] = [], earlyTop2: boolean[] = [], ch: number[] = [], gap: number[] = [], spread: number[] = [], fin: boolean[] = [];
+    for (let g = 0; g < n; g++) {
+      const base = shuffledSetup(rnd);
+      const ids = [...base.tables, ...base.queue];
+      const lo = plan.lootOrder ?? LOOT_ORDER;
+      const setup: Setup = { ...base, loot: Object.fromEntries(ids.slice(0, lo.length).map((id, i) => [id, lo[i]])) };
+      let s: EngineState = createGame(TEAM_IDS, setup);
+      let o3: TeamId[] = [], l5: TeamId | undefined, o7: TeamId[] = [], prev: TeamId | undefined, c = 0;
+      const early = new Set<TeamId>();
+      /** 전리품을 한 번이라도 받은 함대 (everLast) */
+      const ever = new Set<TeamId>();
+      const held = (t: TeamId) => Object.values(s.hands[t]!).some((x) => x > 0);
+      const give = (from: TeamId, to: TeamId, card: SpecialCardId) => {
+        if (from === to) return;
+        s.hands[from]![card] -= 1;
+        s.hands[to]![card] += 1;
+      };
+      const relocate = () => {
+        // 이번 단계 사건 중 전리품 사건: 같은 역경의 마지막 사건(가로채기)이 실제 받은 함대
+        const got = new Map<number, { team: TeamId; card: SpecialCardId }>();
+        for (const e of s.pub.events) if (e.loot && e.agenda && e.team) got.set(e.agenda, { team: e.team, card: e.loot });
+        for (const { team, card } of got.values()) {
+          const r = ranking(s.pub).map((x) => x.team);
+          const lastT = r[r.length - 1];
+          let to = team;
+          if (plan.loot === 'last') to = lastT;
+          else if (plan.loot === 'top2last' && r.indexOf(team) < 2) to = lastT;
+          else if (plan.loot === 'everLast' || plan.loot === 'holdLast') {
+            // 엔진이 이미 손에 넣어 줬으므로 이 카드를 뺀 상태로 '가지고 있나'를 봄
+            s.hands[team]![card] -= 1;
+            const already = plan.loot === 'everLast' ? ever.has(team) : held(team);
+            s.hands[team]![card] += 1;
+            if (already) to = plan.lastBy === 'now' ? lastT : s.pub.order[s.pub.order.length - 1];
+          }
+          give(team, to, card);
+          ever.add(to);
+          if (s.pub.round <= 3) early.add(to);
+        }
+      };
+      for (let d = 1; d <= DAYS; d++) {
+        s = startRound(s, rnd).state;
+        relocate();
+        if (plan.supply?.includes(d)) {
+          const lastT = s.pub.order[s.pub.order.length - 1];
+          s.hands[lastT]![supplyDeck[Math.floor(rnd() * supplyDeck.length)]] += 1;
+        }
+        s = beginSubmit(s, 0);
+        const morning = ranking(s.pub).map((x) => x.team);
+        strongTeams = new Set(plan.strong ? morning.slice(3) : []);
+        s = resolveRound(s, tracked(decide(s, setup, d))).state;
+        strongTeams = new Set();
+        attacker = undefined;
+        relocate();
+        if (d === 3) o3 = ranking(s.pub).map((x) => x.team);
+        if (d === 5) l5 = ranking(s.pub)[0].team;
+        if (d === RESCUE_DAY) o7 = ranking(s.pub).map((x) => x.team);
+        const q = plan.quiz ?? { kind: 'fixed', r: [3, 6, 12] };
+        if ((plan.quizDays ?? [RESCUE_DAY]).includes(d)) {
+          const r = ranking(s.pub);
+          const topScore = r[0].score;
+          for (const x of r.slice((plan.quizFrom ?? 3) - 1)) {
+            const k = Math.floor(rnd() * 3);
+            if (rnd() >= levels[k]) continue;
+            s.pub.teams[x.team]!.score += q.kind === 'fixed' ? q.r[k] : Math.round((topScore - x.score) * q.r[k]);
+          }
+        }
+        const lead = ranking(s.pub)[0].team;
+        if (d > 1 && lead !== prev) c++;
+        prev = lead;
+      }
+      const r = ranking(s.pub);
+      const final2 = r.slice(0, 2).map((x) => x.team);
+      top3win.push(o3.slice(0, 2).includes(r[0].team));
+      keep2.push(o3.slice(0, 2).every((t) => final2.includes(t)));
+      lead5.push(r[0].team === l5);
+      low7.push(o7.slice(2).includes(r[0].team));
+      for (const t of early) earlyTop2.push(final2.includes(t));
+      ch.push(c);
+      gap.push(r[0].score - r[1].score);
+      spread.push(r[0].score - r[4].score);
+      fin.push(!!s.pub.tables[3]?.done?.some((x) => x.agenda === FINAL_AGENDA));
+    }
+    console.log(`  ${plan.name.padEnd(44)} ${pct(top3win).padStart(4)} · ${pct(keep2).padStart(4)} · ${pct(lead5).padStart(4)} · ${pct(low7).padStart(4)} · ${pct(earlyTop2).padStart(4)} · ${f(mean(ch))}회 · ${f(mean(gap))} · ${f(mean(spread))} | 최종 결전 ${pct(fin)}`);
+  }
+}
+
 const mode = process.argv[2] ?? 'order';
+if (mode === 'comeback') {
+  const G = (a: number, b: number, c: number) => ({ kind: 'gap' as const, r: [a, b, c] as [number, number, number] });
+  const F = (a: number, b: number, c: number) => ({ kind: 'fixed' as const, r: [a, b, c] as [number, number, number] });
+  const L5: SpecialCardId[] = ['promo', 'hold', 'blitz', 'blitz', 'practice'];
+  const gap = G(1 / 3, 2 / 3, 1);
+  const plans: ComebackPlan[] = process.argv[4] === 'loot5' ? [
+    { name: '실제 플레이 v3.4 (5장, 고정 2·3·6)', lootOrder: L5, quiz: F(2, 3, 6) },
+    { name: '5장 + 스핑크스 차이 비례', lootOrder: L5, quiz: gap },
+    { name: '5장 · 얻은 적 있으면→오늘 꼴찌 · 고정 2·3·6', lootOrder: L5, loot: 'everLast', quiz: F(2, 3, 6) },
+    { name: '5장 · 얻은 적 있으면→오늘 꼴찌 · 차이 비례', lootOrder: L5, loot: 'everLast', quiz: gap },
+    { name: '5장 · 지금 들고 있으면→오늘 꼴찌 · 차이 비례', lootOrder: L5, loot: 'holdLast', quiz: gap },
+    { name: '5장 · 얻은 적 있으면→돌파 순간 꼴찌 · 차이 비례', lootOrder: L5, loot: 'everLast', lastBy: 'now', quiz: gap },
+    { name: '(참고) 5장 · 1·2등 돌파면→꼴찌 · 차이 비례', lootOrder: L5, loot: 'top2last', quiz: gap },
+    { name: '(참고) 10장 v3.5 (고정 3·6·12)' },
+  ] : [
+    { name: '실제 플레이 v3.4 (전리품 5장, 2·3·6)', lootOrder: ['promo', 'hold', 'blitz', 'blitz', 'practice'], quiz: F(2, 3, 6) },
+    { name: '지금 v3.5 (돌파 함대 전리품, 7일차 3~5등 3·6·12)' },
+    { name: '[무기] 전리품은 그 순간 꼴찌 함대에게', loot: 'last' },
+    { name: '[무기] 1·2등이 돌파하면 전리품은 꼴찌에게', loot: 'top2last' },
+    { name: '[무기] 보급선: 2~7일차 아침 꼴찌에게 1장', supply: [2, 3, 4, 5, 6, 7] },
+    { name: '[무기] 보급선: 3·5일차 아침 꼴찌에게 1장', supply: [3, 5] },
+    { name: '[무기] 4·5등 단검 3', strong: true },
+    { name: '[스핑크스] 2~5등 대상 3·6·12', quizFrom: 2 },
+    { name: '[스핑크스] 4·7일차 두 번 3·6·12', quizDays: [4, 7] },
+    { name: '[스핑크스] 1등과 차이의 ¼·½·전부', quiz: G(0.25, 0.5, 1) },
+    { name: '[스핑크스] 1등과 차이의 ⅓·⅔·전부', quiz: G(1 / 3, 2 / 3, 1) },
+    { name: '[스핑크스] 2~5등 차이의 ⅓·⅔·전부', quizFrom: 2, quiz: G(1 / 3, 2 / 3, 1) },
+    { name: '[스핑크스] 4·7일차 차이의 ¼·½·전부', quizDays: [4, 7], quiz: G(0.25, 0.5, 1) },
+    { name: '[조합] 1·2등 전리품→꼴찌 + 차이 ⅓·⅔·전부', loot: 'top2last', quiz: G(1 / 3, 2 / 3, 1) },
+    { name: '[조합] 1·2등 전리품→꼴찌 + 4·7일 차이 ¼·½·전부', loot: 'top2last', quizDays: [4, 7], quiz: G(0.25, 0.5, 1) },
+    { name: '[조합] 보급선 3·5일 + 차이 ⅓·⅔·전부', supply: [3, 5], quiz: G(1 / 3, 2 / 3, 1) },
+    { name: '[조합] 1·2등 전리품→꼴찌 + 2~5등 차이 ⅓·⅔·전부', loot: 'top2last', quizFrom: 2, quiz: G(1 / 3, 2 / 3, 1) },
+    { name: '(참고) 스핑크스 없음', quizDays: [] },
+    { name: '(참고) 지금 + 고정 4·8·16', quiz: F(4, 8, 16) },
+  ];
+  comebackSim(Number(process.argv[3] ?? 3000), plans);
+  process.exit(0);
+}
 if (mode === 'loot') {
   const cur: SpecialCardId[] = ['promo', 'hold', 'blitz', 'blitz', 'practice'];
   const P = (...a: SpecialCardId[]) => a;

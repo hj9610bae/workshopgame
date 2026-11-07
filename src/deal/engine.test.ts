@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { FINAL_AGENDA, FINAL_OPEN_ROUND, QUIZ_REWARD, QUIZ_THINK_SECONDS, RESCUE_ROUND, ROUNDS, START_DISTANCE, TEAM_IDS, distanceOf, type TeamId } from './data';
-import { beginSubmit, canOpenRescue, createGame, finish, markQuiz, openRescue, quizQueue, ranking, resolveRound, scout, settleRescue, startQuizTimer, startRound, type EngineState } from './engine';
-import type { Submission } from './types';
+import { FINAL_AGENDA, FINAL_OPEN_ROUND, QUIZ_THINK_SECONDS, RESCUE_ROUND, ROUNDS, START_DISTANCE, TEAM_IDS, distanceOf, type TeamId } from './data';
+import { beginSubmit, canOpenRescue, createGame, finish, markQuiz, openRescue, quizQueue, ranking, rescueReward, resolveRound, scout, settleRescue, startQuizTimer, startRound, type EngineState } from './engine';
+import type { RescueState, Submission } from './types';
 
 /** shuffle 이 원래 순서를 유지하도록 하는 난수 → 1라운드 순서 A,B,C,D,E */
 const keepOrder = () => 0.999;
@@ -365,6 +365,8 @@ describe('고국과의 거리', () => {
   });
 });
 
+const QUIZ_LEVELS_OF = (r: RescueState, t: TeamId) => (['low', 'mid', 'high'] as const).map((l) => rescueReward(r, t, l));
+
 describe('7일차 특별 이벤트: 스핑크스 (구조선 퀴즈)', () => {
   /** RESCUE_ROUND 공개가 끝난 상태. A가 1등, B가 2등, C·D·E는 같은 거리 */
   function day7(): EngineState {
@@ -383,12 +385,22 @@ describe('7일차 특별 이벤트: 스핑크스 (구조선 퀴즈)', () => {
     expect(canOpenRescue({ ...s, pub: { ...s.pub, revealed: 0 } })).toBe(false);
     const o = openRescue(s);
     const tied = s.pub.order.filter((t) => t !== 'A' && t !== 'B').reverse();
-    expect(o.pub.rescue).toEqual({ phase: 'offer', candidates: tied, level: {}, correct: {} });
+    // 1등(A, 20)과의 거리 차이를 등장 때 기록
+    expect(o.pub.rescue).toEqual({ phase: 'offer', candidates: tied, level: {}, correct: {}, gap: { C: 10, D: 10, E: 10 } });
     expect(canOpenRescue(o)).toBe(false);
     expect(markQuiz(o, 'A', { level: 'low' })).toBe(o);
   });
 
-  it('맞힌 함대만 난도별 보상(하 3 · 중 6 · 상 12) 전진, 오답은 벌칙 없음, 모두 계속 항해', () => {
+  it('보상 = 1등과의 차이 × ⅓ · ⅔ · 전부 (반올림, 최소 1해리)', () => {
+    const r = openRescue(day7()).pub.rescue!;
+    expect(QUIZ_LEVELS_OF(r, 'C')).toEqual([3, 7, 10]);
+    const tie = { ...r, gap: { C: 0, D: 2, E: 13 } };
+    expect(QUIZ_LEVELS_OF(tie, 'C')).toEqual([1, 1, 1]);
+    expect(QUIZ_LEVELS_OF(tie, 'D')).toEqual([1, 1, 2]);
+    expect(QUIZ_LEVELS_OF(tie, 'E')).toEqual([4, 9, 13]);
+  });
+
+  it('맞힌 함대만 1등과의 차이에 비례해 전진, 오답은 벌칙 없음, 모두 계속 항해', () => {
     const base = day7();
     let s = openRescue(base);
     const [c3, c4, c5] = s.pub.rescue!.candidates;
@@ -398,14 +410,14 @@ describe('7일차 특별 이벤트: 스핑크스 (구조선 퀴즈)', () => {
     // 문제 공개는 난도 하부터
     expect(quizQueue(s.pub.rescue!)).toEqual([c4, c5, c3]);
     const done = settleRescue(s);
-    expect(done.pub.rescue!.rewards).toEqual({ [c3]: QUIZ_REWARD.high, [c5]: QUIZ_REWARD.mid });
-    expect(done.pub.teams[c3]!.score - base.pub.teams[c3]!.score).toBe(12);
+    expect(done.pub.rescue!.rewards).toEqual({ [c3]: 10, [c5]: 7 });
+    expect(done.pub.teams[c3]!.score).toBe(base.pub.teams.A!.score);
     expect(done.pub.teams[c4]!.score).toBe(base.pub.teams[c4]!.score);
-    expect(done.pub.teams[c5]!.score - base.pub.teams[c5]!.score).toBe(6);
+    expect(done.pub.teams[c5]!.score - base.pub.teams[c5]!.score).toBe(7);
     const d8 = startRound(done).state;
     expect(d8.pub.order).toHaveLength(5);
-    // 상 12해리를 맞힌 3등이 1등(A)을 앞질러 8일차 첫 순번 (역전 기회)
-    expect(d8.pub.order[0]).toBe(c3);
+    // 상을 맞힌 3등은 1등(A)과 같은 거리, 2등(B)을 앞지름 (역전 기회)
+    expect(d8.pub.order.indexOf(c3)).toBeLessThan(d8.pub.order.indexOf('B'));
   });
 
   it('생각 시간 타이머, 건너뛰면 아무도 전진하지 않음', () => {
